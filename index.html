@@ -404,12 +404,24 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
    إعداد Firebase: الصق قيم مشروعك بين علامتي التنصيص (اختياري —
    تقدر كمان تلصقها من داخل البرنامج: الإعدادات > ربط المزامنة)
 ============================================================ */
-const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  appId: ""
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyA2edDs93CZ6_3_oQeLaklmPDNkMg_YfF8",
+  authDomain: "jard-86baf.firebaseapp.com",
+  databaseURL: "https://jard-86baf-default-rtdb.firebaseio.com",
+  projectId: "jard-86baf",
+  storageBucket: "jard-86baf.firebasestorage.app",
+  messagingSenderId: "23420440258",
+  appId: "1:23420440258:web:0122e1ab77ff53ab17f55b"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 };
 /* ============================================================ */
 

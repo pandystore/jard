@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> إدارة كراتين الأحذية</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; }
+        .sidebar { width: 280px; height: 100vh; position: fixed; right: 0; top: 0; background: #fff; border-left: 1px solid #e2e8f0; z-index: 50; }
+        .main-content { margin-right: 280px; padding: 2rem; }
+        
+        .glow-hover { position: relative; transition: all 0.3s ease; }
+        .glow-hover:hover { color: #f97316; text-shadow: 0 0 10px rgba(249, 115, 22, 0.3); transform: translateX(-5px); }
+
+        .stat-card { background: #fff; border: 1px solid #e2e8f0; padding: 0.8rem; border-radius: 1rem; text-align: center; transition: all 0.3s; }
+        
+        .table-container { max-height: 70vh; overflow: auto; border-radius: 0 0 1rem 1rem; }
+        
+        thead th { 
+            position: sticky; 
+            top: 0; 
+            background-color: #1f2937 !important; 
+            color: white !important;
+            z-index: 10; 
+            box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.05); 
+        }
+        thead th input[type="checkbox"] { accent-color: white; }
+
+        .tight-table td, .tight-table th { padding: 7px 16px !important; }
+
+        tbody tr:nth-child(odd) { background-color: #ffffff; }
+        tbody tr:nth-child(even) { background-color: #f1f5f9; }
+        tbody tr:hover { background-color: #fff7ed !important; }
+
+        .editable-cell:focus { 
+            outline: 2px solid #f97316; 
+            background: #fff7ed; 
+            border-radius: 4px;
+        }
+
+        .tab-btn { padding: 12px 24px; cursor: pointer; border-bottom: 3px solid transparent; transition: 0.3s; font-weight: bold; color: #64748b; display: flex; align-items: center; gap: 8px; }
+        .tab-btn.active { border-color: #f97316; color: #f97316; background: rgba(249, 115, 22, 0.05); }
+        .setting-section { display: none; padding: 25px 0; }
+        .setting-section.active { display: block; }
+        .style-btn { width: 40px; height: 40px; border: 1px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; background: white; transition: 0.2s; cursor: pointer; }
+        .style-btn.active { background: #f97316; color: white; border-color: #ea580c; }
+
+        .main-logo { width: 120px; height: auto; }
+
+        .color-badge { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+        .color-badge button { color: #ef4444; }
+
+        /* ستايل الفلتر الجديد */
+        .filter-bar { background: white; padding: 15px; border: 1px solid #e2e8f0; border-bottom: none; border-radius: 1rem 1rem 0 0; }
+        .filter-btn { padding: 6px 15px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: 0.2s; border: 1px solid #e2e8f0; }
+        .filter-btn.active { background: #f97316; color: white; border-color: #ea580c; }
+
+        .mobile-menu-btn, .sidebar-close, .sidebar-overlay { display: none; }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: min(85vw, 320px);
+                height: 100vh;
+                position: fixed;
+                right: 0;
+                top: 0;
+                border-left: 1px solid #e2e8f0;
+                transform: translateX(105%);
+                transition: transform 0.3s ease;
+                z-index: 90;
+                box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
+            }
+            .sidebar.mobile-open { transform: translateX(0); }
+            .main-content { margin-right: 0; padding: 4.5rem 1rem 1rem; width: 100%; min-width: 0; }
+            .mobile-menu-btn {
+                display: flex;
+                position: fixed;
+                right: 1rem;
+                top: 1rem;
+                z-index: 70;
+                width: 48px;
+                height: 48px;
+                align-items: center;
+                justify-content: center;
+                background: #1f2937;
+                color: white;
+                border-radius: 14px;
+                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+            }
+            .sidebar-close { display: flex; color: #ef4444; font-size: 1.25rem; }
+            .sidebar-overlay {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.45);
+                opacity: 0;
+                visibility: hidden;
+                transition: 0.3s;
+                z-index: 80;
+            }
+            .sidebar-overlay.active { opacity: 1; visibility: visible; }
+            #data-table { min-width: 650px; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+
+    <div id="auth-screen" class="fixed inset-0 z-[100] bg-gray-100 flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-xl border border-gray-200 p-8 text-center">
+            <img src="https://i.postimg.cc/tgHQ2YfK/logo.png" alt="Logo" class="w-28 mx-auto mb-5">
+            <h2 class="text-2xl font-extrabold text-gray-800 mb-1">تسجيل الدخول</h2>
+            <p class="text-xs text-gray-400 mb-6">أدخل اسم المستخدم وكلمة المرور</p>
+            <div class="space-y-3 text-right">
+                <div><label class="block text-xs font-bold text-gray-500 mb-1">اسم المستخدم</label><input id="auth-username" type="text" autocomplete="username" value="admin" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-orange-500" placeholder="admin"></div>
+                <div><label class="block text-xs font-bold text-gray-500 mb-1">كلمة المرور</label><input id="auth-password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter') loginUser()" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-orange-500" placeholder="كلمة المرور"></div>
+            </div>
+            <div id="auth-message" class="hidden mt-4 p-3 rounded-xl text-xs font-bold"></div>
+            <button id="login-button" onclick="loginUser()" class="w-full mt-5 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition"><i class="fa-solid fa-right-to-bracket ml-2"></i>دخول</button>
+        </div>
+    </div>
+
+    <button class="mobile-menu-btn" onclick="openMobileSidebar()" aria-label="فتح القائمة"><i class="fa-solid fa-bars text-xl"></i></button>
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
+    <aside id="app-sidebar" class="sidebar flex flex-col p-6 overflow-y-auto">
+        <div class="flex justify-between items-center mb-2">
+            <button onclick="toggleFullScreen()" class="text-gray-400 hover:text-orange-500 transition-colors" title="ملء الشاشة">
+                <i id="fs-icon" class="fa-solid fa-expand text-xl"></i>
+            </button>
+            <button onclick="closeMobileSidebar()" class="sidebar-close" aria-label="إغلاق القائمة"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="mb-8 text-center">
+            <div class="flex justify-center mb-4">
+                <img id="main-logo" src="https://i.postimg.cc/tgHQ2YfK/logo.png" alt="Logo" class="main-logo">
+            </div>
+            <h1 class="text-xl font-800 text-gray-800 glow-hover">إدارة الكراتين</h1>
+            <p class="text-xs text-gray-400 mt-1"> بيمبو لأحذية الأطفال</p>
+        </div>
+
+        <div class="space-y-3 mb-8" id="stats"></div>
+
+        <div class="mt-auto space-y-2">
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3">
+                <div id="user-email" class="text-[10px] text-gray-500 truncate mb-2 text-center"></div>
+                <button onclick="logoutUser()" class="w-full text-red-500 hover:bg-red-50 py-2 rounded-lg flex items-center justify-center gap-2 text-xs font-bold transition"><i class="fa-solid fa-arrow-right-from-bracket"></i>تسجيل الخروج</button>
+            </div>
+            <button onclick="openSettings()" class="w-full bg-gray-800 hover:bg-black text-white py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition">
+                <i class="fa-solid fa-gear"></i> الإعدادات
+            </button>
+
+            <button id="desktop-notification-btn" onclick="toggleDesktopNotifications()" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-600 py-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition mb-4">
+                <i class="fa-solid fa-bell"></i><span>تفعيل إشعارات سطح المكتب</span>
+            </button>
+            
+            <button onclick="printSelectedLabels()" class="w-full bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition">
+                <i class="fa-solid fa-check-double"></i> طباعة المحدد
+            </button>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="deleteSelected()" class="bg-red-100 hover:bg-red-200 text-red-600 py-3 rounded-xl flex items-center justify-center gap-1 text-xs font-bold transition">
+                    <i class="fa-solid fa-minus-circle"></i> حذف المحدد
+                </button>
+                <button onclick="printLabels()" class="bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl flex items-center justify-center gap-1 text-xs font-bold transition">
+                    <i class="fa-solid fa-qrcode"></i> طباعة الكل
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="importExcel()" class="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition">
+                    <i class="fa-solid fa-file-excel"></i> استيراد
+                </button>
+                <button onclick="exportExcel()" class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition">
+                    <i class="fa-solid fa-download"></i> تصدير
+                </button>
+            </div>
+
+            <button onclick="deleteAll()" class="w-full text-red-500 hover:bg-red-50 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition">
+                <i class="fa-solid fa-trash"></i> حذف الكل
+            </button>
+        </div>
+    </aside>
+
+    <main class="main-content flex-1">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <div class="md:col-span-3">
+                    <label class="block text-xs font-bold text-gray-500 mb-2 glow-hover uppercase">كود الصنف</label>
+                    <input id="code" type="text" onkeydown="handleEnter(event, 'color-input')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:bg-white focus:border-orange-500 outline-none transition-all" placeholder="ادخل كود الصنف هنا">
+                </div>
+                <div class="md:col-span-6">
+                    <label class="block text-xs font-bold text-gray-500 mb-2 glow-hover uppercase">اللون</label>
+                    <div class="flex gap-2">
+                        <input id="color-input" type="text" onkeydown="handleColorEnter(event)" class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:bg-white focus:border-orange-500 outline-none transition-all" placeholder="ادخل اللون هنا ">
+                        <button onclick="addColor()" class="bg-gray-800 text-white px-4 rounded-xl hover:bg-black transition-all">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="md:col-span-3">
+                    <button id="addBtn" onclick="addData()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-100 transition-all">
+                        إضافة البيانات
+                    </button>
+                </div>
+            </div>
+            <div id="selected-colors" class="flex flex-wrap gap-2 mt-4"></div>
+        </div>
+
+        <div class="filter-bar flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="relative w-full md:w-1/3">
+                <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input type="text" id="tableSearch" oninput="applyFilters()" class="w-full pr-10 pl-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:border-orange-500 outline-none" placeholder="بحث بكود، لون، أو مقاس...">
+            </div>
+            <div class="flex flex-wrap gap-2 justify-center" id="categoryFilters"></div>
+        </div>
+
+        <div class="bg-white rounded-b-2xl shadow-sm border border-gray-200 table-container">
+            <table class="w-full text-right tight-table" id="data-table">
+                <thead>
+                    <tr>
+                        <th class="w-10"><input type="checkbox" id="select-all" onclick="toggleSelectAll(this)" class="rounded"></th>
+                        <th class="text-sm font-700">كود الصنف</th>
+                        <th class="text-sm font-700">اللون</th>
+                        <th class="text-sm font-700">المقاس</th>
+                        <th class="text-center text-sm font-700">إجراء</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50" id="table-body"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        let defaultConfig = {
+            codeF: { font: 'Cairo', size: 25, bold: true, underline: false },
+            colorF: { font: 'Cairo', size: 20, bold: true, underline: false },
+            sizeF: { font: 'Cairo', size: 30, bold: true, underline: false },
+            margins: { top: 0.15, bottom: 0.15, right: 0.15, left: 0.15 },
+            ranges: { r1: 'صغير', r2: 'وسط', r3: 'كبير', r4: 'محير' },
+            rangeIcons: { r1: 'fa-child', r2: 'fa-user-tie', r3: 'fa-person', r4: 'fa-child-reaching' },
+            rangeMins: { r1: 22, r2: 26, r3: 32, r4: 37 },
+            rangeMaxs: { r1: 26, r2: 31, r3: 36, r4: 41 },
+            rangeEnabled: { r1: true, r2: true, r3: true, r4: true },
+            appLogo: 'https://i.postimg.cc/tgHQ2YfK/logo.png',
+            desktopNotifications: true,
+            deletePassword: '27072350'
+        };
+
+        const windowsFonts = ['Cairo', 'Arial', 'Times New Roman', 'Tahoma', 'Courier New', 'Segoe UI', 'Impact', 'Verdana', 'Georgia', 'Comic Sans MS', 'Calibri', 'Simplified Arabic', 'Traditional Arabic', 'Andalus'];
+        let availableSystemFonts = [...windowsFonts];
+        const availableIcons = [{ id: 'fa-child', name: 'طفل صغير' }, { id: 'fa-child-reaching', name: 'طفل صغير (حركة)' }, { id: 'fa-person', name: 'رجل صغير' }, { id: 'fa-venus', name: 'امرأة' }, { id: 'fa-user-tie', name: 'رسمي صغير' }, { id: 'fa-venus-mars', name: 'مختلط' }, { id: 'fa-shoe-prints', name: 'أثر حذاء' }];
+
+        function mergeConfig(saved = {}) {
+            return {
+                ...defaultConfig,
+                ...saved,
+                codeF: { ...defaultConfig.codeF, ...(saved.codeF || {}) },
+                colorF: { ...defaultConfig.colorF, ...(saved.colorF || {}) },
+                sizeF: { ...defaultConfig.sizeF, ...(saved.sizeF || {}) },
+                margins: { ...defaultConfig.margins, ...(saved.margins || {}) },
+                ranges: { ...defaultConfig.ranges, ...(saved.ranges || {}) },
+                rangeIcons: { ...defaultConfig.rangeIcons, ...(saved.rangeIcons || {}) },
+                rangeMins: { ...defaultConfig.rangeMins, ...(saved.rangeMins || {}) },
+                rangeMaxs: { ...defaultConfig.rangeMaxs, ...(saved.rangeMaxs || {}) },
+                rangeEnabled: { ...defaultConfig.rangeEnabled, ...(saved.rangeEnabled || {}) }
+            };
+        }
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBR88UW-y_-Zfi9ttHe3xFBzBuNyEppR40",
+            authDomain: "size-413f8.firebaseapp.com",
+            databaseURL: "https://size-413f8-default-rtdb.firebaseio.com",
+            projectId: "size-413f8",
+            storageBucket: "size-413f8.firebasestorage.app",
+            messagingSenderId: "659257897313",
+            appId: "1:659257897313:web:8e61c0a53640a75eb1d520"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        let currentUser = null;
+        let unsubscribeData = null;
+        let cloudSaveQueue = Promise.resolve();
+        let config = mergeConfig();
+        let data = [];
+        let temporaryColors = [];
+        let currentFilterCategory = 'all';
+
+        function openMobileSidebar() {
+            document.getElementById('app-sidebar').classList.add('mobile-open');
+            document.getElementById('sidebar-overlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMobileSidebar() {
+            document.getElementById('app-sidebar').classList.remove('mobile-open');
+            document.getElementById('sidebar-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                document.getElementById('fs-icon').classList.replace('fa-expand', 'fa-compress');
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                    document.getElementById('fs-icon').classList.replace('fa-compress', 'fa-expand');
+                }
+            }
+        }
+
+        function handleEnter(e, nextId) { if (e.key === "Enter") { e.preventDefault(); document.getElementById(nextId).focus(); } }
+        function handleColorEnter(e) { if (e.key === "Enter") { e.preventDefault(); addColor(); } }
+
+        async function addColor() {
+            const input = document.getElementById('color-input');
+            const color = input.value.trim();
+            if (!color) return;
+
+            const selection = await showRangePopup();
+            if (!selection) {
+                input.focus();
+                return;
+            }
+
+            temporaryColors.push({ color, range: selection.range, label: selection.label });
+            input.value = '';
+            renderTempColors();
+            input.focus();
+        }
+
+        function removeTempColor(index) { temporaryColors.splice(index, 1); renderTempColors(); }
+
+        async function editTempColorRange(index) {
+            const item = temporaryColors[index];
+            const enabledRanges = Object.entries(config.ranges).filter(([key]) => config.rangeEnabled[key]);
+            const currentKey = enabledRanges.find(([key]) => `${config.rangeMins[key]}-${config.rangeMaxs[key]}` === item.range)?.[0];
+
+            const { value: updated } = await Swal.fire({
+                title: 'تعديل اللون والفئة والمقاسات',
+                width: '600px',
+                html: `
+                    <div class="text-right p-2">
+                        <label class="block text-xs font-bold text-gray-500 mb-2">اللون</label>
+                        <input type="text" id="edit-temp-color" class="w-full p-3 border rounded-xl mb-4 focus:border-orange-500 outline-none">
+                        <label class="block text-xs font-bold text-gray-500 mb-2">الفئة والمقاسات</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            ${enabledRanges.map(([key, label], i) => `
+                                <label class="border-2 rounded-xl p-3 cursor-pointer hover:border-orange-500 flex items-center gap-3">
+                                    <input type="radio" name="edit-temp-range" value="${key}" class="accent-orange-500" ${(currentKey ? key === currentKey : i === 0) ? 'checked' : ''}>
+                                    <i class="fa-solid ${config.rangeIcons[key]} text-orange-500"></i>
+                                    <span><b class="block text-sm">${label}</b><small class="text-gray-400">من ${config.rangeMins[key]} إلى ${config.rangeMaxs[key]}</small></span>
+                                </label>`).join('')}
+                        </div>
+                    </div>`,
+                confirmButtonText: 'حفظ التعديل',
+                cancelButtonText: 'إلغاء',
+                showCancelButton: true,
+                confirmButtonColor: '#f97316',
+                didOpen: () => {
+                    const colorInput = document.getElementById('edit-temp-color');
+                    colorInput.value = item.color;
+                    colorInput.focus();
+                    colorInput.select();
+                },
+                preConfirm: () => {
+                    const color = document.getElementById('edit-temp-color').value.trim();
+                    const selected = document.querySelector('input[name="edit-temp-range"]:checked');
+                    if (!color) {
+                        Swal.showValidationMessage('برجاء إدخال اللون');
+                        return false;
+                    }
+                    if (!selected) {
+                        Swal.showValidationMessage('برجاء اختيار الفئة والمقاسات');
+                        return false;
+                    }
+                    const key = selected.value;
+                    return { color, label: config.ranges[key], range: `${config.rangeMins[key]}-${config.rangeMaxs[key]}` };
+                }
+            });
+
+            if (!updated) return;
+            temporaryColors[index] = updated;
+            renderTempColors();
+        }
+
+        function renderTempColors() {
+            const container = document.getElementById('selected-colors');
+            container.innerHTML = temporaryColors.map((item, i) => `
+                <div class="color-badge">
+                    <span>${item.color}</span>
+                    <span class="text-orange-600">${item.label} (${item.range.replace('-', ' - ')})</span>
+                    <button onclick="editTempColorRange(${i})" style="color:#2563eb" title="تعديل اللون والفئة والمقاسات"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="removeTempColor(${i})" title="حذف اللون"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            `).join('');
+        }
+
+        async function syncDataToCloud() {
+            if (!currentUser) return;
+            const collection = db.collection('users').doc(currentUser.uid).collection('items');
+            const existingSnapshot = await collection.get();
+            const existingMap = new Map(existingSnapshot.docs.map(doc => [doc.id, doc.data()]));
+            const existingIds = new Set(existingMap.keys());
+
+            data.forEach(item => {
+                if (!item.id) item.id = collection.doc().id;
+            });
+            const currentIds = new Set(data.map(item => item.id));
+            const writes = [];
+
+            existingIds.forEach(id => {
+                if (!currentIds.has(id)) writes.push({ type: 'delete', ref: collection.doc(id) });
+            });
+            data.forEach((item, order) => {
+                const value = { code: String(item.code), color: String(item.color), size: String(item.size), order };
+                const oldValue = existingMap.get(item.id);
+                const changed = !oldValue || oldValue.code !== value.code || oldValue.color !== value.color || oldValue.size !== value.size || oldValue.order !== value.order;
+                if (changed) writes.push({ type: 'set', ref: collection.doc(item.id), value });
+            });
+
+            for (let offset = 0; offset < writes.length; offset += 450) {
+                const batch = db.batch();
+                writes.slice(offset, offset + 450).forEach(write => {
+                    if (write.type === 'delete') batch.delete(write.ref);
+                    else batch.set(write.ref, write.value);
+                });
+                await batch.commit();
+            }
+        }
+
+        function saveDataToCloud() {
+            cloudSaveQueue = cloudSaveQueue.then(() => syncDataToCloud()).catch(error => {
+                console.error(error);
+                showToast('تعذر حفظ البيانات على Firebase', 'error');
+            });
+            return cloudSaveQueue;
+        }
+
+        async function saveConfig() {
+            if (!currentUser) return;
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('settings').doc('main').set(config);
+            } catch (error) {
+                console.error(error);
+                showToast('تعذر حفظ الإعدادات على Firebase', 'error');
+            }
+        }
+
+        function applyAppLogo() {
+            const logo = document.getElementById('main-logo');
+            if (logo) logo.src = config.appLogo || defaultConfig.appLogo;
+        }
+
+        function handleLogoUpload(input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('برجاء اختيار ملف صورة صالح', 'error');
+                input.value = '';
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('حجم الشعار يجب ألا يتجاوز 2 ميجابايت', 'error');
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = event => {
+                const image = new Image();
+                image.onload = () => {
+                    const maxSize = 300;
+                    const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(image.width * scale));
+                    canvas.height = Math.max(1, Math.round(image.height * scale));
+                    const context = canvas.getContext('2d');
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    const logoData = canvas.toDataURL('image/png');
+                    const preview = document.getElementById('logo-preview');
+                    preview.src = logoData;
+                    preview.dataset.logo = logoData;
+                };
+                image.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetLogoPreview() {
+            const preview = document.getElementById('logo-preview');
+            if (!preview) return;
+            preview.src = defaultConfig.appLogo;
+            preview.dataset.logo = defaultConfig.appLogo;
+            const input = document.getElementById('logo-file');
+            if (input) input.value = '';
+        }
+        
+        function isDesktopDevice() {
+            return window.matchMedia('(pointer: fine)').matches && window.innerWidth > 768;
+        }
+
+        function sendDesktopNotification(message, type = 'success') {
+            if (!isDesktopDevice() || !config.desktopNotifications || !('Notification' in window) || Notification.permission !== 'granted') return;
+            try {
+                const notification = new Notification(type === 'error' ? 'تنبيه — إدارة الكراتين' : 'إدارة الكراتين', {
+                    body: message,
+                    icon: config.appLogo || defaultConfig.appLogo,
+                    badge: config.appLogo || defaultConfig.appLogo,
+                    tag: 'shoe-box-manager',
+                    renotify: true
+                });
+                notification.onclick = () => { window.focus(); notification.close(); };
+                setTimeout(() => notification.close(), 6000);
+            } catch (error) {
+                console.error('Desktop notification error:', error);
+            }
+        }
+
+        function updateNotificationButton() {
+            const button = document.getElementById('desktop-notification-btn');
+            if (!button) return;
+            const span = button.querySelector('span');
+            const icon = button.querySelector('i');
+            const active = config.desktopNotifications && 'Notification' in window && Notification.permission === 'granted';
+            span.textContent = active ? 'إشعارات سطح المكتب مفعلة' : 'تفعيل إشعارات سطح المكتب';
+            icon.className = active ? 'fa-solid fa-bell text-green-600' : 'fa-solid fa-bell';
+            button.classList.toggle('bg-green-50', active);
+            button.classList.toggle('text-green-600', active);
+            button.classList.toggle('bg-blue-50', !active);
+            button.classList.toggle('text-blue-600', !active);
+        }
+
+        async function toggleDesktopNotifications() {
+            if (!isDesktopDevice()) {
+                Swal.fire({ icon: 'info', title: 'إشعارات سطح المكتب', text: 'هذه الخاصية مخصصة لأجهزة الكمبيوتر.' });
+                return;
+            }
+            if (!('Notification' in window)) {
+                Swal.fire({ icon: 'error', title: 'غير مدعوم', text: 'المتصفح الحالي لا يدعم إشعارات سطح المكتب.' });
+                return;
+            }
+
+            if (config.desktopNotifications && Notification.permission === 'granted') {
+                config.desktopNotifications = false;
+                await saveConfig();
+                updateNotificationButton();
+                showToast('تم إيقاف إشعارات سطح المكتب');
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                config.desktopNotifications = true;
+                await saveConfig();
+                updateNotificationButton();
+                showToast('تم تفعيل إشعارات سطح المكتب');
+            } else {
+                config.desktopNotifications = false;
+                await saveConfig();
+                updateNotificationButton();
+                Swal.fire({ icon: 'warning', title: 'لم يتم السماح بالإشعارات', text: 'اسمح بالإشعارات للموقع من إعدادات المتصفح ثم حاول مرة أخرى.' });
+            }
+        }
+
+        function showToast(msg, icon = "success") { 
+            const Toast = Swal.mixin({ toast: true, position: "top-start", showConfirmButton: false, timer: 3000, timerProgressBar: true }); 
+            Toast.fire({ icon: icon, title: msg });
+            sendDesktopNotification(msg, icon);
+        }
+
+        // منطق الفلترة والبحث
+        function renderCategoryFilters() {
+            const container = document.getElementById('categoryFilters');
+            if (!container) return;
+            container.innerHTML = `
+                <button onclick="filterByCategory('all', this)" class="filter-btn ${currentFilterCategory === 'all' ? 'active' : ''}">الكل</button>
+                ${[1,2,3,4].map(i => {
+                    const key = 'r' + i;
+                    return `<button onclick="filterByCategory('${key}', this)" class="filter-btn ${currentFilterCategory === key ? 'active' : ''}">${config.ranges[key]}</button>`;
+                }).join('')}`;
+        }
+
+        function filterByCategory(cat, btn) {
+            currentFilterCategory = cat;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('tableSearch').value.toLowerCase();
+            const filteredData = data.filter(item => {
+                const matchSearch = item.code.toLowerCase().includes(searchTerm) || 
+                                   item.color.toLowerCase().includes(searchTerm) || 
+                                   item.size.toLowerCase().includes(searchTerm);
+                
+                let matchCat = true;
+                if (currentFilterCategory !== 'all') {
+                    const s = parseInt(item.size);
+                    const min = Number(config.rangeMins[currentFilterCategory]);
+                    const max = Number(config.rangeMaxs[currentFilterCategory]);
+                    matchCat = (s >= min && s <= max);
+                }
+                return matchSearch && matchCat;
+            });
+            renderTable(filteredData);
+        }
+
+        function changeTab(tab) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.setting-section').forEach(s => s.classList.remove('active')); document.getElementById('t-' + tab).classList.add('active'); document.getElementById('s-' + tab).classList.add('active'); }
+        function toggleStyleBit(obj, prop, btnId) { config[obj][prop] = !config[obj][prop]; document.getElementById(btnId).classList.toggle('active'); liveUpdate(); }
+
+        function liveUpdate() {
+            const pCode = document.getElementById('p-code');
+            const pColor = document.getElementById('p-color');
+            const pSize = document.getElementById('p-size');
+            const box = document.getElementById('box-preview');
+            if(!pCode) return;
+            pCode.style.fontFamily = `"${document.getElementById('in-code-f').value}", Cairo, Arial, sans-serif`;
+            pCode.style.fontSize = document.getElementById('in-code-s').value + 'px';
+            pCode.style.fontWeight = config.codeF.bold ? '800' : '400';
+            pCode.style.textDecoration = config.codeF.underline ? 'underline' : 'none';
+            pColor.style.fontFamily = `"${document.getElementById('in-color-f').value}", Cairo, Arial, sans-serif`;
+            pColor.style.fontSize = document.getElementById('in-color-s').value + 'px';
+            pColor.style.fontWeight = config.colorF.bold ? '800' : '400';
+            pColor.style.textDecoration = config.colorF.underline ? 'underline' : 'none';
+            pSize.style.fontFamily = `"${document.getElementById('in-size-f').value}", Cairo, Arial, sans-serif`;
+            pSize.style.fontSize = document.getElementById('in-size-s').value + 'px';
+            pSize.style.fontWeight = config.sizeF.bold ? '800' : '400';
+            pSize.style.textDecoration = config.sizeF.underline ? 'underline' : 'none';
+            box.style.padding = `${document.getElementById('m-t').value}cm ${document.getElementById('m-r').value}cm ${document.getElementById('m-b').value}cm ${document.getElementById('m-l').value}cm`;
+        }
+
+        function getAvailableFonts(selectedFont = '') {
+            return [...new Set([...availableSystemFonts, selectedFont].filter(Boolean))];
+        }
+
+        function refreshFontSelects() {
+            ['code', 'color', 'size'].forEach(type => {
+                const select = document.getElementById(`in-${type}-f`);
+                if (!select) return;
+                const selected = select.value;
+                select.innerHTML = '';
+                getAvailableFonts(selected).forEach(fontName => {
+                    const option = document.createElement('option');
+                    option.value = fontName;
+                    option.textContent = fontName;
+                    option.selected = fontName === selected;
+                    option.style.fontFamily = `"${fontName}", sans-serif`;
+                    select.appendChild(option);
+                });
+            });
+            liveUpdate();
+        }
+
+        async function loadWindowsFonts() {
+            const status = document.getElementById('local-font-status');
+            if (!('queryLocalFonts' in window)) {
+                Swal.fire({ icon: 'info', title: 'المتصفح لا يدعم قراءة خطوط الجهاز', text: 'استخدم Google Chrome أو Microsoft Edge على Windows، وافتح البرنامج من رابط HTTPS الخاص بـ GitHub Pages.' });
+                return;
+            }
+            try {
+                if (status) status.textContent = 'جارٍ قراءة خطوط Windows...';
+                const fonts = await window.queryLocalFonts();
+                const names = fonts.map(font => font.family || font.fullName).filter(Boolean);
+                availableSystemFonts = [...new Set([...windowsFonts, ...names])].sort((a, b) => a.localeCompare(b));
+                refreshFontSelects();
+                if (status) status.textContent = `تم تحميل ${availableSystemFonts.length} خطًا من الجهاز`;
+                showToast(`تم تحميل خطوط Windows بنجاح`);
+            } catch (error) {
+                console.error(error);
+                if (status) status.textContent = 'لم يتم السماح بقراءة الخطوط';
+                Swal.fire({ icon: 'warning', title: 'لم يتم تحميل الخطوط', text: 'اسمح للموقع بالوصول إلى خطوط الجهاز من نافذة الصلاحيات، ثم حاول مرة أخرى.' });
+            }
+        }
+
+        function openSettings() {
+            Swal.fire({
+                title: 'إعدادات النظام والطباعة',
+                width: '900px', confirmButtonText: 'حفظ الإعدادات',
+                html: `
+                    <div class="flex justify-center border-b mb-6">
+                        <button onclick="changeTab('p')" class="tab-btn active" id="t-p"><i class="fa-solid fa-print"></i> تنسيق الطباعة</button>
+                        <button onclick="changeTab('n')" class="tab-btn" id="t-n"><i class="fa-solid fa-tags"></i> الفئات</button>
+                        <button onclick="changeTab('l')" class="tab-btn" id="t-l"><i class="fa-solid fa-image"></i> الشعار</button>
+                        <button onclick="changeTab('s')" class="tab-btn" id="t-s"><i class="fa-solid fa-shield-halved"></i> الأمان</button>
+                    </div>
+                    <div id="s-p" class="setting-section active text-right">
+                        <div class="flex items-center justify-between gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4">
+                            <div><div class="text-xs font-bold text-blue-700">خطوط Windows المثبتة</div><div id="local-font-status" class="text-[10px] text-blue-500 mt-1">اضغط الزر لعرض جميع خطوط الجهاز داخل القوائم</div></div>
+                            <button type="button" onclick="loadWindowsFonts()" class="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-font ml-1"></i>تحميل خطوط الجهاز</button>
+                        </div>
+                        <div class="grid grid-cols-12 gap-6">
+                            <div class="col-span-8 space-y-3">
+                                ${['code','color','size'].map(t => `
+                                <div class="grid grid-cols-[100px_1fr_70px_110px] gap-2 items-center bg-gray-50 p-3 rounded-xl border border-gray-200">
+                                    <span class="font-bold text-sm">${t==='code'?'الكود':t==='color'?'اللون':'المقاس'}:</span>
+                                    <select id="in-${t}-f" onchange="liveUpdate()" class="border p-2 text-xs rounded-lg bg-white">
+                                        ${getAvailableFonts(config[t+'F'].font).map(f => `<option value="${f}" ${config[t+'F'].font === f ? 'selected' : ''}>${f}</option>`).join('')}
+                                    </select>
+                                    <input type="number" id="in-${t}-s" value="${config[t+'F'].size}" oninput="liveUpdate()" class="border p-2 text-xs rounded-lg">
+                                    <div class="flex gap-1">
+                                        <button onclick="toggleStyleBit('${t}F','bold','btn-${t}-b')" id="btn-${t}-b" class="style-btn ${config[t+'F'].bold?'active':''}">B</button>
+                                        <button onclick="toggleStyleBit('${t}F','underline','btn-${t}-u')" id="btn-${t}-u" class="style-btn ${config[t+'F'].underline?'active':''}">U</button>
+                                    </div>
+                                </div>`).join('')}
+                                <div class="bg-gray-100 p-4 rounded-xl border border-dashed border-gray-300">
+                                    <div class="grid grid-cols-4 gap-4">
+                                        ${['t','b','r','l'].map(m => `<div><label class="text-[10px] block mb-1">${m==='t'?'أعلى':m==='b'?'أسفل':m==='r'?'يمين':'يسار'}</label><input type="number" id="m-${m}" step="0.01" value="${config.margins[m==='t'?'top':m==='b'?'bottom':m==='r'?'right':'left']}" oninput="liveUpdate()" class="w-full border p-2 text-xs rounded"></div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-span-4 flex flex-col items-center justify-center bg-gray-50 rounded-2xl p-4 border">
+                                <div id="box-preview" style="width: 5cm; height: 2.5cm; background: white; border: 1px solid #000; position: relative; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box;">
+                                    <div class="flex justify-between items-center px-1" style="height:1.1cm"><div id="p-code" style="background:#000; color:#fff; width:3.3cm; height:0.9cm; display:flex; align-items:center; justify-content:center; border-radius:4px;">1010</div><div style="width:1cm; height:1cm; border:1px dashed #999; font-size:8px; display:flex; align-items:center; justify-content:center">QR</div></div>
+                                    <div class="flex justify-between items-center px-1 mt-1" style="height:1.1cm"><div id="p-size" style="width:1.1cm; height:1.1cm; border:2px solid #000; display:flex; align-items:center; justify-content:center; border-radius:6px">42</div><div id="p-color" style="flex:1; text-align:center">لون</div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="s-n" class="setting-section">
+                        <div class="p-6 text-right space-y-3">
+                            <div class="grid grid-cols-[1.2fr_1.2fr_80px_80px_125px] gap-2 px-3 text-[11px] font-bold text-gray-500">
+                                <span>اسم الفئة</span><span>الأيقونة</span><span>من</span><span>إلى</span><span class="text-center">إظهار عند الإدخال</span>
+                            </div>
+                            ${[1,2,3,4].map(i => {
+                                const key = 'r' + i;
+                                return `<div class="grid grid-cols-[1.2fr_1.2fr_80px_80px_125px] gap-2 items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <input type="text" id="rn-${i}" value="${config.ranges[key]}" class="w-full p-2 border rounded-lg text-sm" placeholder="اسم الفئة">
+                                    <select id="ri-${i}" class="w-full p-2 border rounded-lg text-sm bg-white">${availableIcons.map(icon => `<option value="${icon.id}" ${config.rangeIcons[key] === icon.id ? 'selected' : ''}>${icon.name}</option>`).join('')}</select>
+                                    <input type="number" id="rmin-${i}" value="${config.rangeMins[key]}" title="المقاسات من" class="w-full p-2 border rounded-lg text-sm text-center">
+                                    <input type="number" id="rmax-${i}" value="${config.rangeMaxs[key]}" title="المقاسات إلى" class="w-full p-2 border rounded-lg text-sm text-center">
+                                    <label class="flex items-center justify-center gap-2 text-xs font-bold text-gray-600 cursor-pointer" title="إظهار أو إخفاء الفئة عند إدخال البيانات">
+                                        <input type="checkbox" id="re-${i}" ${config.rangeEnabled[key] ? 'checked' : ''} class="w-5 h-5 accent-orange-500">
+                                        <span>${config.rangeEnabled[key] ? 'مفعلة' : 'مخفية'}</span>
+                                    </label>
+                                </div>`;
+                            }).join('')}
+                            <p class="text-[11px] text-gray-400 px-2"><i class="fa-solid fa-circle-info ml-1"></i>أزل علامة الصح من أي فئة لإخفائها من شاشة اختيار المقاسات عند إضافة البيانات.</p>
+                        </div>
+                    </div>
+                    <div id="s-l" class="setting-section p-6 text-right">
+                        <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                            <div class="flex flex-col md:flex-row items-center gap-6">
+                                <div class="w-40 h-40 bg-white border-2 border-dashed border-gray-300 rounded-2xl flex items-center justify-center p-3">
+                                    <img id="logo-preview" alt="معاينة الشعار" class="max-w-full max-h-full object-contain">
+                                </div>
+                                <div class="flex-1 w-full">
+                                    <label class="text-sm font-bold text-gray-700 block mb-2">رفع شعار البرنامج</label>
+                                    <p class="text-xs text-gray-400 mb-4">اختر صورة PNG أو JPG بحد أقصى 2 ميجابايت. سيتم حفظ الشعار داخل البرنامج.</p>
+                                    <input type="file" id="logo-file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="handleLogoUpload(this)" class="w-full p-3 border border-gray-200 rounded-xl bg-white text-sm mb-3">
+                                    <button type="button" onclick="resetLogoPreview()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-bold"><i class="fa-solid fa-rotate-left ml-1"></i>استعادة الشعار الأصلي</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="s-s" class="setting-section p-6 text-right space-y-4">
+                        <div class="bg-orange-50 p-6 rounded-2xl border border-orange-100">
+                            <h3 class="text-sm font-bold text-orange-700 mb-4"><i class="fa-solid fa-key ml-2"></i>تغيير كلمة مرور الدخول</h3>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div><label class="text-[11px] font-bold text-gray-500 block mb-1">كلمة المرور الحالية</label><input type="password" id="current-login-password" class="w-full p-3 border border-orange-200 rounded-xl bg-white"></div>
+                                <div><label class="text-[11px] font-bold text-gray-500 block mb-1">كلمة المرور الجديدة</label><input type="password" id="new-login-password" class="w-full p-3 border border-orange-200 rounded-xl bg-white"></div>
+                                <div><label class="text-[11px] font-bold text-gray-500 block mb-1">تأكيد كلمة المرور</label><input type="password" id="confirm-login-password" class="w-full p-3 border border-orange-200 rounded-xl bg-white"></div>
+                            </div>
+                            <button type="button" onclick="changeAdminPassword()" class="mt-4 px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold"><i class="fa-solid fa-floppy-disk ml-1"></i>تغيير كلمة المرور</button>
+                        </div>
+                        <div class="bg-red-50 p-6 rounded-2xl border border-red-100"><label class="text-xs font-bold text-red-600 block mb-2">كلمة سر الحذف</label><input type="password" id="sec-p" value="${config.deletePassword}" class="w-full p-4 border border-red-200 rounded-xl"></div>
+                    </div>
+                `,
+                didOpen: () => {
+                    liveUpdate();
+                    const logoPreview = document.getElementById('logo-preview');
+                    if (logoPreview) {
+                        logoPreview.src = config.appLogo || defaultConfig.appLogo;
+                        logoPreview.dataset.logo = config.appLogo || defaultConfig.appLogo;
+                    }
+                },
+                preConfirm: () => {
+                    ['code','color','size'].forEach(t => { config[t+'F'].font = document.getElementById(`in-${t}-f`).value; config[t+'F'].size = document.getElementById(`in-${t}-s`).value; });
+                    config.margins = { top: document.getElementById('m-t').value, bottom: document.getElementById('m-b').value, right: document.getElementById('m-r').value, left: document.getElementById('m-l').value };
+                    config.deletePassword = document.getElementById('sec-p').value;
+                    const logoPreview = document.getElementById('logo-preview');
+                    config.appLogo = logoPreview?.dataset.logo || config.appLogo || defaultConfig.appLogo;
+                    for (const i of [1,2,3,4]) {
+                        const key = 'r' + i;
+                        const min = Number(document.getElementById(`rmin-${i}`).value);
+                        const max = Number(document.getElementById(`rmax-${i}`).value);
+                        if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+                            Swal.showValidationMessage(`راجع المقاسات من وإلى في الفئة ${i}`);
+                            return false;
+                        }
+                        config.ranges[key] = document.getElementById(`rn-${i}`).value.trim() || `فئة ${i}`;
+                        config.rangeIcons[key] = document.getElementById(`ri-${i}`).value;
+                        config.rangeMins[key] = min;
+                        config.rangeMaxs[key] = max;
+                        config.rangeEnabled[key] = document.getElementById(`re-${i}`).checked;
+                    }
+                    saveConfig(); applyAppLogo(); renderCategoryFilters(); applyFilters(); updateStats();
+                }
+            });
+        }
+
+        async function addData() {
+            const codeInput = document.getElementById('code');
+            const code = codeInput.value.trim();
+            if (!code || temporaryColors.length === 0) { Swal.fire({ icon: 'error', title: 'بيانات ناقصة', text: 'برجاء إدخال كود الصنف وإضافة لون واحد على الأقل مع اختيار مقاساته', confirmButtonColor: '#1f2937' }); return; }
+
+            let count = 0;
+            temporaryColors.forEach(item => {
+                const [start, end] = item.range.split('-').map(Number);
+                for (let size = start; size <= end; size++) {
+                    data.push({ code, color: item.color, size: size.toString() });
+                    count++;
+                }
+            });
+
+            showToast(`تمت إضافة ${count} كرتونة بنجاح`);
+            applyFilters(); updateStats(); saveDataToCloud(); clearForm();
+            codeInput.focus();
+        }
+
+        async function showRangePopup() {
+            const enabledRanges = Object.entries(config.ranges).filter(([key]) => config.rangeEnabled[key]);
+            if (enabledRanges.length === 0) {
+                await Swal.fire({ icon: 'warning', title: 'لا توجد فئات مفعلة', text: 'فعّل فئة واحدة على الأقل من الإعدادات ثم الفئات.' });
+                return null;
+            }
+            return new Promise(resolve => {
+                Swal.fire({
+                    title: 'اختر فئة المقاسات',
+                    html: `<div class="grid grid-cols-2 gap-3 p-2">
+                        ${enabledRanges.map(([k, v]) => {
+                            const i = Number(k.slice(1)) - 1;
+                            return `<button data-v="${config.rangeMins[k]}-${config.rangeMaxs[k]}" data-l="${v}" class="r-opt p-4 border-2 hover:border-orange-500 rounded-2xl flex flex-col items-center transition-all bg-white hover:shadow-md">
+                                <i class="fa-solid ${config.rangeIcons[k]} mb-2 text-2xl ${i===0?'text-blue-500':i===1?'text-green-500':i===2?'text-purple-500':'text-pink-500'}"></i>
+                                <b class="text-sm">${v}</b><span class="text-xs text-gray-400 mt-1">من ${config.rangeMins[k]} إلى ${config.rangeMaxs[k]}</span>
+                            </button>`;
+                        }).join('')}
+                    </div>`,
+                    showConfirmButton: false,
+                    didOpen: () => { document.querySelectorAll('.r-opt').forEach(b => b.onclick = () => { resolve({ range: b.dataset.v, label: b.dataset.l }); Swal.close(); }); },
+                    didClose: () => resolve(null)
+                });
+            });
+        }
+
+        function clearForm() { document.getElementById('code').value = ''; document.getElementById('color-input').value = ''; temporaryColors = []; renderTempColors(); }
+
+        function updateCell(index, field, newValue) { data[index][field] = newValue.trim(); saveDataToCloud(); updateStats(); }
+        
+        function renderTable(displayData = data) { 
+            const tbody = document.getElementById('table-body'); 
+            tbody.innerHTML = displayData.map((item, i) => {
+                const originalIndex = data.indexOf(item);
+                return `
+                <tr class="transition-colors">
+                    <td><input type="checkbox" class="row-cb rounded" data-index="${originalIndex}"></td>
+                    <td class="font-semibold text-gray-700">${item.code}</td>
+                    <td contenteditable="true" onblur="updateCell(${originalIndex}, 'color', this.innerText)" class="editable-cell text-gray-600">${item.color}</td>
+                    <td contenteditable="true" onblur="updateCell(${originalIndex}, 'size', this.innerText)" class="editable-cell text-gray-600">${item.size}</td>
+                    <td class="text-center"><button onclick="deleteRow(${originalIndex})" class="text-red-400 p-2 hover:text-red-600 transition-colors"><i class="fa-solid fa-trash-can"></i></button></td>
+                </tr>`}).join(''); 
+        }
+
+        async function deleteRow(i) {
+            const result = await Swal.fire({ title: 'هل أنت متأكد؟', text: "سيتم حذف هذا السطر نهائياً!", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', cancelButtonColor: '#64748b', confirmButtonText: 'نعم، احذف', cancelButtonText: 'إلغاء' });
+            if (result.isConfirmed) { data.splice(i, 1); applyFilters(); updateStats(); saveDataToCloud(); showToast('تم الحذف بنجاح'); }
+        }
+
+        async function deleteSelected() {
+            const selectedCheckboxes = Array.from(document.querySelectorAll('.row-cb:checked'));
+            if (selectedCheckboxes.length === 0) { showToast('لم يتم تحديد أي أصناف لحذفها', 'error'); return; }
+            const result = await Swal.fire({ title: 'حذف المحدد', text: `هل أنت متأكد من حذف عدد ${selectedCheckboxes.length} صنف؟`, icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'نعم، احذف المحدد' });
+            if (result.isConfirmed) {
+                const indicesToDelete = selectedCheckboxes.map(cb => parseInt(cb.dataset.index)).sort((a, b) => b - a);
+                indicesToDelete.forEach(index => data.splice(index, 1));
+                document.getElementById('select-all').checked = false;
+                applyFilters(); updateStats(); saveDataToCloud(); showToast('تم حذف الأصناف المحددة');
+            }
+        }
+
+        function updateStats() {
+            const getC = (s, e) => data.filter(r => parseInt(r.size) >= Number(s) && parseInt(r.size) <= Number(e)).length;
+            const s=getC(config.rangeMins.r1,config.rangeMaxs.r1), m=getC(config.rangeMins.r2,config.rangeMaxs.r2), l=getC(config.rangeMins.r3,config.rangeMaxs.r3), w=getC(config.rangeMins.r4,config.rangeMaxs.r4);
+            const total = Math.ceil(s/15)+Math.ceil(m/15)+Math.ceil(l/15)+Math.ceil(w/15);
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card bg-orange-500 text-white shadow-lg border-orange-500 p-4">
+                    <div class="text-3xl font-800">${total}</div><div class="text-xs font-bold uppercase mt-1">إجمالي الكراتين</div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="stat-card p-3"><i class="fa-solid ${config.rangeIcons.r1} text-blue-500 mb-1 text-lg"></i><div class="text-2xl font-bold">${Math.ceil(s/15)}</div><div class="text-[11px] font-bold text-gray-500">${config.ranges.r1}</div></div>
+                    <div class="stat-card p-3"><i class="fa-solid ${config.rangeIcons.r2} text-green-500 mb-1 text-lg"></i><div class="text-2xl font-bold">${Math.ceil(m/15)}</div><div class="text-[11px] font-bold text-gray-500">${config.ranges.r2}</div></div>
+                    <div class="stat-card p-3"><i class="fa-solid ${config.rangeIcons.r3} text-purple-500 mb-1 text-lg"></i><div class="text-2xl font-bold">${Math.ceil(l/15)}</div><div class="text-[11px] font-bold text-gray-500">${config.ranges.r3}</div></div>
+                    <div class="stat-card p-3"><i class="fa-solid ${config.rangeIcons.r4} text-pink-500 mb-1 text-lg"></i><div class="text-2xl font-bold">${Math.ceil(w/15)}</div><div class="text-[11px] font-bold text-gray-500">${config.ranges.r4}</div></div>
+                </div>`;
+        }
+
+        async function deleteAll() { const { value: pass } = await Swal.fire({ title: 'تأكيد الحذف الكلي', input: 'password', inputPlaceholder: 'كلمة السر', inputValidator: (v) => { if(v !== config.deletePassword) return 'كلمة السر خطأ!'; } }); if(pass) { data=[]; saveDataToCloud(); applyFilters(); updateStats(); } }
+
+        function executePrint(items) {
+            const win = window.open('', '_blank');
+            const content = items.map((item, idx) => `<div class="label"><div class="r1"><div class="cb">${item.code}</div><div class="qr" id="qr-${idx}"></div></div><div class="r2"><div class="sb">${item.size}</div><div class="ct">${item.color}</div></div></div>`).join('');
+            win.document.write(`<html dir="rtl"><head><style>@page { size: 5cm 2.5cm; margin: 0; } html, body { width: 5cm; margin: 0; padding: 0; } * { box-sizing: border-box; } .label { width: 5cm; height: 2.5cm; padding: ${config.margins.top}cm ${config.margins.right}cm ${config.margins.bottom}cm ${config.margins.left}cm; overflow: hidden; page-break-after: always; break-after: page; page-break-inside: avoid; break-inside: avoid; display: flex; flex-direction: column; } .label:last-child { page-break-after: auto; break-after: auto; } .r1 { flex: 1 1 50%; min-height: 0; display: flex; justify-content: space-between; align-items: center; } .r2 { flex: 1 1 50%; min-height: 0; display: flex; justify-content: space-between; align-items: center; margin-top: 0; } .cb { width: 3.5cm; height: 1.0cm; border-radius: 4px; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; font-family: "${config.codeF.font}", Cairo, Arial, sans-serif; font-size: ${config.codeF.size}px; font-weight: ${config.codeF.bold?800:400}; text-decoration: ${config.codeF.underline?'underline':'none'}; } .sb { width: 1.0cm; height: 1.0cm; border: 2px solid #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: "${config.sizeF.font}", Cairo, Arial, sans-serif; font-size: ${config.sizeF.size}px; font-weight: ${config.sizeF.bold?800:400}; text-decoration: ${config.sizeF.underline?'underline':'none'}; } .ct { flex: 1; text-align: center; font-family: "${config.colorF.font}", Cairo, Arial, sans-serif; font-size: ${config.colorF.size}px; font-weight: ${config.colorF.bold?800:400}; text-decoration: ${config.colorF.underline?'underline':'none'}; } .qr canvas { width: 40px !important; height: 40px !important; } </style><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script></head><body>${content}<script>window.onload = () => { const its = ${JSON.stringify(items)}; its.forEach((it, i) => new QRCode(document.getElementById('qr-'+i), {text: it.code, width: 40, height: 40})); setTimeout(() => { window.print(); window.close(); }, 500); };<\/script></body></html>`);
+            win.document.close();
+        }
+
+        function printSelectedLabels() { const sel = Array.from(document.querySelectorAll('.row-cb:checked')).map(cb => data[cb.dataset.index]); if(sel.length) executePrint(sel); else showToast('يرجى تحديد أصناف أولاً', 'error'); }
+        function printLabels() { if(data.length) executePrint(data); }
+        function toggleSelectAll(m) { document.querySelectorAll('.row-cb').forEach(c => c.checked = m.checked); }
+        function exportExcel() { const ws = XLSX.utils.json_to_sheet(data.map(({ code, color, size }) => ({ code, color, size }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Shoes"); XLSX.writeFile(wb, "shoe_boxes.xlsx"); }
+        
+        function importExcel() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.xlsx, .xls';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const arrayBuffer = event.target.result;
+                    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    if (rawData.length < 2) { showToast('الملف فارغ أو غير صالح', 'error'); return; }
+                    const headers = rawData[1] || [];
+                    const { value: mapping } = await Swal.fire({
+                        title: 'مطابقة أعمدة الإكسيل',
+                        html: `<div class="text-right space-y-4 p-2">${['كود الصنف', 'اللون الأول', 'اللون الثاني', 'اللون الثالث', 'المقاس/الفئة'].map((label, idx) => `<div><label class="block text-xs font-bold mb-1">${label}:</label><select id="col-${idx}" class="w-full p-2 border rounded text-sm bg-white"><option value="">-- اختر العمود --</option>${headers.map((h, i) => `<option value="${i}">${h || 'عمود ' + (i+1)}</option>`).join('')}</select></div>`).join('')}</div>`,
+                        focusConfirm: false, showCancelButton: true, confirmButtonText: 'بدء الاستيراد',
+                        preConfirm: () => ({ codeIdx: document.getElementById('col-0').value, c1Idx: document.getElementById('col-1').value, c2Idx: document.getElementById('col-2').value, c3Idx: document.getElementById('col-3').value, sizeIdx: document.getElementById('col-4').value })
+                    });
+                    if (!mapping || mapping.codeIdx === "" || mapping.c1Idx === "" || mapping.sizeIdx === "") { if(mapping) showToast('يجب تحديد كود الصنف واللون الأول والمقاس على الأقل', 'error'); return; }
+                    let importedCount = 0;
+                    for (let i = 2; i < rawData.length; i++) {
+                        const row = rawData[i]; if (!row || row.length === 0) continue;
+                        const code = row[mapping.codeIdx]; const sizeVal = String(row[mapping.sizeIdx] || '').trim();
+                        const colors = [row[mapping.c1Idx], mapping.c2Idx !== "" ? row[mapping.c2Idx] : null, mapping.c3Idx !== "" ? row[mapping.c3Idx] : null].filter(c => c && String(c).trim() !== "");
+                        if (!code || !sizeVal || colors.length === 0) continue;
+                        let start = 0, end = 0;
+                        const matchedRange = [1,2,3,4].map(i => 'r' + i).find(key => sizeVal.includes(config.ranges[key]));
+                        if (matchedRange) { start = Number(config.rangeMins[matchedRange]); end = Number(config.rangeMaxs[matchedRange]); }
+                        else { const num = parseInt(sizeVal); if (!isNaN(num)) { start = num; end = num; } }
+                        if (start !== 0) { colors.forEach(clr => { for (let s = start; s <= end; s++) { data.push({ code: String(code), color: String(clr), size: String(s) }); importedCount++; } }); }
+                    }
+                    saveDataToCloud(); applyFilters(); updateStats(); showToast(`تم استيراد ${importedCount} كرتونة بنجاح`);
+                };
+                reader.readAsArrayBuffer(file);
+            };
+            input.click();
+        }
+
+        function setAuthMessage(message, isError = true) {
+            const box = document.getElementById('auth-message');
+            box.textContent = message;
+            box.className = `mt-4 p-3 rounded-xl text-xs font-bold ${isError ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
+        }
+
+        const ADMIN_USERNAME = 'admin';
+        const ADMIN_EMAIL = 'admin@size-413f8.firebaseapp.com';
+        const DEFAULT_ADMIN_PASSWORD = '123456';
+
+        function setAuthBusy(busy) {
+            const loginButton = document.getElementById('login-button');
+            loginButton.disabled = busy;
+            loginButton.classList.toggle('opacity-50', busy);
+        }
+
+        function authCredentials() {
+            return {
+                username: document.getElementById('auth-username').value.trim(),
+                password: document.getElementById('auth-password').value
+            };
+        }
+
+        function translateAuthError(error) {
+            const messages = {
+                'auth/missing-password': 'برجاء إدخال كلمة المرور',
+                'auth/weak-password': 'كلمة المرور يجب ألا تقل عن 6 أحرف',
+                'auth/email-already-in-use': 'كلمة المرور غير صحيحة',
+                'auth/invalid-credential': 'اسم المستخدم أو كلمة المرور غير صحيحة',
+                'auth/wrong-password': 'كلمة المرور الحالية غير صحيحة',
+                'auth/user-disabled': 'تم تعطيل حساب المدير',
+                'auth/network-request-failed': 'تعذر الاتصال بالإنترنت',
+                'auth/operation-not-allowed': 'فعّل تسجيل الدخول بالبريد وكلمة المرور من Firebase Authentication',
+                'auth/requires-recent-login': 'أعد تسجيل الدخول ثم حاول تغيير كلمة المرور مرة أخرى'
+            };
+            return messages[error.code] || error.message || 'حدث خطأ أثناء تسجيل الدخول';
+        }
+
+        async function loginUser() {
+            const { username, password } = authCredentials();
+            if (username !== ADMIN_USERNAME) { setAuthMessage('اسم المستخدم غير صحيح'); return; }
+            if (!password) { setAuthMessage('أدخل كلمة المرور'); return; }
+            setAuthBusy(true);
+            try {
+                await auth.signInWithEmailAndPassword(ADMIN_EMAIL, password);
+            } catch (loginError) {
+                if (password !== DEFAULT_ADMIN_PASSWORD) {
+                    setAuthMessage('كلمة المرور غير صحيحة');
+                } else {
+                    try {
+                        await auth.createUserWithEmailAndPassword(ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD);
+                    } catch (createError) {
+                        setAuthMessage(translateAuthError(createError));
+                    }
+                }
+            } finally {
+                setAuthBusy(false);
+            }
+        }
+
+        async function changeAdminPassword() {
+            const currentPassword = document.getElementById('current-login-password').value;
+            const newPassword = document.getElementById('new-login-password').value;
+            const confirmPassword = document.getElementById('confirm-login-password').value;
+            if (!currentPassword || !newPassword || !confirmPassword) { showToast('أكمل جميع حقول كلمة المرور', 'error'); return; }
+            if (newPassword.length < 6) { showToast('كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف', 'error'); return; }
+            if (newPassword !== confirmPassword) { showToast('تأكيد كلمة المرور غير مطابق', 'error'); return; }
+            try {
+                const credential = firebase.auth.EmailAuthProvider.credential(ADMIN_EMAIL, currentPassword);
+                await currentUser.reauthenticateWithCredential(credential);
+                await currentUser.updatePassword(newPassword);
+                document.getElementById('current-login-password').value = '';
+                document.getElementById('new-login-password').value = '';
+                document.getElementById('confirm-login-password').value = '';
+                showToast('تم تغيير كلمة مرور الدخول بنجاح');
+            } catch (error) {
+                showToast(translateAuthError(error), 'error');
+            }
+        }
+
+        async function logoutUser() {
+            const result = await Swal.fire({ title: 'تسجيل الخروج', text: 'هل تريد تسجيل الخروج من الحساب؟', icon: 'question', showCancelButton: true, confirmButtonText: 'تسجيل الخروج', cancelButtonText: 'إلغاء', confirmButtonColor: '#ef4444' });
+            if (result.isConfirmed) await auth.signOut();
+        }
+
+        async function loadUserWorkspace(user) {
+            const settingsRef = db.collection('users').doc(user.uid).collection('settings').doc('main');
+            try {
+                const settingsSnapshot = await settingsRef.get({ source: 'server' });
+                if (settingsSnapshot.exists) config = mergeConfig(settingsSnapshot.data());
+                else { config = mergeConfig(); await settingsRef.set(config); }
+            } catch (error) {
+                console.error(error);
+                showToast('تعذر تحميل الإعدادات من Firebase', 'error');
+                return;
+            }
+
+            applyAppLogo();
+            updateNotificationButton();
+            renderCategoryFilters();
+            applyFilters();
+            updateStats();
+
+            unsubscribeData = db.collection('users').doc(user.uid).collection('items').onSnapshot(snapshot => {
+                data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+                applyFilters();
+                updateStats();
+            }, error => {
+                console.error(error);
+                showToast('تعذر مزامنة البيانات مع Firebase', 'error');
+            });
+        }
+
+        auth.onAuthStateChanged(async user => {
+            if (unsubscribeData) { unsubscribeData(); unsubscribeData = null; }
+            currentUser = user;
+            const authScreen = document.getElementById('auth-screen');
+            if (user) {
+                document.getElementById('user-email').textContent = 'المستخدم: admin';
+                authScreen.classList.add('hidden');
+                await loadUserWorkspace(user);
+            } else {
+                data = [];
+                config = mergeConfig();
+                temporaryColors = [];
+                renderTempColors();
+                applyAppLogo();
+                renderCategoryFilters();
+                applyFilters();
+                updateStats();
+                authScreen.classList.remove('hidden');
+            }
+        });
+
+        window.onload = () => { applyAppLogo(); updateNotificationButton(); renderCategoryFilters(); applyFilters(); updateStats(); };
+    </script>
+</body>
+</html>

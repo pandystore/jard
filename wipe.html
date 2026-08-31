@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>مسح Firebase - بيمبو ستور</title>
+<style>
+body{font-family:Tahoma,Arial; background:#f8fafc; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0}
+.card{background:#fff; border:1px solid #e2e8f0; border-radius:1rem; padding:2rem; max-width:400px; width:90%; text-align:center; box-shadow:0 10px 20px rgba(0,0,0,.1)}
+button{background:#ef4444; color:#fff; border:none; border-radius:.6rem; padding:.8rem 1.5rem; font-weight:800; cursor:pointer; font-size:1rem; width:100%; margin-top:1rem}
+button.ok{background:#16a34a}
+pre{font-size:.7rem; text-align:left; direction:ltr; background:#f1f5f9; padding:.5rem; border-radius:.5rem; overflow:auto}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>🔥 مسح Firebase نهائي</h2>
+<p style="font-size:.85rem;color:#475569">الزر ده هيمسح كل بيانات الجرد من قاعدة البيانات <b>jard</b> نهائياً من Firebase. استخدمه لو المسح من البرنامج مش بيسمع.</p>
+<pre id="log">جاهز...</pre>
+<button id="wipeBtn">💥 امسح كل بيانات الجرد من Firebase الآن</button>
+<button class="ok" onclick="location.href='./'">↩️ رجوع للبرنامج</button>
+</div>
+<script>
+const DB_URL = 'https://jard-86baf-default-rtdb.firebaseio.com/jard';
+const logEl = document.getElementById('log');
+function log(t){ logEl.textContent += '\n' + t; console.log(t); }
+document.getElementById('wipeBtn').onclick = async ()=>{
+  if (!confirm('متأكد هتمسح كل بيانات الجرد من Firebase نهائياً؟')) return;
+  log('جاري المسح...');
+  try {
+    // مسح data
+    let r = await fetch(DB_URL + '/data.json', { method: 'DELETE' });
+    log('مسح data: ' + r.status);
+    // مسح notifs
+    r = await fetch(DB_URL + '/notifs.json', { method: 'DELETE' });
+    log('مسح notifs: ' + r.status);
+    // مسح sessions
+    r = await fetch(DB_URL + '/sessions.json', { method: 'DELETE' });
+    log('مسح sessions: ' + r.status);
+    // كتابة ختم مسح
+    const wipeTs = Date.now();
+    r = await fetch(DB_URL + '/meta/lastWipeRev.json', { method: 'PUT', body: JSON.stringify(wipeTs) });
+    log('ختم المسح: ' + r.status + ' ts=' + wipeTs);
+    r = await fetch(DB_URL + '/meta/lastWipe.json', { method: 'PUT', body: JSON.stringify(wipeTs) });
+    log('ختم المسح 2: ' + r.status);
+    // مسح الكاش المحلي
+    try { localStorage.removeItem('jard::snapshot'); localStorage.removeItem('jard::inventoryData'); localStorage.setItem('jard::lastWipe', String(wipeTs)); } catch(e){}
+    try { if ('caches' in window) { const ks = await caches.keys(); for (const k of ks) if (k.startsWith('jard-')) await caches.delete(k); } } catch(e){}
+    log('✅ تم المسح النهائي - افتح البرنامج الآن فاضي');
+    alert('✅ اتمسح كل شيء من Firebase - البرنامج دلوقتي فاضي');
+  } catch(e){
+    log('❌ خطأ: ' + e.message);
+    alert('خطأ: ' + e.message);
+  }
+};
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33bb3818edf4329',t:'MTc4ODE3NTgwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>

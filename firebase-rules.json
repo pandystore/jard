@@ -1,0 +1,49 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "jard": {
+      ".read": "auth != null",
+      "items": {
+        ".write": "auth != null && root.child('jard/meta/adminUid').val() == auth.uid",
+        "$code": {
+          ".write": "auth != null && (newData.exists() || root.child('jard/meta/adminUid').val() == auth.uid)",
+          ".validate": "newData.val() == null || newData.hasChildren(['code'])"
+        }
+      },
+      "notifs": {
+        ".write": "auth != null",
+        "$id": {
+          ".validate": "newData.hasChildren(['ts']) && newData.child('ts').isNumber()"
+        }
+      },
+      "sessions": {
+        "$user": {
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['ts']) && newData.child('ts').isNumber()"
+        }
+      },
+      "probe-test": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "meta": {
+        "adminUid": {
+          ".write": "auth != null && !data.exists()"
+        },
+        "adminHash": {
+          ".write": "auth != null && (!data.exists() || root.child('jard/meta/adminUid').val() == auth.uid)"
+        },
+        "users": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() == auth.uid"
+        },
+        "loginRequiredExplicit": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() == auth.uid"
+        },
+        "usersRev": { ".write": "auth != null" },
+        "dt": { ".write": "auth != null" },
+        "logo": { ".write": "auth != null" }
+      }
+    }
+  }
+}

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>مسح Firebase - بيمبو ستور</title>
+<style>
+body{font-family:Tahoma,Arial; background:#f8fafc; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0}
+.card{background:#fff; border:1px solid #e2e8f0; border-radius:1rem; padding:2rem; max-width:400px; width:90%; text-align:center; box-shadow:0 10px 20px rgba(0,0,0,.1)}
+button{background:#ef4444; color:#fff; border:none; border-radius:.6rem; padding:.8rem 1.5rem; font-weight:800; cursor:pointer; font-size:1rem; width:100%; margin-top:1rem}
+button.ok{background:#16a34a}
+button:disabled{opacity:.5; cursor:not-allowed}
+input[type=password],input[type=text]{width:100%; box-sizing:border-box; padding:.7rem; border:1px solid #cbd5e1; border-radius:.6rem; font-size:1rem; margin-top:.75rem; text-align:center; font-family:Tahoma,Arial}
+pre{font-size:.7rem; text-align:left; direction:ltr; background:#f1f5f9; padding:.5rem; border-radius:.5rem; overflow:auto}
+.warn{font-size:.72rem;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;padding:.5rem;margin-top:.5rem;font-weight:700}
+</style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://jard-86baf-default-rtdb.firebaseio.com https://identitytoolkit.googleapis.com; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://*.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src https://jard-86baf-default-rtdb.firebaseio.com https://identitytoolkit.googleapis.com; frame-src 'self';">
+</head>
+<body>
+<div class="card">
+<h2>🔥 مسح Firebase نهائي</h2>
+<p style="font-size:.85rem;color:#475569">الزر ده هيمسح كل بيانات الجرد من قاعدة البيانات <b>jard</b> نهائياً من Firebase. استخدمه لو المسح من البرنامج مش بيسمع.</p>
+<p style="font-size:.8rem;color:#b91c1c;font-weight:700">🔒 الصفحة دي محمية — لازم باسورد الأدمن نفسه المستخدم في البرنامج.</p>
+<div id="noSessionWarn" style="display:none" class="warn">⚠️ مش شايف إنك مسجّل دخول كأدمن في البرنامج على نفس التبويب ده. تقدر تكمل بالباسورد بس، لكن يفضّل تفتح البرنامج الأول وتسجّل دخول قبل ما تيجي هنا.</div>
+<input type="password" id="pw" placeholder="باسورد الأدمن" autocomplete="off" disabled>
+<div id="lockWarn" style="display:none" class="warn"></div>
+<pre id="log">جاري الاتصال بـ Firebase...</pre>
+<button id="wipeBtn" disabled>💥 امسح كل بيانات الجرد من Firebase الآن</button>
+<button class="ok" onclick="location.href='./'">↩️ رجوع للبرنامج</button>
+</div>
+<script>
+/* نسخة الملف: 4 — 2026-09-08 — دخول مجهول للقراءة/التحقق، ودخول حقيقي بحساب الأدمن (نفس اللي البرنامج بيعمله تلقائياً) قبل أي مسح فعلي */
+const DB_URL = 'https://jard-86baf-default-rtdb.firebaseio.com/jard';
+const API_KEY = 'AIzaSyA2edDs93CZ6_3_oQeLaklmPDNkMg_YfF8';
+const PROJECT_ID = 'jard-86baf';
+const ADMIN_EMAIL = 'admin@' + PROJECT_ID + '.local';
+const logEl = document.getElementById('log');
+const pwEl = document.getElementById('pw');
+const btn = document.getElementById('wipeBtn');
+const lockWarn = document.getElementById('lockWarn');
+function log(t){ logEl.textContent += '\n' + t; console.log(t); }
+
+/* تحذير لو الصفحة اتفتحت من غير جلسة أدمن سابقة في نفس التبويب —
+   طبقة إضافية بسيطة، مش بديل عن الباسورد */
+try {
+  const su = sessionStorage.getItem('jard::sessionUser');
+  let isAdminSession = false;
+  if (su) { try { isAdminSession = JSON.parse(su).role === 'admin'; } catch(e){} }
+  if (!isAdminSession) document.getElementById('noSessionWarn').style.display = 'block';
+} catch(e){}
+
+/* دخول مجهول عن طريق REST — كافي للقراءة والتحقق من الباسورد بس، مش للمسح نفسه */
+let anonToken = null;
+async function signInAnon(){
+  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true })
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  anonToken = j.idToken;
+}
+/* دخول حقيقي بحساب الأدمن — نفس الحساب اللي البرنامج بيعمله تلقائياً أول مرة تكتب الباسورد فيه.
+   ده اللي القواعد الجديدة فعلياً بتوثق بيه إنك الأدمن الحقيقي، مش مجرد حد داخل مجهول */
+async function signInAsAdmin(password){
+  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: ADMIN_EMAIL, password: password, returnSecureToken: true })
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(()=>({}));
+    throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
+  }
+  const j = await r.json();
+  return j.idToken;
+}
+function withAuth(path, token){ return DB_URL + path + '?auth=' + encodeURIComponent(token); }
+(async () => {
+  try {
+    await signInAnon();
+    log('✅ تم الاتصال — اكتب الباسورد للمتابعة');
+    pwEl.disabled = false;
+    pwEl.focus();
+  } catch(e){
+    log('❌ فشل الاتصال بـ Firebase: ' + e.message + '\n\u2192 تأكد إن "Anonymous" مفعّل في Firebase Console ← Authentication ← Sign-in method');
+  }
+})();
+
+async function hashPass(p){
+  try {
+    if (crypto && crypto.subtle) {
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('bjrd::' + p));
+      return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {}
+  let h = 5381; const s = 'bjrd::' + p;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return 'fb' + h.toString(16);
+}
+
+/* Rate limiting بسيط: بعد 5 محاولات غلط، قفل مؤقت متزايد (30 ثانية، بعدين دقيقة، إلخ) */
+let failCount = 0;
+let lockedUntil = 0;
+function isLocked(){
+  if (Date.now() < lockedUntil) {
+    const secs = Math.ceil((lockedUntil - Date.now()) / 1000);
+    lockWarn.style.display = 'block';
+    lockWarn.textContent = '⛔ محاولات كتير غلط — استنى ' + secs + ' ثانية';
+    return true;
+  }
+  lockWarn.style.display = 'none';
+  return false;
+}
+
+/* منع سباق الطلبات: كل نداء ليه رقم، وبس آخر نداء هو اللي يقدر يحدّث الزرار */
+let checkToken = 0;
+let checkTimer = null;
+let lastVerifiedHash = null; /* آخر باسورد اتأكد إنه صح فعلياً */
+function checkPass(){
+  clearTimeout(checkTimer);
+  btn.disabled = true;
+  lastVerifiedHash = null;
+  if (isLocked()) return;
+  if (!anonToken) return;
+  checkTimer = setTimeout(doCheck, 350); /* debounce */
+}
+async function doCheck(){
+  const myToken = ++checkToken;
+  const p = pwEl.value || '';
+  if (!p) return;
+  let remoteHash = null;
+  try {
+    const r = await fetch(withAuth('/meta/adminHash.json', anonToken), { cache: 'no-store' });
+    remoteHash = await r.json();
+  } catch (e) {
+    if (myToken === checkToken) { btn.disabled = true; log('⚠️ تعذّر التحقق من الباسورد (مشكلة اتصال)'); }
+    return;
+  }
+  const h = await hashPass(p);
+  const DEFAULT_HASH = await hashPass('123456');
+  const ok = remoteHash ? (h === remoteHash) : (h === DEFAULT_HASH);
+  if (myToken !== checkToken) return; /* فيه نداء أحدث لسه شغال، اتجاهل النتيجة القديمة دي */
+  btn.disabled = !ok;
+  lastVerifiedHash = ok ? h : null;
+}
+pwEl.addEventListener('input', checkPass);
+pwEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !btn.disabled) btn.click(); });
+
+document.getElementById('wipeBtn').onclick = async ()=>{
+  if (isLocked()) return;
+  // إعادة تحقق فعلية من الباسورد الحالي وقت الضغط — مش الاعتماد على disabled القديمة بس
+  const currentHash = await hashPass(pwEl.value || '');
+  if (!lastVerifiedHash || currentHash !== lastVerifiedHash) {
+    failCount++;
+    lockWarn.style.display = 'block';
+    lockWarn.textContent = '❌ الباسورد مش مطابق — حاول تاني';
+    if (failCount >= 5) {
+      lockedUntil = Date.now() + Math.min(300000, 30000 * Math.pow(2, failCount - 5));
+      isLocked();
+    }
+    return;
+  }
+  // تأكيد مكتوب بدل confirm() سهل التجاوز من الـ Console
+  const typed = prompt('اكتب كلمة "مسح" بالظبط عشان تأكد إنك عايز تمسح كل البيانات نهائياً:');
+  if (typed !== 'مسح') { log('اتلغى — الكلمة مش مطابقة'); return; }
+  const whoDid = prompt('اكتب اسمك (للتسجيل في سجل التتبع):') || 'غير معروف';
+
+  btn.disabled = true;
+  /* لازم نسجّل دخول بحساب الأدمن الحقيقي دلوقتي — القواعد الجديدة مش هتقبل مسح كامل
+     من دخول مجهول، حتى لو الباسورد المكتوب صح، لأنها بتتأكد من هوية Firebase نفسها */
+  let adminToken;
+  try {
+    log('جاري تأكيد هويتك كأدمن حقيقي...');
+    adminToken = await signInAsAdmin(pwEl.value);
+    log('✅ هويتك اتأكدت');
+  } catch(e){
+    log('❌ فشل تأكيد الهوية: ' + e.message);
+    if (String(e.message).indexOf('EMAIL_NOT_FOUND') !== -1 || String(e.message).indexOf('INVALID_PASSWORD') !== -1) {
+      log('\u2192 افتح البرنامج نفسه وادخل الإعدادات بالباسورد ده مرة واحدة الأول، عشان يتسجّل حسابك كأدمن حقيقي في Firebase');
+    }
+    btn.disabled = false;
+    return;
+  }
+  log('جاري عمل نسخة احتياطية قبل المسح...');
+  try {
+    // نسخة احتياطية تلقائية قبل أي مسح — عشان البيانات ما تضيعش نهائي بلا رجعة
+    const backupRes = await fetch(withAuth('/items.json', adminToken), { cache: 'no-store' });
+    const backupData = await backupRes.json();
+    if (backupData) {
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'jard-backup-before-wipe-' + Date.now() + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      log('✅ اتحملت نسخة احتياطية على جهازك قبل المسح');
+    } else {
+      log('ℹ️ مفيش بيانات موجودة أصلاً للنسخ الاحتياطي');
+    }
+  } catch(e){ log('⚠️ فشلت النسخة الاحتياطية (' + e.message + ') — كمّلنا المسح برضه بناءً على طلبك'); }
+
+  log('جاري المسح...');
+  let anyFail = false;
+  const paths = ['/items.json', '/notifs.json', '/sessions.json'];
+  for (const p of paths) {
+    try {
+      const r = await fetch(withAuth(p, adminToken), { method: 'DELETE' });
+      log('مسح ' + p + ': ' + r.status + (r.ok ? ' ✅' : ' ❌'));
+      if (!r.ok) anyFail = true;
+    } catch(e){ log('❌ خطأ في مسح ' + p + ': ' + e.message); anyFail = true; }
+  }
+  try {
+    const wipeTs = Date.now();
+    let r = await fetch(withAuth('/meta/lastWipeRev.json', adminToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
+    log('ختم المسح (rev): ' + r.status);
+    r = await fetch(withAuth('/meta/lastWipe.json', adminToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
+    log('ختم المسح (ts): ' + r.status);
+    // تسجيل مين عمل المسح — سجل تدقيق بسيط
+    r = await fetch(withAuth('/meta/lastWipeBy.json', adminToken), { method: 'PUT', body: JSON.stringify(whoDid + ' — ' + new Date(wipeTs).toLocaleString('ar-EG')) });
+    log('تسجيل المسؤول: ' + r.status);
+  } catch(e){ log('❌ خطأ في كتابة ختم المسح: ' + e.message); anyFail = true; }
+  try { if ('caches' in window) { const ks = await caches.keys(); for (const k of ks) if (k.startsWith('jard-')) await caches.delete(k); } } catch(e){}
+
+  if (anyFail) {
+    log('⚠️ حصل فشل جزئي — بعض المسارات ممكن ما تكونش اتمسحت. راجع السطور فوق وحاول تاني لو لزم.');
+    alert('⚠️ حصل فشل جزئي في المسح — راجع السجل تحت وحاول تاني لو محتاج');
+  } else {
+    log('✅ تم المسح النهائي - افتح البرنامج الآن فاضي');
+    alert('✅ اتمسح كل شيء من Firebase - البرنامج دلوقتي فاضي');
+  }
+};
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33bb3818edf4329',t:'MTc4ODE3NTgwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
+</html>

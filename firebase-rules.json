@@ -1,38 +1,105 @@
 {
+  /* ============================================================================
+     قواعد حماية قاعدة البيانات — بيمبو جرد
+
+     ⚠️ الملف ده مايشتغلش لوحده: لازم ترفعه على Firebase
+        Realtime Database ← Rules ← الصق المحتوى ← Publish
+
+     الفكرة الأساسية:
+       "الأدمن الحقيقي" = الهوية الحقيقية على Firebase Authentication
+       (اللي بتتعمل أول ما الأدمن يؤكد كلمة مروره)، و uid بتاعه متسجل في
+       jard/meta/adminUid. أي كتابة حساسة لازم تجي من الـ uid ده بالظبط.
+
+     ملاحظة مهمة عن قواعد Realtime Database:
+       الصلاحية بتنزل لتحت — لو أبو العقدة (.write) مفتوح، كل الأولاد مفتوحين
+       وماممكنش نقفلهم من تحت. عشان كده مفيش .write عام على meta أو على
+       الأصناف: كل مفتاح ليه قاعدته الخاصة.
+     ============================================================================ */
   "rules": {
     ".read": false,
     ".write": false,
+
     "jard": {
       ".read": "auth != null",
+
+      /* ---------- الأصناف ----------
+         أي مستخدم دخل يقدر يعدّ (يضيف أو يعدّل صنف)،
+         لكن مسح صنف موجود قرار إداري — للأدمن الحقيقي بس */
       "items": {
-        /* أي مستخدم مسجل دخول يقدر يضيف/يمسح الأصناف (المسح بيتم من زر إعادة ضبط المصنع بعد التأكد من كلمة المرور على العميل) */
-        ".write": "auth != null",
+        ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid",
         "$code": {
-          ".validate": "newData.val() == null || newData.hasChildren(['code'])"
+          ".write": "auth != null && (newData.exists() || root.child('jard/meta/adminUid').val() === auth.uid)",
+          ".validate": "newData.val() == null || (newData.hasChildren(['code']) && newData.child('code').isString())"
         }
       },
+
+      /* ---------- الإشعارات ---------- */
       "notifs": {
-        ".write": "auth != null",
         "$id": {
-          ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber())"
-        }
-      },
-      "auditLog": {
-        ".write": "auth != null"
-      },
-      "sessions": {
-        "$user": {
           ".write": "auth != null",
           ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber())"
         }
       },
+
+      /* ---------- سجل العمليات ----------
+         إضافة بس: مفيش تعديل ولا مسح لسجل موجود (عشان محدش يموّي أثره) */
+      "auditLog": {
+        "$id": {
+          ".write": "auth != null && !data.exists()",
+          ".validate": "newData.hasChildren(['ts'])"
+        }
+      },
+
+      /* ---------- الجلسات ----------
+         ملاحظة بصراحة: المستخدمين العاديين بيدخلوا بهوية مجهولة (anonymous)
+         على Firebase، فالسيرفر مايعرفش مين صاحب الجلسة الحقيقي.
+         اللي هنا يمنع الكتابة الغلط ويثبت شكل البيانات بس.
+         الحماية الكاملة محتاجة حساب Firebase حقيقي لكل مستخدم. */
+      "sessions": {
+        "$user": {
+          ".write": "auth != null",
+          ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber() && newData.child('name').isString())"
+        }
+      },
+
       "probe-test": {
         ".read": "auth != null",
         ".write": "auth != null"
       },
+
+      /* ---------- الإعدادات والمستخدمين ----------
+         دي أخطر عقدة في القاعدة: فيها كلمات المرور وقايمة المستخدمين.
+         قبل كده كانت مفتوحة لأي حد → أي حد كان يقدر يعمل نفسه أدمن. */
       "meta": {
         ".read": "auth != null",
-        ".write": "auth != null"
+
+        /* أول أدمن يعمل الحساب هو اللي بيسجّل uid بتاعه.
+           بعد كده مفيش حد يقدر يغيّره غير نفسه. */
+        "adminUid": {
+          ".write": "auth != null && (data.val() == null || data.val() === auth.uid)"
+        },
+
+        /* 🔒 للأدمن الحقيقي بس */
+        "adminHash": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "users": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "usersRev": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "forceWipe": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "loginRequiredExplicit": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+
+        /* مفاتيح عادية — أي مستخدم داخل يقدر يكتبها */
+        "setupDone": { ".write": "auth != null" },
+        "logo":      { ".write": "auth != null" },
+        "dt":        { ".write": "auth != null" }
       }
     }
   }

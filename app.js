@@ -650,10 +650,13 @@ async function ensureAdmin(){
     if (p1 !== p2) { toast('كلمتا المرور غير متطابقتين', 'error'); return false; }
     adminHash = await hashPass(p1);
     store.setItem(S('adminHash'), adminHash);
-    pushMeta(false); /* اللوجو/الباسورد بس — مش بنلمس المستخدمين */
-    await ensureFirebaseAdminAuth(p1); /* إنشاء حماية حقيقية على مستوى Firebase — بصمت، بنفس الباسورد */
-    addLog('تم إنشاء كلمة مرور admin');
+    /* ⚠️ الترتيب هنا مهم: نعمل الهوية الحقيقية على Firebase الأول —
+       هي اللي بتسجّل meta/adminUid، وقواعد السيرفر ما بتقبلش كتابة adminHash
+       غير من الـ uid ده بالظبط. لو رفعنا الباسورد الأول السيرفر هيرفضه */
+    await ensureFirebaseAdminAuth(p1);
     adminAuthedLive = true; /* نقطة 4: باسورد اتكتب صح */
+    pushMeta(false); /* اللوجو/الباسورد بس — مش بنلمس المستخدمين */
+    addLog('تم إنشاء كلمة مرور admin');
     toast('تم إنشاء كلمة المرور بنجاح', 'success');
     return true;
  }
@@ -667,9 +670,10 @@ async function ensureAdmin(){
   const upg = await verifyPass(p, adminHash);
   if (upg) {
     failCount = 0; adminAuthedLive = true;
+    await ensureFirebaseAdminAuth(p);
     /* لو كان مخزّن بالصيغة القديمة → حدّثه للنسخة الأقوى على طول */
     if (upg !== adminHash) { adminHash = upg; store.setItem(S('adminHash'), adminHash); scheduleMetaPush(); }
-    await ensureFirebaseAdminAuth(p); return true;
+    return true;
  }
   failCount++;
   if (failCount >= 5) {
@@ -1175,6 +1179,10 @@ async function tryLogin(user, pass){
   if (user === '__admin__' || user === '') {
     const up = await verifyPass(pass, adminHash);
     if (up) {
+      adminAuthedLive = true;
+      /* 🛡️ لازم ناخد الهوية الحقيقية على Firebase — قواعد السيرفر ما بتقبلش
+         أي كتابة إدارية غير من الـ uid المسجّل في meta/adminUid */
+      try { await ensureFirebaseAdminAuth(pass); } catch (e) {}
       if (up !== adminHash) { adminHash = up; store.setItem(S('adminHash'), adminHash); scheduleMetaPush(); }
       return { name: 'admin', role: 'admin' };
     }
@@ -2314,10 +2322,17 @@ function pushMeta(withUsers){
   pendingMetaPush = false;
   const meta = {};
   meta.setupDone = true; /* أول ما البرنامج يكتب أي meta حقيقي، نعلّم إنه اتظبط قبل كده — يمنع إعادة زرع admin تلقائي بعد أي إعادة ضبط مصنع لاحقة */
-  if (adminHash) meta.adminHash = adminHash;
-  if (loginRequiredExplicit !== null) meta.loginRequiredExplicit = loginRequiredExplicit;
+  /* 🔒 المفاتيح الحساسة دي قواعد السيرفر بتقبلها من الأدمن الحقيقي بس.
+     فمابنبعتهاش أصلاً لو المستخدم الحالي مش أدمن — عشان الكتابة كلها ما ترفضش */
+  /* مين يقدر يكتب المفاتيح الحساسة؟
+     - الأدمن/المشرف بعد الدخول
+     - أو أول تشغيل وقت إنشاء كلمة المرور (لسه مفيش جلسة دخول)
+     لو بعتناها من غير صلاحية، السيرفر هيرفض الكتابة كلها مش المفتاح ده بس */
+  const canWriteAdminMeta = !!(adminAuthedLive || isElevated());
+  if (adminHash && canWriteAdminMeta) meta.adminHash = adminHash;
+  if (loginRequiredExplicit !== null && canWriteAdminMeta) meta.loginRequiredExplicit = loginRequiredExplicit;
   /* المستخدمين يتكتبوا بس لما التعديل فعلًا فيهم (withUsers) — تغيير اللوجو/الباسورد مش بيلمسهم */
-  if (withUsers) {
+  if (withUsers && canWriteAdminMeta) {
     /* 🔒 تخزين كـ map بمفاتيح تبدأ بحرف (u_) — مش array:
        Firebase كان بيرجّع الـ array كـ object أحيانًا، والقارئ القديم بيتجاهلها
        → الجهاز يفتكر مفيش مستخدمين → يزرع admin الافتراضي فوقهم ويمسحهم. اتقفل للأبد */
@@ -3719,6 +3734,7 @@ async function openSettings(){
     if (p1 !== p2) { toast('غير متطابقتين', 'error'); return; }
     adminHash = await hashPass(p1);
     store.setItem(S('adminHash'), adminHash);
+    adminAuthedLive = true; /* اتأكدنا من الباسورد القديم → من حقنا نرفع الجديد */
     pushMeta(false);
     /* تحديث حساب Firebase الحقيقي بنفس الباسورد الجديد — بصمت، من غير أي خطوة زيادة */
     try {

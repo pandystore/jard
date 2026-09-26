@@ -519,10 +519,7 @@ function toast(msg, type, opts){
   opts = opts || {};
   const t = document.createElement('div');
   t.className = 'toast ' + (type || 'info');
-  const span = document.createElement('span');
-  /* opts.html = الرسالة فيها تنسيق (سطور جديدة/عريض).
-     المحتوى المتغيّر لازم يكون معدّى بـ esc() قبل ما ييجي هنا */
-  if (opts.html) span.innerHTML = msg; else span.textContent = msg;
+  const span = document.createElement('span'); span.textContent = msg;
   t.appendChild(span);
   /* المدد اتطوّلت عشان الأدمن والمستخدم يلحقوا يقروا الإشعار —
      وكانت 3 ثواني بس وبتطير قبل ما حد يلحق يشوفها */
@@ -1445,7 +1442,6 @@ function updateTable(){
       '<td class="tc fwb tblue" contenteditable="' + ceAct + '" data-qty="actualQuantity" data-cell="act">' + fmtQ(d.act) + '</td>' +
       '<td class="tc fwb" data-cell="diff">' + fmtQ(d.diff) + '</td>' +
       '<td class="tc txs fwb" data-cell="status">' + esc(d.status) + '</td>' +
-      '<td class="p3 txs" data-cell="by">' + esc(byName(item)) + '</td>' +
       '<td class="p3 txs" contenteditable="' + ceName + '" data-edit="note">' + esc(item.note) + '</td>' +
     '</tr>';
   }
@@ -1484,14 +1480,6 @@ function displayQty(item){
   const diff = uQty - item.systemQuantity;
   return { act: uQty, diff: diff, status: diff > 0 ? 'زيادة' : diff < 0 ? 'عجز' : 'متساوي' };
 }
-/* مين جرد الصنف — لو فيه أكتر من واحد نعرض كلهم بالكمية بتاعتهم */
-function byName(item){
-  const cs = item.counts && typeof item.counts === 'object' ? item.counts : null;
-  const names = cs ? Object.keys(cs).filter(u => Number(cs[u]) > 0) : [];
-  if (!names.length) return item.countedBy || '—';
-  if (names.length === 1) return names[0];
-  return names.map(u => u + ' (' + fmtQ(cs[u]) + ')').join('، ');
-}
 function rowClass(status, serial){
   return (status === 'زيادة' ? 'row-surplus' : status === 'عجز' ? 'row-deficit' : '') +
     (selectedSerials.has(serial) ? ' selected-for-print' : '');
@@ -1529,7 +1517,6 @@ function patchSingleRow(item){
   const actEl = tr.querySelector('[data-cell="act"]'); if (actEl && document.activeElement !== actEl) actEl.textContent = fmtQ(d.act);
   const diffEl = tr.querySelector('[data-cell="diff"]'); if (diffEl) diffEl.textContent = fmtQ(d.diff);
   const stEl = tr.querySelector('[data-cell="status"]'); if (stEl) stEl.textContent = d.status;
-  const byEl = tr.querySelector('[data-cell="by"]'); if (byEl) byEl.textContent = byName(item);
   const noteEl = tr.querySelector('[data-edit="note"]'); if (noteEl && document.activeElement !== noteEl) noteEl.textContent = item.note;
   tr.className = rowClass(d.status, item.serial);
 }
@@ -1699,10 +1686,7 @@ function processCode(code){
   if (item) {
     const prevBy = item.countedBy;
     if (item.isJarded && who && prevBy && prevBy !== who) {
-      /* ⚠️ تنبيه واضح: حد تاني جرد الصنف ده قبل كده — نوريه مين وعدّ كام */
-      toast('⚠️ «' + item.name + '» اتجرد قبل كده<br>' +
-            '<b>' + esc(byName(item)) + '</b> — الإجمالي الحالي <b>' + fmtQ(item.actualQuantity) + '</b><br>' +
-            'عدّتك إنت هتتضاف فوق مش هتستبدل', 'warning', { life: 12000, html: true });
+      toast('⚠️ "' + item.name + '" اتجرد بواسطة ' + prevBy + ' قبل كده — كميته كانت ' + fmtQ(item.actualQuantity), 'warning');
       beep('bad');
       addLog('تنبيه تعدد جرد: ' + item.code + ' بواسطة ' + prevBy + ' ثم ' + who);
  }

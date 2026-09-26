@@ -120,9 +120,9 @@
         <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         مسح المحدد
       </button>
-      <button onclick="openUndoHistory()" class="sbtn b-slate" id="btnUndoHist">
-        <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>
-        سجل التراجع
+      <button onclick="openReports()" class="sbtn b-teal" id="btnReports" title="تقارير الجرد — تصدير PDF وإكسيل">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+        التقارير
       </button>
       <button onclick="prepareAndPrint()" class="sbtn b-slate" id="btnPrint" title="طباعة تقرير الجرد">
         <svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -163,6 +163,9 @@
         </button>
       </form>
       <div id="lastScan" style="display:none;margin-top:.45rem;font-size:.72rem;font-weight:700;color:#16a34a"></div>
+      <div class="kbd-hint no-print">
+        <span><b>F2</b> جرد</span><span><b>F3</b> بحث</span><span><b>F4</b> كاميرا</span><span><b>F9</b> تقارير</span><span><b>Esc</b> إغلاق</span>
+      </div>
     </div>
     <div class="card">
       <label class="card-label">بحث سريع</label>
@@ -233,6 +236,24 @@
         </tr>
       </tfoot>
     </table>
+  </div>
+
+  <!-- ترقيم صفحات: بنرسم صفحة واحدة بس في كل مرة عشان الجهاز ما يبطّأش مع آلاف الأصناف -->
+  <div class="pager no-print" id="pager" style="display:none">
+    <div class="pager-info" id="pagerInfo"></div>
+    <div class="pager-ctrl">
+      <select id="pageSizeSel" onchange="setPageSize(this.value)" title="عدد الأصناف في الصفحة">
+        <option value="50">50 صنف</option>
+        <option value="100" selected>100 صنف</option>
+        <option value="250">250 صنف</option>
+        <option value="0">اعرض الكل</option>
+      </select>
+      <button type="button" onclick="gotoPage('first')" title="أول صفحة">⏮</button>
+      <button type="button" onclick="gotoPage('prev')" title="الصفحة السابقة">◀</button>
+      <span class="pager-pos" id="pagerPos"></span>
+      <button type="button" onclick="gotoPage('next')" title="الصفحة الجاية">▶</button>
+      <button type="button" onclick="gotoPage('last')" title="آخر صفحة">⏭</button>
+    </div>
   </div>
 
   <div id="printSign">

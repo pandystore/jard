@@ -44,6 +44,13 @@ function eq(actual, expected, label) {
   if (ok) { pass++; console.log('  ✅ ' + label); }
   else { fail++; console.log('  ❌ ' + label + ' — المتوقع: ' + JSON.stringify(expected) + ' | النتيجة: ' + JSON.stringify(actual)); }
 }
+/* مقارنة map من غير اهتمام بترتيب المفاتيح (counts عبارة عن object وترتيب مفاتيحه مالوش معنى) */
+function eqMap(actual, expected, label) {
+  const s = o => JSON.stringify(Object.keys(o || {}).sort().reduce((a, k) => { a[k] = (o || {})[k]; return a; }, {}));
+  const ok = s(actual) === s(expected);
+  if (ok) { pass++; console.log('  ✅ ' + label); }
+  else { fail++; console.log('  ❌ ' + label + ' — المتوقع: ' + s(expected) + ' | النتيجة: ' + s(actual)); }
+}
 
 console.log('== sanitizeCode / parseQty / fmtQ ==');
 {
@@ -140,6 +147,340 @@ console.log('== mergeOneItem (حل تعارض على مستوى صنف واحد)
   eq(m3.actualQuantity, 5, 'اتنين مستخدمين عاديين مختلفين بيعدّوا نفس الصنف — حصصهم بتتجمع (2+3=5)');
 }
 
-console.log('\n' + '='.repeat(50));
-console.log('النتيجة: ' + pass + ' نجح، ' + fail + ' فشل');
-if (fail > 0) process.exit(1);
+console.log('== mergeOneItem: حصص المستخدمين ماتضيعش (نسخة محلية قديمة) ==');
+{
+  /* الاختبارات اللي فوق بتستخدم أصناف من غير حصص (counts فاضية) فبتمشي في فرع
+     الوقت. دي الحالة الأخطر: جهاز عنده نسخة قديمة ما شافش فيها عدّة حد تاني،
+     ووصله تحديث من السيرفر. زمان كان فيه فرعين بيرجّعوا نسخة واحدة كاملة
+     ويسقطوا حصص باقي الناس — فكمية حد كانت بتختفي من غير سبب. */
+  const code = ['getUserRole', 'calculateRow', 'mergeOneItem'].map(extractFn).join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(
+    'let usersList = [{name:"admin",role:"admin"},{name:"محمد",role:"user"},{name:"سعاد",role:"user"}];\n' + code +
+    '\nmodule.exports = { mergeOneItem };',
+    'extracted-merge-safety.js'
+  );
+  const { mergeOneItem } = m.exports;
+
+  const it = (counts, by, ts) => ({ code:'10001', name:'أرز', group:'g', systemQuantity:10,
+    actualQuantity: Object.keys(counts).reduce((a,u)=>a+counts[u],0),
+    isJarded:true, counts, countedBy: by, editedAt: ts });
+
+  /* 1) الأدمن عدّل وجهازه لسه ما شافش إن محمد جرد — عدّة محمد لازم ماتروحش */
+  const r1 = mergeOneItem(it({admin:3}, 'admin', 200), it({'محمد':5}, 'محمد', 100), 'admin');
+  eqMap(r1.counts, { admin:3, 'محمد':5 }, 'تعديل الأدمن مامسحش عدّة محمد (اللي جهازه ماكانش شايفها)');
+  eq(r1.actualQuantity, 8, 'والإجمالي 8 مش 3');
+
+  /* 2) العكس: مستخدم عادي بيعدّل، والسيرفر عنده نسخة أدمن أحدث — عدّته هو ماتروحش */
+  const r2 = mergeOneItem(it({'محمد':4}, 'محمد', 200), it({admin:7}, 'admin', 300), 'محمد');
+  eqMap(r2.counts, { admin:7, 'محمد':4 }, 'نسخة الأدمن الأحدث مابلعتش عدّة محمد');
+  eq(r2.actualQuantity, 11, 'والإجمالي 11 مش 7');
+
+  /* 3) تلات مستخدمين، والنسخة المحلية فيها واحد بس */
+  const r3 = mergeOneItem(it({admin:1}, 'admin', 400), it({'محمد':2, 'سعاد':3}, 'محمد', 350), 'admin');
+  eqMap(r3.counts, { admin:1, 'محمد':2, 'سعاد':3 }, 'التلاتة محفوظين');
+  eq(r3.actualQuantity, 6, 'والإجمالي 6 مش 1');
+
+  /* 4) نسخة محلية قديمة ماتنزّلش عدّة حد حدّثها على السيرفر */
+  const r4 = mergeOneItem(it({admin:2, 'محمد':5}, 'admin', 500), it({'محمد':9}, 'محمد', 600), 'admin');
+  eq(r4.counts['محمد'], 9, 'السيرفر أحدث (9) — النسخة المحلية القديمة (5) ما نزلتوش');
+  eq(r4.actualQuantity, 11, 'والإجمالي 11 مش 7');
+
+  /* 5) مفيش حصص خالص على الطرفين — مفيش حاجة تضيع أصلاً */
+  const r5 = mergeOneItem(it({}, '', 200), it({}, '', 100), 'admin');
+  eq(r5.actualQuantity, 0, 'صنف لسه مجردش — يفضل صفر');
+}
+
+console.log('== النيّات: applyCountOps / legacySeedOp / applyMetaPatch ==');
+{
+  const code = ['round2', 'sumCounts', 'normItem', 'calculateRow', 'applyCountOps', 'legacySeedOp', 'applyMetaPatch'].map(extractFn).join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(code + '\nmodule.exports = { round2, sumCounts, applyCountOps, legacySeedOp, applyMetaPatch };', 'pure.js');
+  const { applyCountOps, legacySeedOp, applyMetaPatch, sumCounts } = m.exports;
+
+  const base = { serial: 1, code: '10001', name: 'صنف', group: 'عام', systemQuantity: 20, actualQuantity: 5,
+                 isJarded: true, countedBy: 'admin', counts: { admin: 5 }, editedAt: 100 };
+
+  // السيرفر عنده 5 للأدمن — مستخدم تاني بيقول "زوّد حصتي واحد" → الاتنين يتحسبوا
+  const r1 = applyCountOps(base, [{ t: 'delta', who: 'محمد', d: 1, ts: 200 }], 'محمد', '10001', base);
+  eq(r1.actualQuantity, 6, 'delta على قيمة السيرفر بتزوّد فوقها (5 + 1 = 6)');
+  eq(r1.counts, { admin: 5, 'محمد': 1 }, 'delta مابيمسحش حصّة مستخدم تاني');
+
+  // نفس النيّة بس السيرفر بقى عنده 9 (حد تاني كتب في النص) → النتيجة 10 مش 6
+  const raced = Object.assign({}, base, { actualQuantity: 9, counts: { admin: 5, 'محمد': 4 } });
+  const r2 = applyCountOps(raced, [{ t: 'delta', who: 'محمد', d: 1, ts: 200 }], 'محمد', '10001', base);
+  eq(r2.actualQuantity, 10, 'لو السيرفر اتغيّر، النيّة بتتنفّذ على القيمة الجديدة (9 + 1 = 10)');
+  eq(r2.counts['محمد'], 5, 'حصتي بتزوّد على حصتي القديمة مش بتستبدلها');
+
+  // cur = null (الصنف لسه مش موجود على السيرفر) → مفيش عدّ مزدوج
+  const localOptimistic = { serial: 1, code: 'X9', name: 'صنف جديد', systemQuantity: 0, actualQuantity: 1,
+                            isJarded: true, countedBy: 'محمد', counts: { 'محمد': 1 }, editedAt: 300 };
+  const r3 = applyCountOps(null, [{ t: 'delta', who: 'محمد', d: 1, ts: 300 }], 'محمد', 'X9', localOptimistic);
+  eq(r3.actualQuantity, 1, 'صنف جديد: النيّة بتتطبق من الصفر — مفيش double counting');
+  eq(r3.code, 'X9', 'الكود بييجي من المفتاح حتى لو cur null');
+  eq(r3.name, 'صنف جديد', 'البيانات الوصفية بتاخد من النسخة المحلية لما السيرفر مفيهوش الصنف');
+
+  // دالة نقية: نفس المدخلات = نفس الناتج (مهم لأن Firebase بيناديها أكتر من مرة)
+  const a = JSON.stringify(applyCountOps(base, [{ t: 'delta', who: 'محمد', d: 1, ts: 200 }], 'محمد', '10001', base));
+  const b = JSON.stringify(applyCountOps(base, [{ t: 'delta', who: 'محمد', d: 1, ts: 200 }], 'محمد', '10001', base));
+  eq(a, b, 'applyCountOps نقية — إعادة التنفيذ بتدي نفس النتيجة بالظبط');
+  eq(JSON.stringify(base.counts), JSON.stringify({ admin: 5 }), 'applyCountOps مابتعدّلش نسخة السيرفر اللي جاتلها');
+
+  // الكتابة اليدوية: الرقم ده حصّة صاحبها هو بس — والإجمالي = المجموع
+  const r4 = applyCountOps(base, [{ t: 'set', who: 'محمد', v: 3, ts: 400 }], 'محمد', '10001', base);
+  eq(r4.counts, { admin: 5, 'محمد': 3 }, 'كتابة يدوية بتكتب في كيس صاحبها بس');
+  eq(r4.actualQuantity, 8, 'أدمن 5 + محمد كتب 3 = 8 على مستوى الصنف (الكمية بتتجمع)');
+
+  // مثال المستخدم التاني: أدمن كتب 3 ومحمد كتب 2 → 5
+  const base2 = { serial: 2, code: '10002', name: 'صنف', systemQuantity: 10, actualQuantity: 3,
+                  isJarded: true, countedBy: 'admin', counts: { admin: 3 }, editedAt: 100 };
+  const r5 = applyCountOps(base2, [{ t: 'set', who: 'محمد', v: 2, ts: 500 }], 'محمد', '10002', base2);
+  eq(r5.actualQuantity, 5, 'أدمن 3 + محمد كتب 2 = 5 على مستوى الصنف');
+  eq(r5.counts, { admin: 3, 'محمد': 2 }, 'كتابة محمد مامسحتش الـ 3 بتاعة الأدمن');
+
+  // الأدمن كمان بيكتب في كيسه هو بس — مفيش أي عملية بتمسح حصص حد
+  const r5b = applyCountOps(base, [{ t: 'set', who: 'admin', v: 12, ts: 600 }], 'admin', '10001', base);
+  eq(r5b.counts, { admin: 12 }, 'الأدمن بيعدّل كيسه هو (5 → 12)');
+  const withUser = applyCountOps({ serial: 1, code: '10001', actualQuantity: 1, counts: { 'محمد': 1 }, editedAt: 100 },
+                                 [{ t: 'set', who: 'admin', v: 12, ts: 600 }], 'admin', '10001', null);
+  eq(withUser.actualQuantity, 13, 'كتابة الأدمن 12 + عدّة محمد 1 = 13 (الأدمن مابقاش يمسح حد)');
+  eq(withUser.counts, { 'محمد': 1, admin: 12 }, 'عدّة محمد فضلت موجودة بعد كتابة الأدمن');
+
+  // seed: بيانات قديمة فيها كمية من غير حصص
+  const legacy = { serial: 2, code: '20002', name: 'قديم', systemQuantity: 4, actualQuantity: 10,
+                   isJarded: true, countedBy: 'سعاد', counts: {}, editedAt: 50 };
+  const seedOp = legacySeedOp(legacy, 'محمد', 600);
+  eq(seedOp, { t: 'seed', who: 'سعاد', v: 10, ts: 600 }, 'legacySeedOp بينسب الكمية القديمة لصاحبها الأصلي');
+  const r6 = applyCountOps(legacy, [seedOp, { t: 'delta', who: 'محمد', d: 1, ts: 600 }], 'محمد', '20002', legacy);
+  eq(r6.actualQuantity, 11, 'بيانات قديمة: 10 القديمة + 1 الجديدة = 11 (مش 1)');
+  eq(r6.counts, { 'سعاد': 10, 'محمد': 1 }, 'الكمية القديمة اتنسبت لسعاد والعدّة الجديدة لمحمد');
+
+  // seed بيتجاهل لو السيرفر عنده حصص حقيقية — مستحيل يبوظ شغل موجود
+  const r7 = applyCountOps(base, [seedOp, { t: 'delta', who: 'محمد', d: 1, ts: 700 }], 'محمد', '10001', base);
+  eq(r7.counts, { admin: 5, 'محمد': 1 }, 'seed بيتجاهل تماماً لو فيه حصص حقيقية على السيرفر');
+  eq(legacySeedOp(base, 'محمد', 1), null, 'مفيش seed لصنف عنده حصص أصلاً');
+
+  // applyMetaPatch: تعديل الاسم مايمسحش العدّ
+  const r8 = applyMetaPatch(base, Object.assign({}, base, { name: 'الاسم الجديد', group: 'أدوات' }), '10001');
+  eq(r8.name, 'الاسم الجديد', 'الاسم الجديد اتحفظ');
+  eq(r8.counts, { admin: 5 }, 'تعديل بيانات وصفية مايلمسش حصص العد');
+  eq(r8.actualQuantity, 5, 'تعديل بيانات وصفية ماغيّرش الكمية الفعلية');
+  eq(sumCounts({ a: 1.005, b: 2 }), 3.01, 'sumCounts بيقرّب لمنزلتين');
+}
+
+console.log('== جرد متزامن فعلي: جهازين على نفس الصنف في نفس اللحظة ==');
+{
+  /* Firebase وهمي بيحاكي سلوك RTDB الحقيقي بالظبط:
+       - أول نداء لدالة الـ transaction بيكون بـ null (البيانات لسه مش في الكاش)
+       - لو القيمة على السيرفر اتغيّرت بين القراءة والكتابة، السيرفر بيرفض
+         ويبعت القيمة الجديدة والدالة تتنفّذ تاني (optimistic concurrency) */
+  function makeFakeDb(initial){
+    const data = Object.assign({}, initial || {});
+    const listeners = [];
+    const notify = [];
+    let depth = 0;
+    const api = {
+      data,
+      stats: { attempts: 0, retries: 0, delivered: 0 },
+      hook: null, /* بتتنفذ بين القراءة والكتابة — بنحاكي بيها جهاز تاني بيكتب في نفس اللحظة */
+      ref(path){
+        const key = path.split('/').pop();
+        return {
+          on(event, cb){ if (event === 'child_changed') listeners.push(cb); return cb; },
+          transaction(updateFn, onComplete){
+            const outer = (depth === 0);
+            depth++;
+            try {
+              let base = null; /* أول نداء دايمًا null زي ما Firebase بيعمل */
+              for (let attempt = 1; attempt <= 40; attempt++){
+                const proposed = updateFn(base);
+                api.stats.attempts++;
+                if (api.hook){ const h = api.hook; api.hook = null; h(); } /* جهاز تاني بيقطع علينا */
+                const current = (key in data) ? data[key] : null;
+                if (JSON.stringify(base) === JSON.stringify(current)){
+                  data[key] = proposed;
+                  if (onComplete) onComplete(null, true, { val: () => data[key] });
+                  notify.push([key, data[key]]);
+                  return;
+                }
+                api.stats.retries++;
+                base = current; /* السيرفر بعت القيمة الجديدة → نعيد تنفيذ النيّة عليها */
+              }
+              if (onComplete) onComplete(new Error('maxretries'), false, null);
+            } finally {
+              depth--;
+              /* البثّ لباقي الأجهزة بيحصل بعد ما العملية تكمل — زي ما السيرفر بيعمل */
+              if (outer){
+                while (notify.length){
+                  const pair = notify.shift();
+                  api.stats.delivered++;
+                  listeners.forEach(cb => cb({ key: pair[0], val: () => pair[1] }));
+                }
+              }
+            }
+          }
+        };
+      }
+    };
+    return api;
+  }
+
+  /* جهاز كامل: بنستخرج الدوال الحقيقية من app.js (مش نسخة منقولة بإيد) وبنشغّلها
+     على Firebase الوهمي — فالاختبار بيمرّ فعلًا على الكود اللي اتغيّر */
+  function makeDevice(fakeDb, user, role, items){
+    globalThis.__FAKE_DB__ = fakeDb;
+    const names = ['round2', 'sumCounts', 'normItem', 'calculateRow', 'applyCountOps', 'legacySeedOp',
+                   'getUserRole', 'mergeOneItem', 'resolveIncomingItem',
+                   'itemKey', 'enqueueCountOp', 'pushCountOpsNow', 'requeueCountOps', 'adoptCommittedItem'];
+    const prelude = [
+      'const db = globalThis.__FAKE_DB__;',
+      'let syncOn = true, accessDenied = false, pendingOfflinePush = false, lastSyncErr = "";',
+      'let editingCount = 0, pendingRemote = false;',
+      'const navigator = { onLine: true };',
+      'let usersList = [{name:"admin",role:"admin"},{name:"محمد",role:"user"},{name:"منى",role:"user"}];',
+      'let pendingItemWrites = {}, pendingCountOps = {}, countPushTimers = {}, countRetry = {}, committedItemKeys = {};',
+      'let dirtyItemCodes = new Set(), selectedSerials = new Set();',
+      'const inventoryData = ' + JSON.stringify(items) + ';',
+      'const sessionUser = ' + JSON.stringify({ name: user, role: role }) + ';',
+      'function fbPath(){ return "jard"; }',
+      'function setSyncUI(){} function updateOfflineBar(){} function flashDot(){} function toast(){}',
+      'function updateTable(){} function updateStats(){} function renderCategoryButtons(){} function patchSingleRow(){}',
+      'function findItemIndexByCode(c){ return inventoryData.findIndex(i => i.code === c); }',
+      /* الجدولة فورية عشان الاختبار deterministic — زي setTimeout بس من غير انتظار */
+      'function scheduleCountPush(code){ if (pendingCountOps[code] && pendingCountOps[code].length) pushCountOpsNow(code); }',
+      /* استقبال تحديثات السيرفر — بيمرّر لـ resolveIncomingItem الحقيقية من app.js
+         (الجزء ده نسخة مصغّرة من hChanged: نفس القرار + نفس الإسناد في inventoryData) */
+      'function deliverIncoming(key, raw){',
+      '  const incoming = normItem(raw, String(key).replace(/^c_/, ""));',
+      '  const idx = findItemIndexByCode(incoming.code);',
+      '  if (idx === -1){ inventoryData.push(incoming); calculateRow(incoming); return; }',
+      '  const local = inventoryData[idx];',
+      '  const finalItem = resolveIncomingItem(key, local, incoming, sessionUser ? sessionUser.name : "");',
+      '  finalItem.serial = local.serial;',
+      '  inventoryData[idx] = finalItem;',
+      '  calculateRow(finalItem);',
+      '}'
+    ].join('\n');
+    const Module = require('module');
+    const m = new Module();
+    m._compile(prelude + '\n' + names.map(extractFn).join('\n') +
+      '\ndb.ref("jard/items").on("child_changed", snap => { deliverIncoming(snap.key, snap.val()); });' +
+      '\nmodule.exports = { inventoryData, enqueueCountOp, pushCountOpsNow, queue: () => pendingCountOps, keys: () => committedItemKeys };',
+      'device.js');
+    return m.exports;
+  }
+
+  const SERVER = { c_10001: { serial: 1, code: '10001', name: 'صنف تجريبي', group: 'عام', systemQuantity: 20,
+                              actualQuantity: 0, isJarded: false, difference: -20, status: 'عجز', note: '',
+                              countedBy: '', counts: {}, conflict: false, editedAt: 100 } };
+
+  // ---- السيناريو المبلّغ عنه: الأدمن بيعدّ 5 والمستخدم التاني بيعدّ 3 في نفس اللحظة ----
+  const fake = makeFakeDb(SERVER);
+  const adminDev = makeDevice(fake, 'admin', 'admin', [JSON.parse(JSON.stringify(SERVER.c_10001))]);
+  const userDev  = makeDevice(fake, 'محمد', 'user',  [JSON.parse(JSON.stringify(SERVER.c_10001))]);
+
+  let userScans = 0;
+  for (let i = 0; i < 5; i++){
+    if (userScans < 3){
+      userScans++;
+      /* كل عدّة من الأدمن، المستخدم بيكتب في نفس اللحظة بالظبط (قبل ما كتابة الأدمن تكمل) */
+      fake.hook = () => {
+        userDev.enqueueCountOp('10001', { t: 'delta', who: 'محمد', d: 1, ts: 1000 + i });
+        userDev.pushCountOpsNow('10001');
+      };
+    } else fake.hook = null;
+    adminDev.enqueueCountOp('10001', { t: 'delta', who: 'admin', d: 1, ts: 2000 + i });
+    adminDev.pushCountOpsNow('10001');
+  }
+
+  const finalItem = fake.data['c_10001'];
+  eq(finalItem.actualQuantity, 8, '5 من الأدمن + 3 من المستخدم في نفس اللحظة = 8 (مفيش عدّة ضاعت)');
+  eqMap(finalItem.counts, { admin: 5, 'محمد': 3 }, 'كل جهاز شاف حصّة التاني ومحصلش مسح');
+  eq(finalItem.difference, -12, 'الفرق اتحسب من المجموع الحقيقي (8 − 20 = −12)');
+  eq(fake.stats.retries > 0, true, 'السيرفر رفض وأعاد المحاولة فعلًا وقت التعارض (retries=' + fake.stats.retries + ')');
+  eq(fake.stats.delivered > 0, true, 'التحديثات اتبثّت للأجهزة التانية (delivered=' + fake.stats.delivered + ')');
+  eq(adminDev.inventoryData[0].actualQuantity, 8, 'شاشة الأدمن عرضت المجموع الصحيح بعد التأكيد');
+  eq(userDev.inventoryData[0].actualQuantity, 8, 'شاشة المستخدم عرضت نفس المجموع بعد ما وصله البثّ');
+  eqMap(userDev.inventoryData[0].counts, { admin: 5, 'محمد': 3 }, 'المستخدم شاف عدّة الأدمن على شاشته');
+  eqMap(adminDev.inventoryData[0].counts, { admin: 5, 'محمد': 3 }, 'الأدمن شاف عدّة المستخدم على شاشته');
+
+  // ---- للمقارنة: نفس السيناريو بالطريقة القديمة (set كامل) كان بيضيّع العدّ ----
+  {
+    const data = JSON.parse(JSON.stringify(SERVER));
+    const oldWrite = (localItem) => { data['c_10001'] = JSON.parse(JSON.stringify(localItem)); };
+    const localAdmin = JSON.parse(JSON.stringify(SERVER.c_10001));
+    const localUser  = JSON.parse(JSON.stringify(SERVER.c_10001));
+    localAdmin.actualQuantity = 5; localAdmin.counts = { admin: 5 }; localAdmin.isJarded = true;
+    localUser.actualQuantity  = 3; localUser.counts  = { 'محمد': 3 }; localUser.isJarded = true;
+    oldWrite(localAdmin); oldWrite(localUser); /* آخر كتابة بتمسح الأولى */
+    eq(data['c_10001'].actualQuantity, 3, '⚠️ الطريقة القديمة كانت بتضيّع 5 عدّات وتسيب 3 بس — دي المشكلة اللي اتقفلت');
+  }
+
+  // ---- صنف جديد بيظهر على الجهازين في نفس اللحظة ----
+  const fake2 = makeFakeDb({});
+  const d1 = makeDevice(fake2, 'admin', 'admin', []);
+  const d2 = makeDevice(fake2, 'منى', 'user', []);
+  const newItem = { serial: 1, code: 'X9', name: 'صنف جديد', group: 'غير معروف', systemQuantity: 0,
+                    actualQuantity: 1, isJarded: true, countedBy: 'admin', counts: { admin: 1 }, editedAt: 500 };
+  fake2.hook = () => { d2.enqueueCountOp('X9', { t: 'delta', who: 'منى', d: 1, ts: 501 }); d2.pushCountOpsNow('X9'); };
+  d1.inventoryData.push(JSON.parse(JSON.stringify(newItem)));
+  d1.enqueueCountOp('X9', { t: 'delta', who: 'admin', d: 1, ts: 500 });
+  d1.pushCountOpsNow('X9');
+  eq(fake2.data['c_X9'].actualQuantity, 2, 'صنف جديد اتعمل على جهازين في نفس اللحظة → الاتنين اتحسبوا (2)');
+  eqMap(fake2.data['c_X9'].counts, { admin: 1, 'منى': 1 }, 'حصص الجهازين محفوظة على الصنف الجديد');
+
+  // ---- جرد أوفلاين: العدّات تتجمّع في الطابور وتتنفّذ بالترتيب لما النت يرجع ----
+  const fake3 = makeFakeDb(SERVER);
+  const offDev = makeDevice(fake3, 'محمد', 'user', [JSON.parse(JSON.stringify(SERVER.c_10001))]);
+  for (let i = 0; i < 4; i++) offDev.enqueueCountOp('10001', { t: 'delta', who: 'محمد', d: 1, ts: 900 + i });
+  offDev.pushCountOpsNow('10001');
+  eq(fake3.data['c_10001'].actualQuantity, 4, '4 عدّات أوفلاين مترفعة كلها في Transaction واحدة');
+  eq(Object.keys(offDev.queue()).indexOf('10001'), -1, 'الطابور اتفضى بعد ما الكتابة نجحت');
+}
+
+console.log('== تشفير كلمات المرور (salt) ==');
+{
+  /* الدوال دي async، فمش هنقدر نستخدم extractFn العادية (بتقص كلمة async) —
+     بناخد البلوك كله من app.js زي ما هو ونشغّله */
+  const a = src.indexOf("const PASS_PREFIX = 'bjrd::';");
+  const b = src.indexOf('async function verifyPass(p, stored){');
+  if (a === -1 || b === -1) { fail++; console.log('  ❌ مالقتش بلوك تشفير الباسوردات في app.js'); }
+  else {
+    let end = src.indexOf('\n}', b);
+    end = src.indexOf('\n', end + 1);
+    const code = src.slice(a, end) + '\nmodule.exports = { hashPass, verifyPass, legacyHash, randomSalt };';
+    const Module = require('module');
+    const m = new Module();
+    m._compile(code, 'pass-extracted.js');
+    const { hashPass, verifyPass, legacyHash } = m.exports;
+
+    (async () => {
+      const h1 = await hashPass('123456');
+      const h2 = await hashPass('123456');
+      eq(h1 !== h2, true, 'نفس الباسورد بيطلع hash مختلف كل مرة (فيه salt عشوائي)');
+      eq(h1.startsWith('v2$'), true, 'الصيغة الجديدة v2$salt$hash');
+      eq(h1.split('$').length, 3, 'الـhash مكوّن من 3 أجزاء');
+      eq(await verifyPass('123456', h1), h1, 'التحقق صح بنفس الباسورد');
+      eq(await verifyPass('654321', h1), null, 'باسورد غلط بيرجع null');
+      eq(await verifyPass('123456', h2), h2, 'التحقق بيشتغل مع أي salt');
+      eq(await verifyPass('123456', ''), null, 'مفيش hash مخزّن = مرفوض');
+      eq(await verifyPass('123456', null), null, 'hash = null مرفوض');
+
+      /* الترحيل من الصيغة القديمة: hash خام من غير salt لازم يتقبل مرة ويتحدّث */
+      const old = await legacyHash('123456');
+      eq(old.indexOf('$'), -1, 'الهاش القديم مفيهوش $ (صيغة قديمة)');
+      const up = await verifyPass('123456', old);
+      eq(!!up, true, 'الباسورد القديم بيتقبل وقت الدخول');
+      eq(up !== old, true, 'وبيترجّع بنسخة محدّثة فيها salt');
+      eq(up.startsWith('v2$'), true, 'النسخة المحدّثة بالصيغة الجديدة');
+      eq(await verifyPass('123456', up), up, 'والتحقق بالنسخة المحدّثة شغال');
+      eq(await verifyPass('999999', old), null, 'باسورد غلط على هاش قديم مرفوض');
+
+      console.log('\n' + '='.repeat(50));
+      console.log('النتيجة: ' + pass + ' نجح، ' + fail + ' فشل');
+      if (fail > 0) process.exit(1);
+    })();
+  }
+}

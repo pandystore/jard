@@ -1,13 +1,10 @@
-/* بيمبو جرد — Service Worker (jard-v10) - مسح نهائي حقيقي + أونلاين فقط
-   - البرنامج أونلاين فقط بدون حفظ بيانات محلية
-   - المسح يمسح الكاش في كل المتصفحات
-   - الإشعارات شغالة حتى مع minimize
+/* بيمبو جرد — Service Worker (jard-v11) — أونلاين فقط، مفيش كاش نهائياً
+   - مفيش أي نسخة من البرنامج بتتخزن على الجهاز (لا كاش ولا localStorage)
+   - من غير نت البرنامج مش هيفتح خالص
+   - موجود بس عشان إشعارات الجرد تفضل شغالة والتبويب مصغّر
+   - نسخة v11 بتمسح كل كاش النسخ القديمة أوتوماتيك أول ما تتفعّل
 */
-const CACHE = 'jard-v10';
-const CORE = [
-  './',
-  './index.html'
-];
+const CACHE = 'jard-v11'; /* الاسم بس عشان مسح القديم — مفيش كتابة عليه */
 
 let swNotifEnabled = false;
 let swLastTs = Date.now();
@@ -64,36 +61,25 @@ async function pollNotifs(){
   }
 }
 
+/* ⛔ مفيش كاش خالص — البرنامج أونلاين 100% ومايفتحش من غير نت.
+   الـ Service Worker موجود بس عشان إشعارات الجرد تشتغل والتبويب مصغّر،
+   مش عشان يخزّن نسخة من البرنامج على الجهاز. */
 self.addEventListener('install', e => {
-  e.waitUntil(
-    (async ()=>{
-      const c = await caches.open(CACHE);
-      for (const u of CORE) {
-        try { await c.add(u); } catch(err){}
-      }
-      await self.skipWaiting();
-    })()
-  );
+  e.waitUntil(self.skipWaiting());
 });
 self.addEventListener('activate', e => {
+  /* نمسح أي كاش قديم من النسخ السابقة — مفيش أي نسخة من البرنامج تفضل على الجهاز */
   e.waitUntil(
-    caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k.indexOf('jard') === 0).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.hostname.includes('firebaseio.com') || url.hostname.includes('firebasedatabase.app') || url.hostname.includes('googleapis.com')) return;
-  if (req.mode === 'navigate') {
-    e.respondWith(
-      fetch(req).then(res=>{ try{ caches.open(CACHE).then(c=>c.put('./index.html', res.clone())); }catch(err){} return res; }).catch(()=>caches.match('./index.html'))
-    );
-    return;
-  }
-  e.respondWith(
-    caches.match(req).then(hit=> hit || fetch(req))
-  );
+  /* على طول من النت — مفيش fallback على الكاش، فلو النت مقطوع البرنامج مش هيفتح */
+  e.respondWith(fetch(req));
 });
 
 self.addEventListener('message', e => {

@@ -189,7 +189,7 @@ let committedItemKeys = {};
 let editingCount = 0, pendingRemote = false;
 let failCount = 0, lockUntil = 0;
 /* نقطة 3: حماية شاشة الدخول الرئيسية من التخمين — 5 محاولات غلط = قفل دقيقة */
-let loginFails = 0, loginLockUntil = 0, loginLockLevel = 0;
+let loginFails = 0, loginLockUntil = 0;
 /* نقطة 4: صلاحية الأدمن متتصدّقش من التخزين — لازم باسورد متكتوب صح في تحميل الصفحة ده */
 let adminAuthedLive = false;
 let pendingMetaPush = false;
@@ -260,10 +260,18 @@ function normData(arr){
    لكن أبسط بكتير دلوقتي لأنه بيتطبق على صنف واحد بس وقت تعارض حقيقي (نادر جداً مع per-item sync) */
 function mergeOneItem(l, r, me){
   const rRole = getUserRole(r.countedBy);
+  const lRole = getUserRole(l.countedBy);
+  const meRole = getUserRole(me);
   const rTs = Number(r.editedAt) || 0;
   const lTs = Number(l.editedAt) || 0;
-  /* ⚠️ كان فيه هنا فرعين بيرجّعوا نسخة الأدمن كاملة ويسقطوا حصص باقي الناس.
-     اتشالوا نهائياً: العدّة بتزيد بس ومفيش عدّة حد بتروح لأي سبب. */
+  if (rRole === 'admin' && lRole !== 'admin' && meRole !== 'admin' && (rTs >= lTs || (!rTs && !lTs))) {
+    calculateRow(r);
+    return r;
+ }
+  if (lRole === 'admin' && rRole !== 'admin' && meRole === 'admin' && (lTs >= rTs || (!rTs && !lTs))) {
+    calculateRow(l);
+    return l;
+ }
   const counts = Object.assign({}, r.counts || {});
   Object.keys(l.counts || {}).forEach(u => {
     if (u === me || counts[u] === undefined) counts[u] = l.counts[u];
@@ -272,11 +280,17 @@ function mergeOneItem(l, r, me){
   m.counts = counts;
   if (Object.keys(counts).length) {
     const tot = Object.keys(counts).reduce((a, u) => a + (Number(counts[u]) || 0), 0);
-    /* دايماً ناخد مجموع الحصص المدموجة — مفيش نسخة واحدة بتكسب على التانية */
-    m.actualQuantity = Math.round(tot * 100) / 100;
-    m.isJarded = true;
-    if (me) m.countedBy = me;
-    else if (rRole === 'admin' && rTs >= lTs) m.countedBy = r.countedBy;
+    const remoteSum = Object.keys(r.counts||{}).reduce((a,u)=>a+(Number(r.counts[u])||0),0);
+    if (rRole === 'admin' && Math.abs(r.actualQuantity - remoteSum) > 0.01 && (rTs >= lTs || (!rTs && !lTs))) {
+      m.actualQuantity = r.actualQuantity;
+      m.counts = r.counts;
+      m.countedBy = r.countedBy;
+ } else {
+      m.actualQuantity = Math.round(tot * 100) / 100;
+      m.isJarded = true;
+      if (me) m.countedBy = me;
+      if (rRole === 'admin' && rTs >= lTs) m.countedBy = r.countedBy;
+ }
     m.isJarded = true;
  } else {
     if (rTs && lTs) {
@@ -1109,9 +1123,6 @@ function detachNotifListener(){
 
 /* ---------- تعديل مستخدم: الاسم أو كلمة المرور ---------- */
 async function editUser(i){
-  /* 🔒 تعديل المستخدمين (اسم/باسورد/صلاحية) للأدمن بس —
-     وقواعد السيرفر كمان بترفض كتابة meta/users من أي حد تاني */
-  if (needAdmin()) return;
   const u = usersList[i];
   if (!u) return;
   const action = await new Promise(res => {
@@ -1253,7 +1264,7 @@ function showLock(){
         inp.value = '';
         return;
  }
-      loginFails = 0; loginLockLevel = 0; say('');
+      loginFails = 0; say('');
       if (u.role === 'admin') adminAuthedLive = true; /* نقطة 4: باسورد اتكتب صح دلوقتي في الجلسة دي */
       sessionUser = u;
       store.setItem('sessionUser', JSON.stringify(u));
@@ -1262,22 +1273,16 @@ function showLock(){
       resetIdleTimer();
       addLog('دخول المستخدم: ' + u.name);
       toast('أهلًا ' + u.name, 'success');
-      /* ⚠️ لو باسورد admin لسه الافتراضي (123456) — ده أشهر باسورد في الدنيا */
-      if (u.role === 'admin' && okPassIsDefault(inp.value)) warnDefaultAdminPass();
  
  } else {
       loginFails++;
-      /* 🔒 تسجيل كل محاولة فاشلة بالاسم — عشان تعرف مين بيحاول يدخل */
-      addLog('⛔ محاولة دخول فاشلة: "' + (uname || 'admin') + '" (المرة ' + loginFails + ')');
       const c = ov.querySelector('.lock-card');
       c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
       if (loginFails >= 5) {
-        /* #6 قفل متصاعد: دقيقة، دقيقتين، 4 دقايق... لحد سقف 15 دقيقة */
-        loginLockLevel++;
         loginFails = 0;
-        loginLockUntil = Date.now() + Math.min(900000, 60000 * Math.pow(2, loginLockLevel - 1));
+        loginLockUntil = Date.now() + 60000;
         const btn = ov.querySelector('#lockBtn'); if (btn) btn.disabled = true;
-        addLog('⚠️ قفل مؤقت لشاشة الدخول: محاولات تخمين متكررة (المستوى ' + loginLockLevel + ')');
+        addLog('⚠️ قفل مؤقت لشاشة الدخول: محاولات تخمين متكررة');
         startLockCountdown();
  } else {
         say('❌ اسم المستخدم أو كلمة المرور غلط — فاضل ' + (5 - loginFails) + ' محاولات قبل القفل المؤقت');
@@ -2407,36 +2412,6 @@ function setupBarcodeInput(){
    F2 = خانة الجرد (المسح)   |   F3 / Ctrl+F = البحث   |   F4 = الكاميرا
    F9 = التقارير             |   Esc = اقفل النافذة أو فضّي البحث
    مش بتشتغل وإنت بتكتب جوه أي خانة، عشان ما تعطلش الكتابة العادية */
-/* ---------- تحذير باسورد admin الافتراضي ---------- */
-function okPassIsDefault(p){
-  return p === DEFAULT_ADMIN.pass && (!adminHash || true);
-}
-async function warnDefaultAdminPass(){
-  /* نتأكد إنها فعلاً لسه الافتراضية على السيرفر مش بس إن المستخدم كتبها */
-  const stillDefault = await verifyPass(DEFAULT_ADMIN.pass, adminHash);
-  if (!stillDefault) return;
-  const yes = await confirmDlg('⚠️ باسورد admin لسه الافتراضي',
-    'الباسورد الحالي هو <b>123456</b> — ده أشهر باسورد في الدنيا وأي حد هيجربه أول حاجة.<br><br>' +
-    'غيّره دلوقتي؟ (تقدر تغيّره بعدين من الإعدادات)', 'أيوه غيّر دلوقتي', false);
-  if (!yes) { addLog('⚠️ الأدمن أجّل تغيير الباسورد الافتراضي'); return; }
-  const p1 = await inputDlg('باسورد جديد لـ admin', '8 أحرف على الأقل', true);
-  if (p1 === null) return;
-  if (p1.length < 8) { toast('الباسورد قصير — 8 أحرف على الأقل', 'error'); return; }
-  if (p1 === DEFAULT_ADMIN.pass) { toast('دي نفس الباسورد القديمة', 'error'); return; }
-  const p2 = await inputDlg('أكد الباسورد الجديد', '', true);
-  if (p1 !== p2) { toast('غير متطابقتين', 'error'); return; }
-  adminHash = await hashPass(p1);
-  store.setItem(S('adminHash'), adminHash);
-  adminAuthedLive = true;
-  await ensureFirebaseAdminAuth(DEFAULT_ADMIN.pass).catch(() => {});
-  try {
-    const cu = firebase.auth && firebase.auth().currentUser;
-    if (cu && cu.email === adminAuthEmail()) await cu.updatePassword(p1);
-  } catch (e) {}
-  pushMeta(false);
-  addLog('🔑 تم تغيير باسورد admin الافتراضي');
-  toast('تم تغيير الباسورد — حافظ عليه', 'success');
-}
 function setupKeyboardShortcuts(){
   const typing = t => {
     if (!t) return false;

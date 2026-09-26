@@ -418,16 +418,61 @@ function resolveIncomingItem(key, local, incoming, me){
   if (pendingItemWrites[key]) return mergeOneItem(local, incoming, me);
   return incoming;
 }
-async function hashPass(p){
+/* ---------- تشفير كلمات المرور ----------
+   القديم كان SHA-256 ببادئة ثابتة من غير salt → نفس الباسورد بيطلع نفس الـhash
+   دايماً، وده بيخليه سهل الفك لو حد وصل للـhash.
+   دلوقتي كل كلمة مرور ليها salt عشوائي خاص بيها، والصيغة:  v2$<salt>$<sha256>
+   والـhash القديم (من غير salt) لسه بيتقبل مرة واحدة وقت الدخول وبيتحدّث تلقائياً. */
+const PASS_PREFIX = 'bjrd::';
+
+function randomSalt(){
+  const b = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) crypto.getRandomValues(b);
+  else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+  return [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+async function sha256Hex(txt){
   try {
-    if (crypto && crypto.subtle) {
-      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('bjrd::' + p));
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
       return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
- }
- } catch (e) {}
-  let h = 5381; const s = 'bjrd::' + p;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return 'fb' + h.toString(16);
+    }
+  } catch (e) {}
+  return null;
+}
+/* الهاش القديم بالظبط — محتاجينه عشان نعرف نتحقق من الباسوردات المخزّنة قبل التحديث */
+async function legacyHash(p){
+  const h = await sha256Hex(PASS_PREFIX + p);
+  if (h) return h;
+  let x = 5381; const t = PASS_PREFIX + p;
+  for (let i = 0; i < t.length; i++) x = ((x << 5) + x + t.charCodeAt(i)) >>> 0;
+  return 'fb' + x.toString(16);
+}
+async function hashPass(p, salt){
+  const s = salt || randomSalt();
+  const h = await sha256Hex(PASS_PREFIX + s + '::' + p);
+  /* مفيش crypto.subtle؟ منلفّقش hash ضعيف — نرجّع نسخة v1 بالـsalt نفسه */
+  if (!h) {
+    let x = 5381; const t = PASS_PREFIX + s + '::' + p;
+    for (let i = 0; i < t.length; i++) x = ((x << 5) + x + t.charCodeAt(i)) >>> 0;
+    return 'v1$' + s + '$' + x.toString(16);
+  }
+  return 'v2$' + s + '$' + h;
+}
+/* التحقق من كلمة مرور.
+   بيرجّع الـhash الصح (لو الباسورد صح) أو null (لو غلط).
+   ولو المخزّن كان بالصيغة القديمة بيرجّع نسخة محدّثة بالـsalt —
+   واللي بيناديها بيخزّنها، فالتحديث بيحصل تلقائياً أول ما المستخدم يدخل. */
+async function verifyPass(p, stored){
+  if (!stored || typeof stored !== 'string') return null;
+  const parts = stored.split('$');
+  if (parts.length === 3 && (parts[0] === 'v1' || parts[0] === 'v2')) {
+    const cand = await hashPass(p, parts[1]);
+    return cand === stored ? stored : null;
+  }
+  /* صيغة قديمة: hash خام من غير salt */
+  if (await legacyHash(p) === stored) return await hashPass(p);
+  return null;
 }
 
 /* ---------- الأصوات (بصمة زيبرا/UPOS الحقيقية) ---------- */
@@ -619,7 +664,13 @@ async function ensureAdmin(){
  }
   const p = await inputDlg('كلمة المرور', 'أدخل كلمة المرور', true);
   if (p === null) return false;
-  if (await hashPass(p) === adminHash) { failCount = 0; adminAuthedLive = true; await ensureFirebaseAdminAuth(p); return true; }
+  const upg = await verifyPass(p, adminHash);
+  if (upg) {
+    failCount = 0; adminAuthedLive = true;
+    /* لو كان مخزّن بالصيغة القديمة → حدّثه للنسخة الأقوى على طول */
+    if (upg !== adminHash) { adminHash = upg; store.setItem(S('adminHash'), adminHash); scheduleMetaPush(); }
+    await ensureFirebaseAdminAuth(p); return true;
+ }
   failCount++;
   if (failCount >= 5) {
     /* قفل متصاعد: 30 ثانية أول مرة، وبعدين يتضاعف (دقيقة، دقيقتين...) لحد سقف 5 دقايق */
@@ -1121,15 +1172,22 @@ async function editUser(i){
   toast('تم تغيير كلمة المرور لـ ' + u.name, 'success');
 }
 async function tryLogin(user, pass){
-  const h = await hashPass(pass);
   if (user === '__admin__' || user === '') {
-    if (adminHash && h === adminHash) return { name: 'admin', role: 'admin' };
+    const up = await verifyPass(pass, adminHash);
+    if (up) {
+      if (up !== adminHash) { adminHash = up; store.setItem(S('adminHash'), adminHash); scheduleMetaPush(); }
+      return { name: 'admin', role: 'admin' };
+    }
     return null;
  }
   const u = usersList.find(x => x.name === user);
   if (u && u.active === false) return { blocked: true, name: u.name }; /* مستخدم موقوف */
-  if (u && u.hash === h) return { name: u.name, role: u.role || 'user' };
-  return null;
+  if (!u) return null;
+  const okHash = await verifyPass(pass, u.hash);
+  if (!okHash) return null;
+  /* تحديث تلقائي من الصيغة القديمة للـsalt الجديد */
+  if (okHash !== u.hash) { u.hash = okHash; store.setItem(S('usersList'), JSON.stringify(usersList)); scheduleMetaPush(); }
+  return { name: u.name, role: u.role || 'user' };
 }
 function showLock(){
   /* نشيل شاشة القفل الأولية (الثابتة في HTML) عشان شاشة الدخول الحقيقية تبان */
@@ -2335,6 +2393,40 @@ function setupBarcodeInput(){
 }
 
 /* ---------- أحداث الجدول (Delegation) ---------- */
+/* ---------- اختصارات الكيبورد ----------
+   F2 = خانة الجرد (المسح)   |   F3 / Ctrl+F = البحث   |   F4 = الكاميرا
+   F9 = التقارير             |   Esc = اقفل النافذة أو فضّي البحث
+   مش بتشتغل وإنت بتكتب جوه أي خانة، عشان ما تعطلش الكتابة العادية */
+function setupKeyboardShortcuts(){
+  const typing = t => {
+    if (!t) return false;
+    const tag = (t.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || t.isContentEditable === true;
+  };
+  document.addEventListener('keydown', e => {
+    const k = (e.key || '').toLowerCase();
+    /* Esc: يقفل أي نافذة مفتوحة، ولو مفيش نافذة يفضّي البحث */
+    if (k === 'escape') {
+      const ov = document.querySelector('.modal-overlay');
+      if (ov) { ov.remove(); return; }
+      const ss = $('smartSearch');
+      if (ss && ss.value) { ss.value = ''; resetPage(); updateTable(); }
+      return;
+    }
+    /* الاختصارات دي شغالة في أي مكان */
+    if (k === 'f2') { e.preventDefault(); const i = $('addCode'); if (i) { i.focus(); i.select(); } return; }
+    if (k === 'f3' || ((e.ctrlKey || e.metaKey) && k === 'f')) {
+      e.preventDefault(); const s2 = $('smartSearch'); if (s2) { s2.focus(); s2.select(); } return;
+    }
+    if (k === 'f4') { e.preventDefault(); if (typeof openCameraScanner === 'function') openCameraScanner(); return; }
+    if (k === 'f9') { e.preventDefault(); if (typeof openReports === 'function') openReports(); return; }
+    /* Ctrl+Enter من أي مكان = نفّذ اللي في خانة الجرد */
+    if (k === 'enter' && (e.ctrlKey || e.metaKey)) {
+      const i = $('addCode');
+      if (i && document.activeElement !== i) { e.preventDefault(); const f = $('codeForm'); if (f) f.requestSubmit ? f.requestSubmit() : f.dispatchEvent(new Event('submit')); }
+    }
+  });
+}
 function setupTableEvents(){
   const tb = $('tableBody');
   document.addEventListener('focusin', e => {
@@ -3230,10 +3322,11 @@ async function factoryReset(){
   if (!c1) return;
   const okPass = await inputDlg('تأكيد كلمة مرور admin', 'اكتب كلمة المرور للمتابعة', true);
   if (okPass === null) return;
-  const h = await hashPass(okPass);
-  const defaultStillActive = !adminHash || adminHash === (await hashPass(DEFAULT_ADMIN.pass));
-  const okDefault = defaultStillActive && h === (await hashPass(DEFAULT_ADMIN.pass));
-  if (!okDefault && h !== adminHash) { toast('كلمة مرور غلط — مفيش إعادة ضبط', 'error'); return; }
+  /* الباسوردات دلوقتي بـsalt عشوائي، فالمقارنة المباشرة بين الهاشات ما تنفعش —
+     لازم نتحقق عن طريق verifyPass */
+  const defaultStillActive = !adminHash || (await verifyPass(DEFAULT_ADMIN.pass, adminHash)) !== null;
+  const okDefault = defaultStillActive && okPass === DEFAULT_ADMIN.pass;
+  if (!okDefault && !(await verifyPass(okPass, adminHash))) { toast('كلمة مرور غلط — مفيش إعادة ضبط', 'error'); return; }
 
   toast('⏳ جاري مسح البيانات من السيرفر — استنى ثواني...', 'info');
 
@@ -3615,7 +3708,9 @@ async function openSettings(){
     if (adminHash) {
       old = await inputDlg('كلمة المرور الحالية', 'أدخل كلمة المرور الحالية', true);
       if (old === null) return;
-      if (await hashPass(old) !== adminHash) { toast('كلمة المرور الحالية غير صحيحة', 'error'); return; }
+      const upOld = await verifyPass(old, adminHash);
+      if (!upOld) { toast('كلمة المرور الحالية غير صحيحة', 'error'); return; }
+      if (upOld !== adminHash) { adminHash = upOld; store.setItem(S('adminHash'), adminHash); }
  }
     const p1 = await inputDlg('كلمة مرور جديدة', '3 أحرف على الأقل', true);
     if (p1 === null) return;
@@ -3998,6 +4093,7 @@ window.addEventListener('load', () => {
   dt.value = nowLocalDT();
   setupBarcodeInput();
   setupTableEvents();
+  setupKeyboardShortcuts();
   $('userChip').addEventListener('click', () => setUserFilter(''));
   setupIdleWatch();
   registerSW();

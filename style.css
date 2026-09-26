@@ -305,3 +305,8 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .pager-ctrl button:hover{ background:#e2e8f0; }
 .pager-pos{ font-size:.78rem; font-weight:800; color:#0f172a; min-width:3.5rem; text-align:center; }
 @media (max-width:520px){ .pager{ justify-content:center; } .pager-info{ width:100%; text-align:center; } }
+
+/* ---------- تلميحات اختصارات الكيبورد ---------- */
+.kbd-hint{ display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.45rem; }
+.kbd-hint span{ font-size:.62rem; font-weight:700; color:#64748b; background:#f1f5f9; border:1px solid var(--border); border-radius:.3rem; padding:.1rem .35rem; }
+.kbd-hint b{ color:#0f172a; font-family:monospace; }

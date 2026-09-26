@@ -395,6 +395,47 @@ console.log('== جرد متزامن فعلي: جهازين على نفس الص�
   eq(Object.keys(offDev.queue()).indexOf('10001'), -1, 'الطابور اتفضى بعد ما الكتابة نجحت');
 }
 
-console.log('\n' + '='.repeat(50));
-console.log('النتيجة: ' + pass + ' نجح، ' + fail + ' فشل');
-if (fail > 0) process.exit(1);
+console.log('== تشفير كلمات المرور (salt) ==');
+{
+  /* الدوال دي async، فمش هنقدر نستخدم extractFn العادية (بتقص كلمة async) —
+     بناخد البلوك كله من app.js زي ما هو ونشغّله */
+  const a = src.indexOf("const PASS_PREFIX = 'bjrd::';");
+  const b = src.indexOf('async function verifyPass(p, stored){');
+  if (a === -1 || b === -1) { fail++; console.log('  ❌ مالقتش بلوك تشفير الباسوردات في app.js'); }
+  else {
+    let end = src.indexOf('\n}', b);
+    end = src.indexOf('\n', end + 1);
+    const code = src.slice(a, end) + '\nmodule.exports = { hashPass, verifyPass, legacyHash, randomSalt };';
+    const Module = require('module');
+    const m = new Module();
+    m._compile(code, 'pass-extracted.js');
+    const { hashPass, verifyPass, legacyHash } = m.exports;
+
+    (async () => {
+      const h1 = await hashPass('123456');
+      const h2 = await hashPass('123456');
+      eq(h1 !== h2, true, 'نفس الباسورد بيطلع hash مختلف كل مرة (فيه salt عشوائي)');
+      eq(h1.startsWith('v2$'), true, 'الصيغة الجديدة v2$salt$hash');
+      eq(h1.split('$').length, 3, 'الـhash مكوّن من 3 أجزاء');
+      eq(await verifyPass('123456', h1), h1, 'التحقق صح بنفس الباسورد');
+      eq(await verifyPass('654321', h1), null, 'باسورد غلط بيرجع null');
+      eq(await verifyPass('123456', h2), h2, 'التحقق بيشتغل مع أي salt');
+      eq(await verifyPass('123456', ''), null, 'مفيش hash مخزّن = مرفوض');
+      eq(await verifyPass('123456', null), null, 'hash = null مرفوض');
+
+      /* الترحيل من الصيغة القديمة: hash خام من غير salt لازم يتقبل مرة ويتحدّث */
+      const old = await legacyHash('123456');
+      eq(old.indexOf('$'), -1, 'الهاش القديم مفيهوش $ (صيغة قديمة)');
+      const up = await verifyPass('123456', old);
+      eq(!!up, true, 'الباسورد القديم بيتقبل وقت الدخول');
+      eq(up !== old, true, 'وبيترجّع بنسخة محدّثة فيها salt');
+      eq(up.startsWith('v2$'), true, 'النسخة المحدّثة بالصيغة الجديدة');
+      eq(await verifyPass('123456', up), up, 'والتحقق بالنسخة المحدّثة شغال');
+      eq(await verifyPass('999999', old), null, 'باسورد غلط على هاش قديم مرفوض');
+
+      console.log('\n' + '='.repeat(50));
+      console.log('النتيجة: ' + pass + ' نجح، ' + fail + ' فشل');
+      if (fail > 0) process.exit(1);
+    })();
+  }
+}

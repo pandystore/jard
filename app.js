@@ -183,6 +183,14 @@ let db = null, syncOn = false, refOff = null;
 let pendingItemWrites = {};
 let dirtyItemCodes = new Set();
 let itemPushTimers = {};
+/* طابور "نيّات" الجرد لكل صنف — دي اللي بتتطبّق على السيرفر جوه Transaction.
+   الطابور ده هو اللي بيخلي الجرد الأوفلاين يتجمّع ويتنفّذ بالترتيب لما النت يرجع */
+let pendingCountOps = {};   /* code -> [op] */
+let countPushTimers = {};
+let countRetry = {};        /* code -> عدد المحاولات الفاشلة المتتالية (backoff) */
+/* آخر كتابة على المفتاح ده كانت Transaction بتاعتنا — فاللي جاي من السيرفر هو نتيجتنا بالظبط
+   وماينفعش نعمل عليه دمج تاني (الدمج كان ممكن يبلع حصص حد تاني) */
+let committedItemKeys = {};
 let editingCount = 0, pendingRemote = false;
 let failCount = 0, lockUntil = 0;
 /* نقطة 3: حماية شاشة الدخول الرئيسية من التخمين — 5 محاولات غلط = قفل دقيقة */
@@ -308,6 +316,117 @@ function mergeOneItem(l, r, me){
   if (r.note && rRole === 'admin') m.note = r.note;
   calculateRow(m);
   return m;
+}
+/* ============================================================================
+   الجرد المتزامن — النيّات بدل الأرقام الجاهزة
+   ----------------------------------------------------------------------------
+   المشكلة القديمة: كل جهاز كان يحسب الكمية الجديدة محلياً (5+1) ويبعت الناتج
+   النهائي للسيرفر بـ set() كامل على الصنف. فلو جهازين عدّوا نفس الصنف في نفس
+   اللحظة، الاتنين بيحسبوا من نفس النقطة القديمة، والكتابة التانية بتمسح شغل
+   الأولى بالكامل — من غير أي خطأ ولا تنبيه.
+
+   الحل: الجهاز مابقاش يحدد الرقم النهائي. بيسجّل "نيّته" هو بس، والسيرفر هو
+   اللي يطبّقها على القيمة الموجودة عنده فعلاً جوه Transaction. ولو جهاز تاني
+   كتب في نفس اللحظة، السيرفر بيرفض الكتابة ويعيد تنفيذ النيّة على القيمة
+   الجديدة تلقائياً — فمفيش أي احتمال لضياع عدّة.
+
+   أنواع النيّات:
+     delta    — مسح باركود: زوّد حصتي بمقدار (عادة 1)
+     setTotal — تعديل يدوي: خَلّي الإجمالي = القيمة، وعدّل حصتي أنا بس حسابياً
+     reset    — الأدمن بيفرض الكمية: يمسح حصص الباقي ويحط الكمية كلها باسمه
+     seed     — بيانات قديمة فيها كمية من غير حصص: نسبّ الكمية لصاحبها الأصلي.
+                بتتنفّذ على السيرفر بس لو مفيش أي حصص هناك، فمستحيل تبوظ عدّة موجودة
+   ========================================================================== */
+function round2(n){ return Math.round((Number(n) || 0) * 100) / 100; }
+/* الكمية الفعلية = مجموع حصص كل المستخدمين — كل مستخدم ليه كيس مستقل */
+function sumCounts(counts){
+  const c = (counts && typeof counts === 'object') ? counts : {};
+  return round2(Object.keys(c).reduce((a, u) => a + (Number(c[u]) || 0), 0));
+}
+/* جسم الـ Transaction — دالة نقية 100%: تاخد نسخة السيرفر الحالية (cur) وقايمة
+   النيّات، وترجّع الصنف النهائي.
+
+   لازم تفضل نقية لسببين:
+     1) Firebase بيناديها أكتر من مرة لو جهاز تاني كتب في نفس اللحظة (إعادة المحاولة)
+     2) Firebase بيناديها أول مرة بقيمة null لو بيانات الصنف مش محمّلة في الكاش
+   عشان كده مفيش Date.now() ولا أي حالة خارجية جواها — كل حاجة من ops. */
+function applyCountOps(cur, ops, me, code, localBase){
+  const list = Array.isArray(ops) ? ops : [];
+  const src = (cur && typeof cur === 'object') ? cur : (localBase || null);
+  const item = normItem(src, code);
+  if (code) item.code = code;
+  /* الحصص بتبدأ من نسخة السيرفر بس — مش من النسخة المحلية، لأن المحلية أصلاً فيها
+     نيّاتنا مطبّقة (optimistic) فلو بدأنا منها هتتحسب مرتين.
+     ولو العقدة لسه مش موجودة على السيرفر (cur == null) يبقى مفيش حصص لحد غيرنا أصلاً */
+  let counts = (cur && cur.counts && typeof cur.counts === 'object') ? Object.assign({}, cur.counts) : {};
+  let lastWho = '', lastTs = Number(item.editedAt) || 0;
+  for (let i = 0; i < list.length; i++){
+    const op = list[i];
+    if (!op) continue;
+    const who = op.who || '';
+    if (op.t === 'seed'){
+      /* بنسبّ الكمية القديمة لصاحبها بس لو مفيش أي حصص خالص — لو فيه حصص حقيقية
+         يبقى البيانات مش قديمة والـ seed يتجاهل تماماً */
+      if (!Object.keys(counts).length && who) counts[who] = Math.max(0, round2(op.v));
+    } else if (op.t === 'delta'){
+      if (who) counts[who] = round2((Number(counts[who]) || 0) + (Number(op.d) || 0));
+    } else if (op.t === 'setTotal'){
+      if (who){
+        let others = 0;
+        Object.keys(counts).forEach(u => { if (u !== who) others += Number(counts[u]) || 0; });
+        counts[who] = Math.max(0, round2((Number(op.v) || 0) - others));
+      }
+    } else if (op.t === 'reset'){
+      counts = {};
+      if (who) counts[who] = Math.max(0, round2(op.v));
+    } else continue;
+    if (who) lastWho = who;
+    lastTs = Math.max(lastTs, Number(op.ts) || 0);
+  }
+  item.counts = counts;
+  item.actualQuantity = sumCounts(counts);
+  item.isJarded = true;
+  item.countedBy = lastWho || me || item.countedBy || '';
+  item.editedAt = lastTs;
+  calculateRow(item);
+  return item;
+}
+/* بيانات قديمة: كمية موجودة على الصنف من غير أي حصص (اتكتبت قبل نظام الحصص).
+   لازم ننسبها لصاحبها الأصلي قبل ما نضيف فوقها، وإلا مجموع الحصص هيطلع أقل من
+   الكمية الحقيقية. النيّة بتتنفّذ على السيرفر بس لو مفيش أي حصص هناك خالص —
+   فمستحيل تبوظ عدّة مستخدم تاني موجودة */
+function legacySeedOp(item, bag, ts){
+  if (!item) return null;
+  if (item.counts && Object.keys(item.counts).length) return null;
+  const base = round2(item.actualQuantity);
+  const owner = item.countedBy || bag;
+  if (!owner) return null;
+  if (base === 0 && !item.countedBy) return null;
+  return { t: 'seed', who: owner, v: base, ts: ts };
+}
+/* تعديل بيانات وصفية (اسم/مجموعة/كمية سيستم/ملاحظة) من غير ما نلمس حصص العد —
+   كده تعديل اسم صنف مايقدرش يمسح عدّة حد تاني بالغلط */
+function applyMetaPatch(cur, local, code){
+  if (!cur || typeof cur !== 'object') return normItem(local, code); /* العقدة لسه مش موجودة → اكتب الصنف كامل */
+  const item = normItem(cur, code);
+  const l = normItem(local, code);
+  ['name', 'group', 'systemQuantity', 'note'].forEach(f => { item[f] = l[f]; });
+  item.serial = Number(l.serial) || item.serial;
+  /* الفعلي = مجموع الحصص لو فيه حصص — مش بنغيّر حاجة من جيب حد */
+  if (Object.keys(item.counts || {}).length) item.actualQuantity = sumCounts(item.counts);
+  item.editedAt = Math.max(Number(item.editedAt) || 0, Number(l.editedAt) || 0);
+  calculateRow(item);
+  return item;
+}
+/* يقرّر ناخد التحديث الجاي من السيرفر زي ما هو ولا ندمجه مع النسخة المحلية.
+   لو آخر كتابة على المفتاح ده كانت Transaction بتاعتنا، فاللي جاي ده هو نتيجتنا
+   بالظبط — ماينفعش ندمج عليها تاني (الدمج القديم كان ممكن يبلع حصص مستخدم تاني،
+   وتحديداً فرع "الأدمن يكسب" اللي بيرجّع النسخة المحلية بكل ما فيها) */
+function resolveIncomingItem(key, local, incoming, me){
+  if (committedItemKeys[key]) { delete committedItemKeys[key]; return incoming; }
+  /* لو عندي كتابة لسه ماتأكدتش نجاحها لنفس الصنف ده، ادمج بدل ما أبلع تحديث السيرفر على عمياني */
+  if (pendingItemWrites[key]) return mergeOneItem(local, incoming, me);
+  return incoming;
 }
 async function hashPass(p){
   try {
@@ -1319,35 +1438,28 @@ function updateQty(serial, field, value, tr){
   const prevQty = item.actualQuantity;
   const who = sessionUser ? sessionUser.name : '';
   const whoRole = sessionUser ? (sessionUser.role||'user') : 'user';
+  let viaOps = false;
   if (field === 'systemQuantity') {
     item[field] = v;
   } else if (field === 'actualQuantity') {
-    // أي تعديل على الفعلي يسمع فوراً للكل
-    item.actualQuantity = v;
-    item.isJarded = true;
-    if (who) item.countedBy = who;
-    // حدث الـ counts عشان الدمج مايضيعش التعديل
-    item.counts = item.counts || {};
-    if (whoRole === 'admin') {
-      // تعديل الأدمن قانوني: يمسح باقي العد ويخلي الكمية كلها باسمه
-      item.counts = {};
-      if (who) item.counts[who] = v;
-    } else {
-      // مستخدم عادي: عدّل حصته هو بس، والباقي يفضل
-      if (who) {
-        // احسب مجموع حصص باقي المستخدمين غيري
-        let sumOthers = 0;
-        Object.keys(item.counts).forEach(u=>{ if (u!==who) sumOthers += Number(item.counts[u])||0; });
-        // لو أنا عدلت الفعلي ككل، اعتبر ان حصتي = الفعلي الجديد - حصص الآخرين (لا تقل عن 0)
-        const myNew = Math.max(0, v - sumOthers);
-        item.counts[who] = myNew;
-        // لو مفيش حصص تانية، الفعلي = حصتي
-        if (sumOthers===0) item.actualQuantity = myNew;
-        else item.actualQuantity = sumOthers + myNew;
-      } else {
-        item.actualQuantity = v;
-      }
-    }
+    /* التعديل اليدوي بقى "نيّة" للسيرفر مش رقم نهائي محسوب هنا.
+       بنقول له "الإجمالي يبقى كذا" وهو اللي يحسب حصتي أنا بس من القيمة الموجودة
+       عنده فعلاً — جوه Transaction — فلو حد تاني كتب في نفس اللحظة شغله مايتبلعش */
+    const bag = who || 'بدون مستخدم';
+    const nowTs = Date.now();
+    const ops = [];
+    const seed = legacySeedOp(item, bag, nowTs);
+    if (seed) ops.push(seed);
+    ops.push(whoRole === 'admin'
+      ? { t: 'reset',    who: bag, v: v, ts: nowTs }   /* الأدمن بيفرض الكمية ويحطها كلها باسمه */
+      : { t: 'setTotal', who: bag, v: v, ts: nowTs }); /* مستخدم عادي: يعدّل حصته هو بس والباقي يفضل */
+    /* optimistic محلياً بنفس الدالة النقية اللي السيرفر هيستخدمها — عشان الشاشة
+       والنتيجة النهائية على السيرفر يطلعوا نفس الرقم بالظبط */
+    const opt = applyCountOps(item, ops, who, item.code, item);
+    opt.serial = item.serial;
+    Object.assign(item, opt);
+    ops.forEach(op => enqueueCountOp(item.code, op));
+    viaOps = true;
   } else {
     item[field] = v;
   }
@@ -1357,7 +1469,7 @@ function updateQty(serial, field, value, tr){
   touchLocal();
   localSave();
   updateStats();
-  schedulePushItem(item);
+  if (viaOps) scheduleCountPush(item.code); else schedulePushItem(item);
   // إشعار و تتبع
   try {
     if (field === 'actualQuantity' && who && v !== prevQty && (!whoRole || whoRole === 'user')) {
@@ -1386,34 +1498,36 @@ function processCode(code){
   }
   lastScanCode = code; lastScanTime = nowTs;
   const who = sessionUser ? sessionUser.name : '';
+  const bag = who || 'بدون مستخدم';
   const item = inventoryData.find(i => i.code === code);
   let done = null, qty = 0;
+  const ops = [];
   if (item) {
     const prevBy = item.countedBy;
     if (item.isJarded && who && prevBy && prevBy !== who) {
-      item.counts = item.counts || {};
-      item.counts[prevBy] = item.counts[prevBy] !== undefined ? item.counts[prevBy] : item.actualQuantity;
-      item.counts[who] = (item.counts[who] || 0) + 1;
       toast('⚠️ "' + item.name + '" اتجرد بواسطة ' + prevBy + ' قبل كده — كميته كانت ' + fmtQ(item.actualQuantity), 'warning');
       addLog('تنبيه تعدد جرد: ' + item.code + ' بواسطة ' + prevBy + ' ثم ' + who);
-    } else {
-      item.counts = item.counts || {};
-      if (prevBy === who || !prevBy) item.counts[who || 'بدون مستخدم'] = item.actualQuantity + 1;
     }
-    const beforeQty = item.actualQuantity;
-    item.actualQuantity = Math.round((item.actualQuantity + 1) * 100) / 100;
-    item.isJarded = true;
-    item.editedAt = Date.now();
-    if (who) item.countedBy = who;
-    calculateRow(item);
+    /* بيانات قديمة من غير حصص؟ ننسب الكمية الموجودة لصاحبها الأصلي الأول */
+    const seed = legacySeedOp(item, bag, nowTs);
+    if (seed) ops.push(seed);
+    /* النيّة الحقيقية: "زوّد حصتي أنا واحد" — مش "اكتب الرقم 6".
+       السيرفر هو اللي هيطبّقها على الكمية الموجودة عنده فعلاً، فلو جهاز تاني
+       عدّ نفس الصنف في نفس اللحظة الاتنين هيتحسبوا */
+    ops.push({ t: 'delta', who: bag, d: 1, ts: nowTs });
+    const opt = applyCountOps(item, ops, who, item.code, item);
+    opt.serial = item.serial;
+    Object.assign(item, opt);
     beep('ok');
     done = item; qty = item.actualQuantity;
     // 🔔 إشعار فوري للمسؤول: مستخدم جرد فقط عدّ صنف
     try { if (sessionUser && (!sessionUser.role || sessionUser.role === 'user')) pushCountNotif(item, 1); } catch(e){}
   } else {
     const ns = inventoryData.length ? Math.max.apply(null, inventoryData.map(i => i.serial)) + 1 : 1;
-    const nv = { serial: ns, code: code, name: 'صنف جديد', group: 'غير معروف', systemQuantity: 0, actualQuantity: 1, isJarded: true, difference: 1, status: 'زيادة', note: '', countedBy: who, counts: who ? { [who]: 1 } : {}, conflict: false, editedAt: Date.now() };
+    const nv = { serial: ns, code: code, name: 'صنف جديد', group: 'غير معروف', systemQuantity: 0, actualQuantity: 1, isJarded: true, difference: 1, status: 'زيادة', note: '', countedBy: who, counts: { [bag]: 1 }, conflict: false, editedAt: nowTs };
     inventoryData.push(nv);
+    /* الصنف جديد على السيرفر كمان — النيّة هتتبني عليه من الصفر هناك */
+    ops.push({ t: 'delta', who: bag, d: 1, ts: nowTs });
     beep('ok');
     if (!eanOk(code)) toast('⚠️ كود غير معروف واحتمال قراءة غلط (checksum مش سليم) — اتسجل كزيادة: ' + code, 'warning');
     else toast('كود غير معروف — اتسجل كزيادة: ' + code, 'warning');
@@ -1422,7 +1536,13 @@ function processCode(code){
     try { if (sessionUser && (!sessionUser.role || sessionUser.role === 'user')) pushCountNotif(nv, 1); } catch(e){}
   }
   touchLocal();
-  localSave(); updateTable(); updateStats(); schedulePushItem(done);
+  localSave(); updateTable(); updateStats();
+  if (done && ops.length) {
+    ops.forEach(op => enqueueCountOp(done.code, op));
+    scheduleCountPush(done.code);
+  } else if (done) {
+    schedulePushItem(done);
+  }
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
@@ -1702,11 +1822,7 @@ function attachSync(){
     let finalItem = incoming;
     if (idx !== -1) {
       const local = inventoryData[idx];
-      /* لو عندي كتابة لسه ماتأكدتش نجاحها لنفس الصنف ده، ادمج بدل ما أبلع تحديث السيرفر على عمياني */
-      if (pendingItemWrites[key]) {
-        const me = sessionUser ? sessionUser.name : '';
-        finalItem = mergeOneItem(local, incoming, me);
-      }
+      finalItem = resolveIncomingItem(key, local, incoming, sessionUser ? sessionUser.name : '');
       finalItem.serial = local.serial; /* رقم التسلسل المحلي هو الأصل، مش أي رقم جاي من السيرفر */
       inventoryData[idx] = finalItem;
       if (!initialLoadDone) return;
@@ -1844,35 +1960,145 @@ function schedulePushItem(item){
   clearTimeout(itemPushTimers[item.code]);
   itemPushTimers[item.code] = setTimeout(() => pushItemNow(item), 450);
 }
+/* تعديل بيانات وصفية (اسم/مجموعة/ملاحظة/كمية سيستم) — بقى Transaction هو كمان،
+   عشان تعديل اسم صنف مايقدرش يمسح حصص حد تاني كان بيعدّ في نفس اللحظة */
 function pushItemNow(item){
   if (!item || !item.code) return;
   if (!syncOn || !db) { pendingOfflinePush = true; return; }
   clearTimeout(itemPushTimers[item.code]); itemPushTimers[item.code] = null;
   const key = itemKey(item.code);
+  const code = item.code;
   pendingItemWrites[key] = true;
   if (navigator && navigator.onLine === false) { pendingOfflinePush = true; setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت'); updateOfflineBar(); }
-  db.ref(fbPath() + '/items/' + key).set(item).then(() => {
+  db.ref(fbPath() + '/items/' + key).transaction(cur => {
+    return applyMetaPatch(cur, item, code);
+  }, (err, committed, snap) => {
     delete pendingItemWrites[key];
-    dirtyItemCodes.delete(item.code);
-    flashDot(); accessDenied = false; updateOfflineBar();
-  }).catch(err => {
-    delete pendingItemWrites[key];
-    pendingOfflinePush = true;
-    lastSyncErr = err && err.message ? err.message : String(err);
-    if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
-      accessDenied = true;
-      setSyncUI('off', 'مرفوض من السيرفر ⚠️');
-      toast('⚠️ السيرفر رفض الكتابة — افتح الإعدادات ← "🔌 الاتصال والمزامنة" ← "ربط قاعدة البيانات"', 'error');
-    } else {
-      setSyncUI('mid', 'انقطع مؤقتًا — محفوظ عندك وهيترفع تلقائيًا');
+    if (err || !committed) {
+      dirtyItemCodes.add(code);
+      pendingOfflinePush = true;
+      lastSyncErr = err && err.message ? err.message : String(err || 'transaction not committed');
+      if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
+        accessDenied = true;
+        setSyncUI('off', 'مرفوض من السيرفر ⚠️');
+        toast('⚠️ السيرفر رفض الكتابة — افتح الإعدادات ← "🔌 الاتصال والمزامنة" ← "ربط قاعدة البيانات"', 'error');
+      } else {
+        setSyncUI('mid', 'انقطع مؤقتًا — محفوظ عندك وهيترفع تلقائيًا');
+      }
+      updateOfflineBar();
+      return;
     }
+    committedItemKeys[key] = true;
+    adoptCommittedItem(code, snap ? snap.val() : null);
+    dirtyItemCodes.delete(code);
+    flashDot(); accessDenied = false; updateOfflineBar();
+  }, false /* applyLocally=false: منحدّثش الكاش المحلي بالقيمة المؤقتة — عندنا optimistic UI أصلاً،
+               وكده المراقبين (child_added/child_changed) مايشوفوش صنف ناقص في نص العملية */);
+}
+/* ---------- رفع نوايا الجرد جوه Transaction — ده قلب إصلاح التعددية ----------
+   مابنبعتش للسيرفر "اكتب 6"، بنقول له "مهما كان الموجود عندك دلوقتي، زوّد حصتي واحد".
+   لو جهاز تاني كتب في نفس اللحظة، السيرفر بيرفض ويعيد تنفيذ النيّة على القيمة الجديدة
+   لوحده — فمفيش أي احتمال إن عدّة تضيع من غير ما يظهر خطأ */
+function enqueueCountOp(code, op){
+  if (!code || !op) return;
+  if (!pendingCountOps[code]) pendingCountOps[code] = [];
+  pendingCountOps[code].push(op);
+}
+function scheduleCountPush(code, delay){
+  if (!code) return;
+  dirtyItemCodes.add(code);
+  if (!syncOn || !db) { pendingOfflinePush = true; setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت'); updateOfflineBar(); return; }
+  clearTimeout(countPushTimers[code]);
+  countPushTimers[code] = setTimeout(() => pushCountOpsNow(code), delay == null ? 350 : delay);
+}
+function pushCountOpsNow(code){
+  if (!code) return;
+  clearTimeout(countPushTimers[code]); countPushTimers[code] = null;
+  const ops = pendingCountOps[code];
+  if (!ops || !ops.length) { delete pendingCountOps[code]; dirtyItemCodes.delete(code); return; }
+  if (!syncOn || !db || (navigator && navigator.onLine === false)) {
+    pendingOfflinePush = true;
+    setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت');
     updateOfflineBar();
-  });
+    return;
+  }
+  const key = itemKey(code);
+  const local = inventoryData.find(i => i.code === code) || null;
+  const me = sessionUser ? sessionUser.name : '';
+  /* نشيل النيّات من الطابور قبل الكتابة — لو الكتابة فشلت نرجّعها زي ما هي بالترتيب */
+  delete pendingCountOps[code];
+  pendingItemWrites[key] = true;
+  db.ref(fbPath() + '/items/' + key).transaction(cur => {
+    /* الدالة دي Firebase بيناديها أكتر من مرة لو حصل تعارض، وأول مرة بـ null لو
+       بيانات الصنف مش في الكاش — عشان كده نقية تماماً ومابتعتمدش على أي حالة بره ops */
+    return applyCountOps(cur, ops, me, code, local);
+  }, (err, committed, snap) => {
+    delete pendingItemWrites[key];
+    if (err || !committed) {
+      requeueCountOps(code, ops);
+      lastSyncErr = err && err.message ? err.message : String(err || 'transaction not committed');
+      if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
+        accessDenied = true;
+        setSyncUI('off', 'مرفوض من السيرفر ⚠️');
+        toast('⚠️ السيرفر رفض الكتابة — افتح الإعدادات ← "🔌 الاتصال والمزامنة" ← "ربط قاعدة البيانات"', 'error');
+      } else {
+        setSyncUI('mid', 'انقطع مؤقتًا — العدّ محفوظ عندك وهيترفع تلقائيًا');
+      }
+      updateOfflineBar();
+      return;
+    }
+    countRetry[code] = 0;
+    committedItemKeys[key] = true;
+    adoptCommittedItem(code, snap ? snap.val() : null);
+    dirtyItemCodes.delete(code);
+    flashDot(); accessDenied = false; updateOfflineBar();
+    /* لو اتجمعت نيّات جديدة وإحنا بنكتب، نرفعها على طول */
+    if (pendingCountOps[code] && pendingCountOps[code].length) scheduleCountPush(code);
+  }, false /* applyLocally=false — نفس سبب pushItemNow */);
+}
+/* فشلت الكتابة → النيّات ترجع الطابور بالترتيب ونعيد المحاولة بـ backoff.
+   مانفضلش نحاول للأبد لو السيرفر رافض الصلاحية؛ هنرفعها مع رجوع النت */
+function requeueCountOps(code, ops){
+  if (!code || !ops || !ops.length) return;
+  const rest = pendingCountOps[code] || [];
+  pendingCountOps[code] = ops.concat(rest); /* الأقدم يفضل في الأول */
+  dirtyItemCodes.add(code);
+  pendingOfflinePush = true;
+  countRetry[code] = (countRetry[code] || 0) + 1;
+  if (countRetry[code] > 5) {
+    toast('⚠️ تعذّر رفع عدّ "' + code + '" دلوقتي — محفوظ عندك وهيترفع أول ما الاتصال يستقر', 'warning');
+    return;
+  }
+  if (syncOn && db && !accessDenied) scheduleCountPush(code, 1200 * countRetry[code]);
+}
+/* النتيجة المعتمدة من السيرفر هي الحقيقة — بنرجّعها على الشاشة زي ما هي */
+function adoptCommittedItem(code, raw){
+  if (!code) return;
+  const idx = findItemIndexByCode(code);
+  if (raw == null) {
+    /* العقدة اتمسحت على السيرفر (حذف من جهاز تاني) — نشيلها محلياً كمان */
+    if (idx !== -1) {
+      selectedSerials.delete(inventoryData[idx].serial);
+      inventoryData.splice(idx, 1);
+      updateTable(); updateStats(); renderCategoryButtons();
+    }
+    flashDot();
+    return;
+  }
+  const item = normItem(raw, code);
+  if (idx === -1) inventoryData.push(item);
+  else { item.serial = inventoryData[idx].serial; inventoryData[idx] = item; }
+  calculateRow(item);
+  if (editingCount > 0) { pendingRemote = true; return; }
+  patchSingleRow(item);
+  updateStats();
+  flashDot();
 }
 /* إعادة رفع أي تعديلات معلّقة (حصلت وإحنا أوفلاين) بمجرد ما النت يرجع — كل صنف لوحده برضه */
 function flushDirtyItems(){
   if (!syncOn || !db || !dirtyItemCodes.size) return;
   Array.from(dirtyItemCodes).forEach(code => {
+    if (pendingCountOps[code] && pendingCountOps[code].length) { countRetry[code] = 0; pushCountOpsNow(code); return; }
     const item = inventoryData.find(i => i.code === code);
     if (item) pushItemNow(item); else dirtyItemCodes.delete(code);
   });

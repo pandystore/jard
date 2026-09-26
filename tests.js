@@ -183,15 +183,25 @@ console.log('== النيّات: applyCountOps / legacySeedOp / applyMetaPatch ==
   eq(a, b, 'applyCountOps نقية — إعادة التنفيذ بتدي نفس النتيجة بالظبط');
   eq(JSON.stringify(base.counts), JSON.stringify({ admin: 5 }), 'applyCountOps مابتعدّلش نسخة السيرفر اللي جاتلها');
 
-  // setTotal: المستخدم كتب 25 في الفعلي → حصته هو بس تتعدّل والباقي يفضل
-  const r4 = applyCountOps(base, [{ t: 'setTotal', who: 'محمد', v: 25, ts: 400 }], 'محمد', '10001', base);
-  eq(r4.actualQuantity, 25, 'setTotal بيوصّل الإجمالي للرقم المطلوب');
-  eq(r4.counts, { admin: 5, 'محمد': 20 }, 'setTotal بيحسب حصتي = الإجمالي − حصص الآخرين (25 − 5 = 20)');
+  // الكتابة اليدوية: الرقم ده حصّة صاحبها هو بس — والإجمالي = المجموع
+  const r4 = applyCountOps(base, [{ t: 'set', who: 'محمد', v: 3, ts: 400 }], 'محمد', '10001', base);
+  eq(r4.counts, { admin: 5, 'محمد': 3 }, 'كتابة يدوية بتكتب في كيس صاحبها بس');
+  eq(r4.actualQuantity, 8, 'أدمن 5 + محمد كتب 3 = 8 على مستوى الصنف (الكمية بتتجمع)');
 
-  // reset: الأدمن بيفرض الكمية → حصص الباقي تتمسح
-  const r5 = applyCountOps(base, [{ t: 'reset', who: 'admin', v: 30, ts: 500 }], 'admin', '10001', base);
-  eq(r5.actualQuantity, 30, 'reset بيحط الكمية كلها');
-  eq(r5.counts, { admin: 30 }, 'reset بيمسح حصص باقي المستخدمين (سلوك الأدمن المتعمّد)');
+  // مثال المستخدم التاني: أدمن كتب 3 ومحمد كتب 2 → 5
+  const base2 = { serial: 2, code: '10002', name: 'صنف', systemQuantity: 10, actualQuantity: 3,
+                  isJarded: true, countedBy: 'admin', counts: { admin: 3 }, editedAt: 100 };
+  const r5 = applyCountOps(base2, [{ t: 'set', who: 'محمد', v: 2, ts: 500 }], 'محمد', '10002', base2);
+  eq(r5.actualQuantity, 5, 'أدمن 3 + محمد كتب 2 = 5 على مستوى الصنف');
+  eq(r5.counts, { admin: 3, 'محمد': 2 }, 'كتابة محمد مامسحتش الـ 3 بتاعة الأدمن');
+
+  // الأدمن كمان بيكتب في كيسه هو بس — مفيش أي عملية بتمسح حصص حد
+  const r5b = applyCountOps(base, [{ t: 'set', who: 'admin', v: 12, ts: 600 }], 'admin', '10001', base);
+  eq(r5b.counts, { admin: 12 }, 'الأدمن بيعدّل كيسه هو (5 → 12)');
+  const withUser = applyCountOps({ serial: 1, code: '10001', actualQuantity: 1, counts: { 'محمد': 1 }, editedAt: 100 },
+                                 [{ t: 'set', who: 'admin', v: 12, ts: 600 }], 'admin', '10001', null);
+  eq(withUser.actualQuantity, 13, 'كتابة الأدمن 12 + عدّة محمد 1 = 13 (الأدمن مابقاش يمسح حد)');
+  eq(withUser.counts, { 'محمد': 1, admin: 12 }, 'عدّة محمد فضلت موجودة بعد كتابة الأدمن');
 
   // seed: بيانات قديمة فيها كمية من غير حصص
   const legacy = { serial: 2, code: '20002', name: 'قديم', systemQuantity: 4, actualQuantity: 10,

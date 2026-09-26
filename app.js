@@ -331,11 +331,14 @@ function mergeOneItem(l, r, me){
    الجديدة تلقائياً — فمفيش أي احتمال لضياع عدّة.
 
    أنواع النيّات:
-     delta    — مسح باركود: زوّد حصتي بمقدار (عادة 1)
-     setTotal — تعديل يدوي: خَلّي الإجمالي = القيمة، وعدّل حصتي أنا بس حسابياً
-     reset    — الأدمن بيفرض الكمية: يمسح حصص الباقي ويحط الكمية كلها باسمه
-     seed     — بيانات قديمة فيها كمية من غير حصص: نسبّ الكمية لصاحبها الأصلي.
-                بتتنفّذ على السيرفر بس لو مفيش أي حصص هناك، فمستحيل تبوظ عدّة موجودة
+     delta — مسح باركود: زوّد حصتي بمقدار (عادة 1)
+     set   — كتابة يدوية: الرقم ده حصّة صاحبها هو بس (مش الإجمالي، ومش بيمسح حد)
+     seed  — بيانات قديمة فيها كمية من غير حصص: نسبّ الكمية لصاحبها الأصلي.
+             بتتنفّذ على السيرفر بس لو مفيش أي حصص هناك، فمستحيل تبوظ عدّة موجودة
+
+   القاعدة الحاكمة: مفيش أي عملية بتمسح حصّة حد تاني. الكمية الفعلية على مستوى
+   الصنف = مجموع حصص كل الناس، فهي بتزيد بس ومفيش عدّة بتضيع لأي سبب —
+   ولا حتى لو الأدمن كتب رقم بإيده.
    ========================================================================== */
 function round2(n){ return Math.round((Number(n) || 0) * 100) / 100; }
 /* الكمية الفعلية = مجموع حصص كل المستخدمين — كل مستخدم ليه كيس مستقل */
@@ -370,14 +373,9 @@ function applyCountOps(cur, ops, me, code, localBase){
       if (!Object.keys(counts).length && who) counts[who] = Math.max(0, round2(op.v));
     } else if (op.t === 'delta'){
       if (who) counts[who] = round2((Number(counts[who]) || 0) + (Number(op.d) || 0));
-    } else if (op.t === 'setTotal'){
-      if (who){
-        let others = 0;
-        Object.keys(counts).forEach(u => { if (u !== who) others += Number(counts[u]) || 0; });
-        counts[who] = Math.max(0, round2((Number(op.v) || 0) - others));
-      }
-    } else if (op.t === 'reset'){
-      counts = {};
+    } else if (op.t === 'set'){
+      /* كتابة يدوية: الرقم ده حصّة صاحبها هو بس — مش الإجمالي، ومش بيمسح حد.
+         الإجمالي بيتحسب لوحده تحت كمجموع كل الحصص */
       if (who) counts[who] = Math.max(0, round2(op.v));
     } else continue;
     if (who) lastWho = who;
@@ -500,10 +498,12 @@ function toast(msg, type, opts){
   t.className = 'toast ' + (type || 'info');
   const span = document.createElement('span'); span.textContent = msg;
   t.appendChild(span);
-  let life = 3000, killed = false;
+  /* المدد اتطوّلت عشان الأدمن والمستخدم يلحقوا يقروا الإشعار —
+     وكانت 3 ثواني بس وبتطير قبل ما حد يلحق يشوفها */
+  let life = (opts.life != null) ? opts.life : 8000, killed = false;
   const kill = () => { if (!killed) { killed = true; t.remove(); } };
   if (opts.actionLabel) {
-    life = 10000;
+    life = 15000;
     const b = document.createElement('button');
     b.className = 'act'; b.textContent = opts.actionLabel;
     b.onclick = () => { kill(); opts.onAction && opts.onAction(); };
@@ -984,7 +984,7 @@ function showJardNotification(ev, isTest){
     if (navigator.serviceWorker && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready.then(reg=>{
         reg.showNotification(title, opts).catch(()=>{
-          try { const n=new Notification(title, opts); n.onclick=()=>{window.focus(); n.close();}; setTimeout(()=>{try{n.close();}catch(e){}},8000);} catch(e){}
+          try { const n=new Notification(title, opts); n.onclick=()=>{window.focus(); n.close();}; setTimeout(()=>{try{n.close();}catch(e){}},20000);} catch(e){}
         });
       }).catch(()=>{
         try { const n=new Notification(title, opts); n.onclick=()=>{window.focus(); n.close();}; } catch(e){}
@@ -1442,17 +1442,16 @@ function updateQty(serial, field, value, tr){
   if (field === 'systemQuantity') {
     item[field] = v;
   } else if (field === 'actualQuantity') {
-    /* التعديل اليدوي بقى "نيّة" للسيرفر مش رقم نهائي محسوب هنا.
-       بنقول له "الإجمالي يبقى كذا" وهو اللي يحسب حصتي أنا بس من القيمة الموجودة
-       عنده فعلاً — جوه Transaction — فلو حد تاني كتب في نفس اللحظة شغله مايتبلعش */
+    /* الكتابة اليدوية: الرقم اللي كتبته ده "حصّتي أنا" — مش إجمالي الصنف.
+       إجمالي الصنف بيطلع لوحده = مجموع حصص كل الناس.
+       يعني: أدمن كتب 5 ومحمد كتب 3 → الصنف يبقى 8. ومفيش حد بيمسح حد،
+       ولا حتى الأدمن — كل واحد بيعدّل في كيسه هو بس */
     const bag = who || 'بدون مستخدم';
     const nowTs = Date.now();
     const ops = [];
     const seed = legacySeedOp(item, bag, nowTs);
     if (seed) ops.push(seed);
-    ops.push(whoRole === 'admin'
-      ? { t: 'reset',    who: bag, v: v, ts: nowTs }   /* الأدمن بيفرض الكمية ويحطها كلها باسمه */
-      : { t: 'setTotal', who: bag, v: v, ts: nowTs }); /* مستخدم عادي: يعدّل حصته هو بس والباقي يفضل */
+    ops.push({ t: 'set', who: bag, v: v, ts: nowTs });
     /* optimistic محلياً بنفس الدالة النقية اللي السيرفر هيستخدمها — عشان الشاشة
        والنتيجة النهائية على السيرفر يطلعوا نفس الرقم بالظبط */
     const opt = applyCountOps(item, ops, who, item.code, item);

@@ -17,7 +17,7 @@ const store = (() => {
     setItem: (k, v) => { mem.set(k, String(v)); },
     removeItem: k => { mem.delete(k); },
     clear: () => { mem.clear(); }
-  };
+ };
 })();
 /* تنظيف لمرة واحدة لأي بقايا من نسخ قديمة كانت بتخزن على الجهاز —
    البرنامج مش بيكتب على localStorage ولا sessionStorage خالص بعد كده */
@@ -31,10 +31,10 @@ const store = (() => {
         const k = box.key(i);
         /* مفاتيح البرنامج بس — مفاتيح أي موقع تاني على نفس الدومين متتلمسش */
         if (k && KILL.test(k)) kill.push(k);
-      }
+ }
       kill.forEach(k => { try { box.removeItem(k); } catch (e) {} });
-    } catch (e) {}
-  });
+ } catch (e) {}
+ });
 })();
 
 const FIREBASE_CONFIG = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey !== undefined) ? window.FIREBASE_CONFIG : { apiKey: "", authDomain: "", databaseURL: "", projectId: "", appId: "" };
@@ -102,8 +102,8 @@ function tabGuard(proceed){
             document.querySelectorAll('.big-block-ov').forEach(x => x.remove());
             active = true;
             proceed();
-          });
-      }
+ });
+ }
       if (m.t === 'takeover' && active) {
         active = false;
         try { stopCameraScanner(); } catch (e) {}
@@ -111,11 +111,11 @@ function tabGuard(proceed){
         bigBlock('🖥️', 'البرنامج اتقفل من هنا',
           'اتفتح من تبويب تاني على نفس الجهاز — الجلسة اتنقلت هناك.<br>عايز ترجع؟ اقفل التبويب التاني وحدّث الصفحة.',
           'حسنًا', () => {});
-      }
-    };
+ }
+ };
     ch.postMessage({ t: 'ping', id: myId });
     setTimeout(() => { if (!decided) { decided = true; active = true; proceed(); } }, 400);
-  } catch (e) { proceed(); }
+ } catch (e) { proceed(); }
 }
 
 /* تنبيه مرئي عند أي خطأ في الصفحة بدل الفشل الصامت */
@@ -128,7 +128,7 @@ window.addEventListener('error', function (e) {
     t.textContent = 'خطأ في الصفحة: ' + e.message;
     box.appendChild(t);
     setTimeout(function () { t.remove(); }, 7000);
-  } catch (err) {}
+ } catch (err) {}
 });
 
 const LOGO_URI = "data:image/png;base64,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";
@@ -145,7 +145,7 @@ function S(k){ return k; }
   ['inventoryData','localRev','logBook','selectedDateTime','customLogo','adminHash','usersList'].forEach(k => {
     const withSuffix = store.getItem(k + '::jard');
     if (withSuffix !== null && store.getItem(k) === null) store.setItem(k, withSuffix);
-  });
+ });
 })();
 
 let inventoryData = []; /* يبدأ فاضي - البيانات من Firebase فقط */
@@ -171,12 +171,11 @@ let firebaseCfgLS = JSON.parse(store.getItem('firebaseCfg') || 'null');
 let db = null, syncOn = false, refOff = null;
 /* المزامنة اللحظية الجديدة: كل صنف بيتبعت لوحده لمساره الخاص، مش المصفوفة كاملة.
    pendingItemWrites: مفاتيح الأصناف اللي عندها كتابة محلية لسه مأكدتش نجاحها (للـ merge وقت التعارض)
-   dirtyItemCodes: أكواد الأصناف اللي عندها تعديل معلّق لسه ما اترفعش (لإعادة المحاولة عند رجوع النت) */
+ */
 let pendingItemWrites = {};
-let dirtyItemCodes = new Set();
 let itemPushTimers = {};
 /* طابور "نيّات" الجرد لكل صنف — دي اللي بتتطبّق على السيرفر جوه Transaction.
-   الطابور ده هو اللي بيخلي الجرد الأوفلاين يتجمّع ويتنفّذ بالترتيب لما النت يرجع */
+   الطابور ده للتجميع اللحظي بس (كام مسحة ورا بعض)، مش لتخزين أوفلاين */
 let pendingCountOps = {};   /* code -> [op] */
 let countPushTimers = {};
 let countRetry = {};        /* code -> عدد المحاولات الفاشلة المتتالية (backoff) */
@@ -189,7 +188,6 @@ let failCount = 0, lockUntil = 0;
 let loginFails = 0, loginLockUntil = 0;
 /* نقطة 4: صلاحية الأدمن متتصدّقش من التخزين — لازم باسورد متكتوب صح في تحميل الصفحة ده */
 let adminAuthedLive = false;
-let pendingOfflinePush = false;
 let pendingMetaPush = false;
 /* ختم نسخة المستخدمين: الأحدث على السيرفر هو القانون — كده الحذف بينفّد ومفيش مستخدم محذوف يرجع لوحده */
 let lastUsersRev = 0;
@@ -203,8 +201,6 @@ let notifRef = null;
 let notifOff = null;
 let lastNotifTs = parseInt(store.getItem('lastNotifTs') || '0') || 0;
 let notifPrompted = false;
-/* رقم إصدار بياناتنا محليًا — عشان لو النت رجع ما يستبدلش شغل الأوفلاين بالقديم */
-let localRev = parseInt(store.getItem(S('localRev')) || '0');
 const deviceId = store.getItem('deviceId') || (() => { const id = 'dev-' + Math.random().toString(36).slice(2, 9); store.setItem('deviceId', id); return id; })();
 
 /* ---------- أدوات عامة ---------- */
@@ -219,7 +215,7 @@ function sanitizeCode(s){
     let i = AR.indexOf(ch); if (i !== -1) { out += String(i); continue; }
     i = FA.indexOf(ch); if (i !== -1) { out += String(i); continue; }
     if (ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126) out += ch; /* ASCII بس */
-  }
+ }
   return out.trim();
 }
 function fmtQ(n){ n = Number(n) || 0; return Number.isInteger(n) ? n : +n.toFixed(2); }
@@ -249,7 +245,7 @@ function normItem(i, fallbackCode){
     counts: (i.counts && typeof i.counts === 'object') ? i.counts : {},
     conflict: !!i.conflict,
     editedAt: Number(i.editedAt) || 0
-  };
+ };
 }
 function normData(arr){
   if (!arr) return [];
@@ -267,15 +263,15 @@ function mergeOneItem(l, r, me){
   if (rRole === 'admin' && lRole !== 'admin' && meRole !== 'admin' && (rTs >= lTs || (!rTs && !lTs))) {
     calculateRow(r);
     return r;
-  }
+ }
   if (lRole === 'admin' && rRole !== 'admin' && meRole === 'admin' && (lTs >= rTs || (!rTs && !lTs))) {
     calculateRow(l);
     return l;
-  }
+ }
   const counts = Object.assign({}, r.counts || {});
   Object.keys(l.counts || {}).forEach(u => {
     if (u === me || counts[u] === undefined) counts[u] = l.counts[u];
-  });
+ });
   const m = Object.assign({}, r);
   m.counts = counts;
   if (Object.keys(counts).length) {
@@ -285,24 +281,24 @@ function mergeOneItem(l, r, me){
       m.actualQuantity = r.actualQuantity;
       m.counts = r.counts;
       m.countedBy = r.countedBy;
-    } else {
+ } else {
       m.actualQuantity = Math.round(tot * 100) / 100;
       m.isJarded = true;
       if (me) m.countedBy = me;
       if (rRole === 'admin' && rTs >= lTs) m.countedBy = r.countedBy;
-    }
+ }
     m.isJarded = true;
-  } else {
+ } else {
     if (rTs && lTs) {
       if (rTs >= lTs) { m.actualQuantity = r.actualQuantity; m.countedBy = r.countedBy || l.countedBy; }
       else { m.actualQuantity = l.actualQuantity; m.countedBy = l.countedBy || r.countedBy; }
-    } else if (rRole === 'admin') {
+ } else if (rRole === 'admin') {
       m.actualQuantity = r.actualQuantity; m.countedBy = r.countedBy || l.countedBy;
-    } else {
+ } else {
       m.actualQuantity = l.actualQuantity; m.countedBy = l.countedBy || r.countedBy;
-    }
+ }
     m.isJarded = r.isJarded || l.isJarded;
-  }
+ }
   m.editedAt = Math.max(rTs, lTs);
   if (me && l.note) m.note = l.note;
   if (r.note && rRole === 'admin') m.note = r.note;
@@ -363,16 +359,16 @@ function applyCountOps(cur, ops, me, code, localBase){
       /* بنسبّ الكمية القديمة لصاحبها بس لو مفيش أي حصص خالص — لو فيه حصص حقيقية
          يبقى البيانات مش قديمة والـ seed يتجاهل تماماً */
       if (!Object.keys(counts).length && who) counts[who] = Math.max(0, round2(op.v));
-    } else if (op.t === 'delta'){
+ } else if (op.t === 'delta'){
       if (who) counts[who] = round2((Number(counts[who]) || 0) + (Number(op.d) || 0));
-    } else if (op.t === 'set'){
+ } else if (op.t === 'set'){
       /* كتابة يدوية: الرقم ده حصّة صاحبها هو بس — مش الإجمالي، ومش بيمسح حد.
          الإجمالي بيتحسب لوحده تحت كمجموع كل الحصص */
       if (who) counts[who] = Math.max(0, round2(op.v));
-    } else continue;
+ } else continue;
     if (who) lastWho = who;
     lastTs = Math.max(lastTs, Number(op.ts) || 0);
-  }
+ }
   item.counts = counts;
   item.actualQuantity = sumCounts(counts);
   item.isJarded = true;
@@ -423,8 +419,8 @@ async function hashPass(p){
     if (crypto && crypto.subtle) {
       const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('bjrd::' + p));
       return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
-    }
-  } catch (e) {}
+ }
+ } catch (e) {}
   let h = 5381; const s = 'bjrd::' + p;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
   return 'fb' + h.toString(16);
@@ -441,7 +437,7 @@ function audioCtx(){
     comp.attack.value = .001; comp.release.value = .08;
     masterGain = AC.createGain(); masterGain.gain.value = 1;
     masterGain.connect(comp); comp.connect(AC.destination);
-  }
+ }
   return AC;
 }
 /* نغمة بظرف حاد: هجوم 2ms + قطع مفاجئ — سر صوت الـ piezo الحقيقي */
@@ -466,16 +462,16 @@ function beep(kind){
       tone(2093, 0, .09, 'sine', 1);
       tone(2093 * 2, 0, .09, 'sine', .18);    /* لمعة علوية */
       tone(2093, 0, .09, 'square', .25);      /* جسم خفيف للنغمة */
-    } else if (kind === 'unk') {
+ } else if (kind === 'unk') {
       /* ⚠️ كود غير معروف — chirp منخفض ثم عالي */
       tone(1300, 0, .06, 'square', .9, 2000);
       tone(2000, .08, .06, 'square', .9, 3100);
-    } else if (kind === 'bad') {
+ } else if (kind === 'bad') {
       /* ❌ صوت الخطأ — هبوط سريع */
       tone(600, 0, .12, 'square', .75, 300);
       tone(1200, .13, .1, 'square', .4, 400);
-    }
-  } catch (e) {}
+ }
+ } catch (e) {}
 }
 /* فك قفل الصوت على iOS/Chrome من أول لمسة */
 function primeAudio(){
@@ -500,7 +496,7 @@ function toast(msg, type, opts){
     b.className = 'act'; b.textContent = opts.actionLabel;
     b.onclick = () => { kill(); opts.onAction && opts.onAction(); };
     t.appendChild(b);
-  }
+ }
   $('toasts').appendChild(t);
   setTimeout(kill, life);
 }
@@ -521,7 +517,7 @@ function showModal(title, bodyHTML, buttons, onDismiss, opts){
     b.className = 'mbtn ' + (bd.kind || 'ghost'); b.textContent = bd.label;
     b.onclick = () => { bd.onClick && bd.onClick(body, close); if (bd.autoClose !== false) close(); };
     foot.appendChild(b);
-  });
+ });
   box.appendChild(h); box.appendChild(body); if (buttons && buttons.length) box.appendChild(foot);
   ov.appendChild(box);
   ov.addEventListener('click', e => { if (e.target === ov) close(); });
@@ -534,7 +530,7 @@ function confirmDlg(title, text, okLabel, danger){
       { label: okLabel || 'تأكيد', kind: danger ? 'danger' : 'primary', onClick: () => res(true) },
       { label: 'إلغاء', kind: 'ghost', onClick: () => res(false) }
     ], () => res(false));
-  });
+ });
 }
 /* معاينة فعلية لأول 15 صف هيتضافوا/يتحدثوا في الاستيراد — مش عدد بس زي ما كان قبل كده */
 function importPreviewDlg(title, summaryText, rowsHTML, okLabel){
@@ -546,7 +542,7 @@ function importPreviewDlg(title, summaryText, rowsHTML, okLabel){
       { label: okLabel || 'تأكيد', kind: 'primary', onClick: () => res(true) },
       { label: 'إلغاء', kind: 'ghost', onClick: () => res(false) }
     ], () => res(false));
-  });
+ });
 }
 function inputDlg(title, ph, isPass){
   return new Promise(res => {
@@ -557,7 +553,7 @@ function inputDlg(title, ph, isPass){
     const inp = m.body.querySelector('#_dlgInp');
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { res(inp.value || ''); m.close(); } });
     setTimeout(() => inp.focus(), 50);
-  });
+ });
 }
 
 /* ---------- التحقق من كلمة المرور ---------- */
@@ -579,22 +575,22 @@ async function ensureFirebaseAdminAuth(password){
   try {
     await firebase.auth().signInWithEmailAndPassword(email, password);
     return true;
-  } catch (e) {
+ } catch (e) {
     if (e && e.code === 'auth/user-not-found') {
       try {
         const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
         /* أول أدمن يعمل الحساب هو اللي بيتسجل — بعد كده مفيش حد يقدر يغيّره غير نفسه (قواعد الحماية) */
         try { await db.ref(fbPath() + '/meta/adminUid').transaction(cur => cur == null ? cred.user.uid : cur); } catch(e2){}
         return true;
-      } catch (e2) {
+ } catch (e2) {
         if (e2 && e2.code === 'auth/operation-not-allowed') {
           toast('⚠️ لازم تفعّل "Email/Password" في Firebase Console ← Authentication ← Sign-in method عشان الحماية المتقدمة تشتغل', 'error');
-        }
+ }
         return false;
-      }
-    }
+ }
+ }
     return false;
-  }
+ }
 }
 async function ensureAdmin(){
   if (!adminHash) {
@@ -611,12 +607,12 @@ async function ensureAdmin(){
     adminAuthedLive = true; /* نقطة 4: باسورد اتكتب صح */
     toast('تم إنشاء كلمة المرور بنجاح', 'success');
     return true;
-  }
+ }
   if (Date.now() < lockUntil) {
     const secs = Math.ceil((lockUntil - Date.now()) / 1000);
     toast('محاولات كثيرة — انتظر ' + secs + ' ثانية', 'error');
     return false;
-  }
+ }
   const p = await inputDlg('كلمة المرور', 'أدخل كلمة المرور', true);
   if (p === null) return false;
   if (await hashPass(p) === adminHash) { failCount = 0; adminAuthedLive = true; await ensureFirebaseAdminAuth(p); return true; }
@@ -625,7 +621,7 @@ async function ensureAdmin(){
     /* قفل متصاعد: 30 ثانية أول مرة، وبعدين يتضاعف (دقيقة، دقيقتين...) لحد سقف 5 دقايق */
     const level = Math.floor(failCount / 5) - 1;
     lockUntil = Date.now() + Math.min(300000, 30000 * Math.pow(2, level));
-  }
+ }
   toast('كلمة مرور غير صحيحة', 'error');
   return false;
 }
@@ -646,9 +642,9 @@ async function seedDefaultAdmin(){
         store.setItem(S('usersList'), JSON.stringify(usersList));
         addLog('استرجاع المستخدمين من السيرفر بدل الزرع: ' + arr.length + ' مستخدم');
         return;
-      }
-    }
-  } catch (e) {}
+ }
+ }
+ } catch (e) {}
   usersList = [{ name: DEFAULT_ADMIN.user, hash: await hashPass(DEFAULT_ADMIN.pass), role: 'admin', active: true }];
   store.setItem(S('usersList'), JSON.stringify(usersList));
   pushMeta(true);
@@ -699,14 +695,14 @@ function applyUserUI(){
     if (lbl) {
       const roleTxt = sessionUser.role === 'admin' ? ' (admin)' : (sessionUser.role === 'supervisor' ? ' (مشرف)' : '');
       lbl.textContent = '👤 ' + sessionUser.name + roleTxt;
-    }
-  } else if (line) line.style.display = 'none';
+ }
+ } else if (line) line.style.display = 'none';
   const adm = isAdmin();
   const elev = isElevated();
   if (sb) sb.style.display = adm ? '' : 'none';
   ['btnExport', 'btnExportCsv', 'btnPrint', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnUndoHist'].forEach(id => {
     const b = $(id); if (b) b.style.display = elev ? '' : 'none';
-  });
+ });
   /* لازم الجدول يترسم من جديد بعد الدخول/الخروج — عشان صلاحيات التعديل
      (contenteditable) بتتحسب وقت الرسم، فلو مرسمناش هتفضل صلاحيات اللي قبلها */
   try { updateTable(); } catch (e) {}
@@ -714,11 +710,11 @@ function applyUserUI(){
     if (adm && sessionUser && syncOn) {
       if (store.getItem('notifEnabled') === '1' && window.Notification && Notification.permission === 'granted') {
         attachNotifListener();
-      }
-    } else {
+ }
+ } else {
       detachNotifListener();
-    }
-  } catch(e){}
+ }
+ } catch(e){}
 }
 
 function logoutUser(){
@@ -767,17 +763,16 @@ let mySessionRef = null;
 function sessionKey(u){ return u.replace(/[.#$\[\]\/]/g, '_'); }
 /* يمنع فتح نفس المستخدم من جهازين — يحجز الجلسة على Firebase */
 async function claimSession(u){
-  /* 📡 أوفلاين؟ دخول فوري من غير انتظار الشبكة خالص — المستخدم يشتغل،
-     والحجز الحقيقي على السيرفر بيتم لوحده أول ما النت يرجع (connectFirebase بيعيد claimSession) */
-  if (navigator && navigator.onLine === false) return { ok: true, soft: true };
+  /* ⛔ مفيش دخول أوفلاين — البرنامج أونلاين فقط، فلازم السيرفر يؤكد حجز الجلسة */
+  if (navigator && navigator.onLine === false) return { ok: false, offline: true };
   /* لو فيه كونفيج ومش متصل لسه: حاول تتصل بس بحد أقصى 2.5 ثانية — منحبسش اليوزر */
   if ((!syncOn || !db) && effectiveCfg() && effectiveCfg().apiKey) {
     await Promise.race([
       connectFirebase(true).catch(() => {}),
       new Promise(r => setTimeout(r, 2500))
     ]);
-  }
-  if (!syncOn || !db) return { ok: true, soft: true }; /* الاتصال متعذر → دخول مؤقت، والتشديد عند أول اتصال */
+ }
+  if (!syncOn || !db) return { ok: false, offline: true }; /* مفيش اتصال → مفيش دخول */
   /* الجلسة على مستوى الجذر — المستخدم مقفول لجهاز واحد حتى لو الفروع مختلفة */
   const ref = db.ref(fbRoot() + '/sessions/' + sessionKey(u.name));
   try {
@@ -787,7 +782,7 @@ async function claimSession(u){
     /* لو فيه جلسة نشطة (آخر نبضة قبل أقل من دقيقة وعشرين) على جهاز تاني → امنع */
     if (v && v.deviceId !== deviceId && v.ts && (now - v.ts) < 80000) {
       return { ok: false, since: v.ts, name: u.name };
-    }
+ }
     await ref.set({ deviceId: deviceId, ts: firebase.database.ServerValue.TIMESTAMP, name: u.name });
     /* لو الصفحة اتقفلت/النت قطع: السيرفر بيمسح حجز الجلسة بنفسه — مفيش قفل معلق */
     try { ref.onDisconnect().remove(); } catch (e) {}
@@ -801,24 +796,24 @@ async function claimSession(u){
       bigBlock('⛔', 'تم إنهاء جلستك',
         'الأدمن سجّل خروجك من الجهاز ده.<br>لو ده حصل بالخطأ، كلم المسؤول وادخل من جديد.',
         'حسنًا — دخول من جديد', () => logoutUser());
-    };
+ };
     window.__sessBeat = setInterval(async () => {
       try {
         const s = await ref.get();
         if (s.val() === null) { clearInterval(window.__sessBeat); window.__sessBeat = null; forceOut(); return; }
         await ref.update({ ts: firebase.database.ServerValue.TIMESTAMP });
-      } catch (e) {}
-    }, 20000);
+ } catch (e) {}
+ }, 20000);
     /* مراقبة فورية: لو الجلسة اتمسحت دلوقتي → شيك فورًا */
     try { if (window.__sessWatch) window.__sessWatch(); } catch (e) {}
     window.__sessWatch = ref.on('value', snap => {
       if (snap.val() !== null) return;
       if (!sessionUser || !loginRequired()) return;
       setTimeout(() => { ref.get().then(c => { if (c.val() === null) forceOut(); }).catch(() => {}); }, 1200);
-    });
+ });
     mySessionRef = ref;
     return { ok: true };
-  } catch (e) { return { ok: true }; } /* فشل الاتصال = نسمح */
+ } catch (e) { return { ok: true }; } /* فشل الاتصال = نسمح */
 }
 function releaseSession(){
   if (window.__sessBeat) { clearInterval(window.__sessBeat); window.__sessBeat = null; }
@@ -827,7 +822,7 @@ function releaseSession(){
     try { mySessionRef.onDisconnect().cancel(); } catch (e) {}
     mySessionRef.remove().catch(() => {});
     mySessionRef = null;
-  }
+ }
 }
 /* نقطة 9+4: استرجاع الجلسة بعد تحديث الصفحة — بس بعد ما السيرفر يأكد:
    (1) المستخدم لسه موجود ومش موقوف (2) مفيش جهاز تاني ماسك الحساب دلوقتي */
@@ -836,13 +831,13 @@ async function validateSavedSession(){
   let live = null;
   if (sessionUser.name === DEFAULT_ADMIN.user && sessionUser.role === 'admin') {
     live = { name: DEFAULT_ADMIN.user, role: 'admin' }; /* حساب الأدمن الافتراضي */
-  } else {
+ } else {
     live = usersList.find(x => x.name === sessionUser.name) || null;
-  }
+ }
   if (!live || live.active === false) {
     sessionUser = null; store.removeItem('sessionUser');
     return false;
-  }
+ }
   /* جدّد الصلاحية من نسخة السيرفر — التخزين المحلي مش مصدر ثقة (نقطة 4) */
   sessionUser = { name: live.name, role: live.role || 'user' };
   store.setItem('sessionUser', JSON.stringify(sessionUser));
@@ -851,7 +846,7 @@ async function validateSavedSession(){
     const takenName = sessionUser.name;
     sessionUser = null; store.removeItem('sessionUser');
     return 'taken:' + takenName;
-  }
+ }
   return true;
 }
 /* ---------- طرد مستخدم من جهازه (للمسؤول) ---------- */
@@ -862,10 +857,10 @@ async function kickUserOut(userName){
     toast('✅ اتطرد ' + userName + ' — جهازه هيسجل خروج خلال ثواني', 'success');
     addLog('طرد يدوي: ' + userName);
     return true;
-  } catch (e) {
+ } catch (e) {
     toast('فشل الطرد: ' + (e.message || 'خطأ'), 'error');
     return false;
-  }
+ }
 }
 async function getOnlineSessions(){
   if (!syncOn || !db) return [];
@@ -876,7 +871,7 @@ async function getOnlineSessions(){
     return Object.entries(v)
       .filter(([, s]) => s && s.ts && (now - s.ts) < 80000)
       .map(([k, s]) => ({ key: k, name: s.name || k, ts: s.ts, deviceId: s.deviceId }));
-  } catch (e) { return []; }
+ } catch (e) { return []; }
 }
 
 
@@ -885,13 +880,13 @@ function tellSW(msg){
   try {
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage(msg);
-    }
+ }
     if (navigator.serviceWorker) {
       navigator.serviceWorker.ready.then(reg=>{
         if (reg.active) reg.active.postMessage(msg);
-      }).catch(()=>{});
-    }
-  } catch(e){}
+ }).catch(()=>{});
+ }
+ } catch(e){}
 }
 let swPingTimer = null;
 function startSwPing(){
@@ -910,7 +905,7 @@ function updateNotifUI(){
     buttons.forEach(b=>{ if(b){ b.textContent='🚫 المتصفح لا يدعم الإشعارات'; b.disabled=true; }});
     hints.forEach(h=>{ if(h) h.textContent='جرب Chrome أو Edge'; });
     return;
-  }
+ }
   const perm = Notification.permission;
   const enabled = store.getItem('notifEnabled') === '1';
   buttons.forEach(btn=>{
@@ -918,24 +913,24 @@ function updateNotifUI(){
     if (perm === 'granted' && enabled) {
       btn.textContent='🔔 الإشعارات مفعّلة ✅';
       btn.style.background='#16a34a';
-    } else if (perm === 'denied') {
+ } else if (perm === 'denied') {
       btn.textContent='🚫 الإشعارات محظورة';
       btn.style.background='#ef4444';
-    } else {
+ } else {
       btn.textContent='🔔 فعّل إشعارات الجرد على سطح المكتب';
       btn.style.background='#2563eb';
-    }
-  });
+ }
+ });
   hints.forEach(hint=>{
     if (!hint) return;
     if (perm === 'granted' && enabled) {
       hint.textContent='شغال ✅ - إشعار زي الواتساب حتى لو الصفحة متصغرة';
-    } else if (perm === 'denied') {
+ } else if (perm === 'denied') {
       hint.textContent='مقفولة - افتح القفل 🔒 فوق واسمح بالإشعارات';
-    } else {
+ } else {
       hint.textContent='اضغط الزر واسمح - هتظهر على الديسكتوب';
-    }
-  });
+ }
+ });
 }
 async function toggleNotif(){
   if (!canShowNotif()) { toast('المتصفح لا يدعم الإشعارات', 'error'); return; }
@@ -945,12 +940,12 @@ async function toggleNotif(){
     updateNotifUI();
     showJardNotification({by:'اختبار', role:'user', code:'TEST', name:'إشعار تجريبي - لو شفته على الديسكتوب يبقى تمام ✅', qty:1, ts:Date.now()}, true);
     return;
-  }
+ }
   if (Notification.permission === 'denied') {
     toast('🚫 مانع الإشعارات من المتصفح - افتح القفل 🔒 فوق', 'error');
     updateNotifUI();
     return;
-  }
+ }
   try {
     const p = await Notification.requestPermission();
     updateNotifUI();
@@ -959,10 +954,10 @@ async function toggleNotif(){
       toast('✅ تم تفعيل الإشعارات - هتوصلك حتى لو minimize', 'success');
       attachNotifListener();
       showJardNotification({by:'النظام', role:'user', code:'TEST', name:'الإشعارات شغالة ✅', qty:1, ts:Date.now()}, true);
-    } else {
+ } else {
       store.setItem('notifEnabled','0');
-    }
-  } catch(e){ toast('تعذر طلب الإشعارات', 'error'); }
+ }
+ } catch(e){ toast('تعذر طلب الإشعارات', 'error'); }
 }
 function showJardNotification(ev, isTest){
   if (!isTest && !isAdmin()) return;
@@ -971,7 +966,7 @@ function showJardNotification(ev, isTest){
   if (!isTest) {
     if (ev.by === (sessionUser && sessionUser.name)) return;
     if (ev.role === 'admin') return;
-  }
+ }
   const title = isTest ? '🔔 بيمبو ستور - الجرد' : ('📦 جرد جديد — ' + ev.by);
   const body = isTest ? ev.name : ((ev.name || 'صنف') + ' \nالكود: ' + (ev.code||'') + ' | القطعة: ' + (ev.qty||'') + '\nبواسطة: ' + ev.by);
   const opts = { body: body, tag: 'jard-'+(ev.ts||Date.now()), renotify: true, requireInteraction: false, vibrate: [200,100,200], data: {url:'./'} };
@@ -980,17 +975,17 @@ function showJardNotification(ev, isTest){
       navigator.serviceWorker.ready.then(reg=>{
         reg.showNotification(title, opts).catch(()=>{
           try { const n=new Notification(title, opts); n.onclick=()=>{window.focus(); n.close();}; setTimeout(()=>{try{n.close();}catch(e){}},20000);} catch(e){}
-        });
-      }).catch(()=>{
+ });
+ }).catch(()=>{
         try { const n=new Notification(title, opts); n.onclick=()=>{window.focus(); n.close();}; } catch(e){}
-      });
-    } else {
+ });
+ } else {
       const n=new Notification(title, opts);
       n.onclick=()=>{window.focus(); n.close();};
-    }
-  } catch(e){
+ }
+ } catch(e){
     try { const n=new Notification(title, opts); n.onclick=()=>{window.focus(); n.close();}; } catch(e2){}
-  }
+ }
   try { if (soundOn) beep('ok'); } catch(e){}
   if (!isTest) toast('🔔 ' + ev.by + ' جرد: ' + (ev.name||ev.code) + ' ×' + (ev.qty||1), 'info');
 }
@@ -1012,7 +1007,7 @@ function pushCountNotif(item, delta, action){
       delta: scanDelta,
       action: action || 'count',
       ts: firebase.database.ServerValue.TIMESTAMP
-    };
+ };
     db.ref(fbPath() + '/notifs').push(ev).catch(()=>{});
     // لو أدمن، احتفظ بآخر 150 حدث فقط
     if (isAdmin()) {
@@ -1024,11 +1019,11 @@ function pushCountNotif(item, delta, action){
             const sorted = Object.entries(v).sort((a,b)=> (a[1].ts||0)-(b[1].ts||0));
             const toDel = sorted.slice(0, keys.length - 150);
             toDel.forEach(([k])=>{ db.ref(fbPath() + '/notifs/' + k).remove().catch(()=>{}); });
-          }
-        });
-      } catch(e){}
-    }
-  } catch(e){}
+ }
+ });
+ } catch(e){}
+ }
+ } catch(e){}
 }
 function attachNotifListener(){
   if (!isAdmin()) return;
@@ -1045,7 +1040,7 @@ function attachNotifListener(){
     lastNotifTs = Math.max(lastNotifTs, ts);
     store.setItem('lastNotifTs', String(lastNotifTs));
     showJardNotification(ev, false);
-  });
+ });
   notifOff = ()=>{ try{ ref.off('child_added', cb); }catch(e){} };
   tellSW({type:'JARD_NOTIF', enabled:true, lastTs:lastNotifTs});
   startSwPing();
@@ -1056,8 +1051,8 @@ function clearAllLocalCaches(){
   try {
     if ('caches' in window) {
       caches.keys().then(keys=>{ keys.forEach(k=>{ if(k.startsWith('jard-')) caches.delete(k); }); });
-    }
-  } catch(e){}
+ }
+ } catch(e){}
   try { tellSW({type:'JARD_WIPE_CACHE'}); } catch(e){}
 }
 function detachNotifListener(){
@@ -1078,7 +1073,7 @@ async function editUser(i){
       { label: '🏷️ تغيير الصلاحية', kind: 'primary', onClick: () => res('role') },
       { label: 'إلغاء', kind: 'ghost', onClick: () => res(null) }
     ], () => res(null));
-  });
+ });
   if (!action) return;
   if (action === 'role') {
     if (u.name === DEFAULT_ADMIN.user) { toast('مايتغيرش صلاحية حساب admin الافتراضي', 'error'); return; }
@@ -1097,7 +1092,7 @@ async function editUser(i){
     addLog('تعديل صلاحية مستخدم: ' + u.name + ' → ' + newRole);
     toast('تم تغيير صلاحية ' + u.name, 'success');
     return;
-  }
+ }
   if (action === 'name') {
     const nn = await inputDlg('اسم جديد للمستخدم', 'الاسم الحالي: ' + u.name);
     if (nn === null) return;
@@ -1111,7 +1106,7 @@ async function editUser(i){
     addLog('تعديل اسم مستخدم: ' + old + ' → ' + v);
     toast('تم تغيير الاسم', 'success');
     return;
-  }
+ }
   const np = await inputDlg('كلمة مرور جديدة لـ "' + u.name + '"', '3 أحرف على الأقل', true);
   if (np === null) return;
   if (np.length < 3) { toast('كلمة المرور قصيرة', 'error'); return; }
@@ -1126,7 +1121,7 @@ async function tryLogin(user, pass){
   if (user === '__admin__' || user === '') {
     if (adminHash && h === adminHash) return { name: 'admin', role: 'admin' };
     return null;
-  }
+ }
   const u = usersList.find(x => x.name === user);
   if (u && u.active === false) return { blocked: true, name: u.name }; /* مستخدم موقوف */
   if (u && u.hash === h) return { name: u.name, role: u.role || 'user' };
@@ -1148,7 +1143,7 @@ function showLock(){
     '<div class="lock-sub">أدخل اسم المستخدم وكلمة المرور</div>' +
     /* 📡 تنبيه ودّي: الدخول شغال أوفلاين عادي */
     ((navigator && navigator.onLine === false)
-      ? '<div style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:.6rem;padding:.55rem .7rem;font-size:.78rem;font-weight:800;margin-bottom:.8rem;line-height:1.9">📡 النت مقطوع دلوقتي — سجّل دخولك عادي وكمّل جردك، وكل حاجة هتترفع لوحدها أول ما النت يرجع ✅</div>'
+      ? '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;border-radius:.6rem;padding:.55rem .7rem;font-size:.78rem;font-weight:800;margin-bottom:.8rem;line-height:1.9">📡 النت مقطوع دلوقتي — البرنامج أونلاين فقط، ومينفعش دخول من غير اتصال. وصّل النت وحاول تاني</div>'
       : '') +
     /* نقطة 3: بانر أخطاء كبير وواضح جوه كارت الدخول نفسه */
     '<div id="lockMsg" style="display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:.6rem;padding:.55rem .7rem;font-size:.9rem;font-weight:800;margin-bottom:.8rem;line-height:1.8"></div>' +
@@ -1167,8 +1162,8 @@ function showLock(){
       const left = Math.ceil((loginLockUntil - Date.now()) / 1000);
       if (left <= 0) { clearInterval(lockTicker); lockTicker = null; say(''); const btn = ov.querySelector('#lockBtn'); if (btn) btn.disabled = false; return; }
       say('⛔ محاولات دخول كتير غلط — القفل مؤقت للحماية. حاول بعد ' + left + ' ثانية');
-    }, 500);
-  };
+ }, 500);
+ };
   const tryOpen = async () => {
     /* نقطة 3: حماية من التخمين — 5 محاولات غلط = دقيقة قفل */
     if (Date.now() < loginLockUntil) { startLockCountdown(); return; }
@@ -1180,13 +1175,17 @@ function showLock(){
       c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
       inp.value = ''; inp.focus();
       return;
-    }
+ }
     if (u) {
       /* قفل "جهاز واحد بس" لكل مستخدم */
       const btn = ov.querySelector('#lockBtn');
       btn.disabled = true; btn.textContent = '⏳ جاري التحقق...';
       const claim = await claimSession(u);
       btn.disabled = false; btn.textContent = 'دخول';
+      if (claim && claim.offline) {
+        say('📡 مفيش اتصال بالإنترنت — البرنامج أونلاين فقط. وصّل النت وحاول تاني');
+        return;
+      }
       if (!claim.ok) {
         /* رسالة الرفض بحجم كبير في منتصف الشاشة (طلب المستخدم) */
         bigBlock('🚫', 'الحساب ده مفتوح على جهاز تاني',
@@ -1194,7 +1193,7 @@ function showLock(){
           'حاول تاني', () => { document.querySelectorAll('.big-block-ov').forEach(x => x.remove()); inp.focus(); });
         inp.value = '';
         return;
-      }
+ }
       loginFails = 0; say('');
       if (u.role === 'admin') adminAuthedLive = true; /* نقطة 4: باسورد اتكتب صح دلوقتي في الجلسة دي */
       sessionUser = u;
@@ -1202,15 +1201,10 @@ function showLock(){
       ov.remove();
       applyUserUI();
       resetIdleTimer();
-      addLog('دخول المستخدم: ' + u.name + (claim && claim.soft ? ' (أوفلاين)' : ''));
-      if (claim && claim.soft) {
-        toast('أهلًا ' + u.name + ' — دلوقتي أوفلاين: كمّل جردك عادي وهيترفع لوحده أول ما النت يرجع 📡', 'warning');
-      } else {
-        toast('أهلًا ' + u.name, 'success');
-      }
-      updateOfflineBar();
-
-    } else {
+      addLog('دخول المستخدم: ' + u.name);
+      toast('أهلًا ' + u.name, 'success');
+ 
+ } else {
       loginFails++;
       const c = ov.querySelector('.lock-card');
       c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
@@ -1220,12 +1214,12 @@ function showLock(){
         const btn = ov.querySelector('#lockBtn'); if (btn) btn.disabled = true;
         addLog('⚠️ قفل مؤقت لشاشة الدخول: محاولات تخمين متكررة');
         startLockCountdown();
-      } else {
+ } else {
         say('❌ اسم المستخدم أو كلمة المرور غلط — فاضل ' + (5 - loginFails) + ' محاولات قبل القفل المؤقت');
-      }
+ }
       inp.value = ''; inp.focus();
-    }
-  };
+ }
+ };
   ov.querySelector('#lockBtn').onclick = tryOpen;
   [inp, uInp].forEach(el => el && el.addEventListener('keydown', e => { if (e.key === 'Enter') tryOpen(); }));
   setTimeout(() => (uInp || inp).focus(), 100);
@@ -1246,9 +1240,9 @@ function resizeLogoFile(file, done, fail){
       const dataUrl = cv.toDataURL('image/png');
       if (dataUrl.length > 250000) { fail && fail(); return; }
       done(dataUrl);
-    };
+ };
     img.src = e.target.result;
-  };
+ };
   r.readAsDataURL(file);
 }
 function applyLogo(src){
@@ -1267,8 +1261,8 @@ function pickNewLogo(){
       addLog('تم تغيير اللوجو');
       toast('تم تغيير اللوجو — بيتزامن على كل الأجهزة', 'success');
       const lp = document.querySelector('#logoPrev'); if (lp) lp.src = dataUrl;
-    }, () => toast('الصورة كبيرة — جرب صورة أصغر', 'error'));
-  };
+ }, () => toast('الصورة كبيرة — جرب صورة أصغر', 'error'));
+ };
   inp.click();
 }
 function resetLogo(){
@@ -1292,14 +1286,14 @@ function getFiltered(){
       const hasCounts = i.counts && Object.keys(i.counts).length > 0;
       const hasUser = hasCounts ? (i.counts[userFilter] !== undefined && Number(i.counts[userFilter]) > 0) : (i.countedBy === userFilter);
       if (!hasUser) return false;
-    }
+ }
     let st = true;
     if (currentStatus === 'زيادة') st = i.status === 'زيادة';
     else if (currentStatus === 'عجز') st = i.status === 'عجز';
     else if (currentStatus === 'hide_equal') st = i.status !== 'متساوي';
     else if (currentStatus === 'not_jarded') st = !i.isJarded;
     return ms && mc && st;
-  });
+ });
 }
 
 /* ---------- عرض الجدول ---------- */
@@ -1335,7 +1329,7 @@ function updateTable(){
       '<td class="tc txs fwb" data-cell="status">' + esc(dispStatus) + '</td>' +
       '<td class="p3 txs" contenteditable="' + (canEdit ? 'true' : 'false') + '" data-edit="note">' + esc(item.note) + '</td>' +
     '</tr>';
-  });
+ });
   const tb = $('tableBody');
   if (tb) tb.innerHTML = html;
   const selAll = $('selectAll'); if (selAll) selAll.checked = filtered.length > 0 && filtered.every(i => selectedSerials.has(i.serial));
@@ -1374,12 +1368,12 @@ function updateStats(){
     if (!gs[i.group]) gs[i.group] = { d: 0, s: 0 };
     if (i.status === 'عجز') gs[i.group].d++;
     if (i.status === 'زيادة') gs[i.group].s++;
-  });
+ });
   let dH = '', sH = '';
   Object.keys(gs).forEach(g => {
     if (gs[g].d > 0) dH += '<div class="analysis-row"><span>' + esc(g) + '</span><span class="fwb">' + gs[g].d + ' صنف</span></div>';
     if (gs[g].s > 0) sH += '<div class="analysis-row"><span>' + esc(g) + '</span><span class="fwb">' + gs[g].s + ' صنف</span></div>';
-  });
+ });
   const dg = $('deficitGroups'); if (dg) dg.innerHTML = dH || '<div style="font-size:9px;color:#9ca3af">لا يوجد عجز</div>';
   const sg = $('surplusGroups'); if (sg) sg.innerHTML = sH || '<div style="font-size:9px;color:#9ca3af">لا يوجد زيادة</div>';
 
@@ -1424,6 +1418,7 @@ function updateField(serial, field, value){
   if (!item) return;
   /* بيانات الصنف (اسم/مجموعة/ملاحظة) للأدمن والمشرف بس — المستخدم العادي جرد فقط */
   if (needAdmin()) return;
+  if (onlineGuard('التعديل ده')) return;
   const v = String(value).trim();
   if (item[field] === v) return;
   item[field] = v;
@@ -1439,13 +1434,15 @@ function updateQty(serial, field, value, tr){
   /* كمية السيستم بيانات صنف مش جرد — للأدمن/المشرف بس.
      المستخدم العادي يقدر يعدّل الكمية الفعلية (دي عدّته هو) وميلمسش حاجة تانية */
   if (field === 'systemQuantity' && needAdmin()) return;
+  /* تعديل الكمية أونلاين بس — مفيش تخزين محلي للتعديل */
+  if (field === 'actualQuantity' && onlineGuard('التعديل ده')) return;
   const prevQty = item.actualQuantity;
   const who = sessionUser ? sessionUser.name : '';
   const whoRole = sessionUser ? (sessionUser.role||'user') : 'user';
   let viaOps = false;
   if (field === 'systemQuantity') {
     item[field] = v;
-  } else if (field === 'actualQuantity') {
+ } else if (field === 'actualQuantity') {
     /* الكتابة اليدوية: الرقم اللي كتبته ده "حصّتي أنا" — مش إجمالي الصنف.
        إجمالي الصنف بيطلع لوحده = مجموع حصص كل الناس.
        يعني: أدمن كتب 5 ومحمد كتب 3 → الصنف يبقى 8. ومفيش حد بيمسح حد،
@@ -1463,13 +1460,12 @@ function updateQty(serial, field, value, tr){
     Object.assign(item, opt);
     ops.forEach(op => enqueueCountOp(item.code, op));
     viaOps = true;
-  } else {
+ } else {
     item[field] = v;
-  }
+ }
   item.editedAt = Date.now();
   calculateRow(item);
   if (tr) refreshRow(tr, item);
-  touchLocal();
   localSave();
   updateStats();
   if (viaOps) scheduleCountPush(item.code); else schedulePushItem(item);
@@ -1477,8 +1473,8 @@ function updateQty(serial, field, value, tr){
   try {
     if (field === 'actualQuantity' && who && v !== prevQty && (!whoRole || whoRole === 'user')) {
       pushCountNotif(item, (v - prevQty), 'edit');
-    }
-  } catch(e){}
+ }
+ } catch(e){}
 }
 /* فحص رقم التحقق EAN/UPC — يكشف القراءة الناقصة من الكاميرا (مثل 3007653602 بدل 6223007653602) */
 function eanOk(code){
@@ -1494,11 +1490,13 @@ let lastScanCode = '', lastScanTime = 0;
 function processCode(code){
   code = sanitizeCode(code);
   if (!code) return;
+  /* مفيش نت؟ مفيش عدّ — منسجلش حاجة محلياً خالص */
+  if (onlineGuard('العدّة دي')) return;
   const nowTs = Date.now();
   if (code === lastScanCode && (nowTs - lastScanTime) < 500) {
     toast('⏱️ نفس الكود اتسجل من لحظة — اتجاهل عشان مايتحسبش مرتين', 'warning');
     return;
-  }
+ }
   lastScanCode = code; lastScanTime = nowTs;
   const who = sessionUser ? sessionUser.name : '';
   const bag = who || 'بدون مستخدم';
@@ -1510,7 +1508,7 @@ function processCode(code){
     if (item.isJarded && who && prevBy && prevBy !== who) {
       toast('⚠️ "' + item.name + '" اتجرد بواسطة ' + prevBy + ' قبل كده — كميته كانت ' + fmtQ(item.actualQuantity), 'warning');
       addLog('تنبيه تعدد جرد: ' + item.code + ' بواسطة ' + prevBy + ' ثم ' + who);
-    }
+ }
     /* بيانات قديمة من غير حصص؟ ننسب الكمية الموجودة لصاحبها الأصلي الأول */
     const seed = legacySeedOp(item, bag, nowTs);
     if (seed) ops.push(seed);
@@ -1525,7 +1523,7 @@ function processCode(code){
     done = item; qty = item.actualQuantity;
     // 🔔 إشعار فوري للمسؤول: مستخدم جرد فقط عدّ صنف
     try { if (sessionUser && (!sessionUser.role || sessionUser.role === 'user')) pushCountNotif(item, 1); } catch(e){}
-  } else {
+ } else {
     const ns = inventoryData.length ? Math.max.apply(null, inventoryData.map(i => i.serial)) + 1 : 1;
     const nv = { serial: ns, code: code, name: 'صنف جديد', group: 'غير معروف', systemQuantity: 0, actualQuantity: 1, isJarded: true, difference: 1, status: 'زيادة', note: '', countedBy: who, counts: { [bag]: 1 }, conflict: false, editedAt: nowTs };
     inventoryData.push(nv);
@@ -1537,28 +1535,22 @@ function processCode(code){
     done = nv; qty = 1;
     renderCategoryButtons();
     try { if (sessionUser && (!sessionUser.role || sessionUser.role === 'user')) pushCountNotif(nv, 1); } catch(e){}
-  }
-  touchLocal();
+ }
   localSave(); updateTable(); updateStats();
   if (done && ops.length) {
     ops.forEach(op => enqueueCountOp(done.code, op));
     scheduleCountPush(done.code);
-  } else if (done) {
+ } else if (done) {
     schedulePushItem(done);
-  }
+ }
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
     ls.textContent = '✓ ' + done.name + ' — الكمية الآن: ' + fmtQ(qty) + (who ? ' — بواسطة: ' + who : '');
-  }
+ }
 }
 
 /* ---------- حفظ ومزامنة ---------- */
-/* أي تعديل محلي بيحدث رقم الإصدار — لو النت رجع والسيرفر أقدم مننا هنتجاهله ونرفع شغلنا */
-function touchLocal(){
-  localRev = Date.now();
-  store.setItem(S('localRev'), String(localRev));
-}
 function localSave(){
   // لا نحفظ بيانات الجرد محلياً - أونلاين فقط (مفيش أي تخزين محلي دائم للبرنامج)
 }
@@ -1575,7 +1567,6 @@ function hydrateSnapshot(){
 /* دمج شغل الأوفلاين مع آخر نسخة سيرفر: كل مستخدم ليه كيسه في counts،
    فمساهمتي أنا (اللي اتعملت والنت مقطوع) تفضل محلية، ومساهمات زمايلي من السيرفر الأحدث */
 function saveAndRefresh(rebuildCats, item){
-  touchLocal();
   localSave();
   updateTable();
   updateStats();
@@ -1618,7 +1609,7 @@ async function getAnonIdToken(cfg){
   if (_anonTokenCache && Date.now() < _anonTokenExp) return _anonTokenCache;
   const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(cfg.apiKey), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true })
-  });
+ });
   if (!r.ok) throw new Error('تعذر الدخول المجهول (HTTP ' + r.status + ') — تأكد إن "Anonymous" مفعّل في Firebase Console ← Authentication ← Sign-in method');
   const j = await r.json();
   _anonTokenCache = j.idToken;
@@ -1635,7 +1626,7 @@ function parseCfgLoose(txt){
     if (/^https?:\/\//.test(label)) return label;
     if (/^https?:\/\//.test(url)) return label || url;
     return label || url;
-  });
+ });
   try { const c = JSON.parse(txt); if (c && c.apiKey) return c; } catch (e) {}
   try {
     let t = txt.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
@@ -1652,11 +1643,11 @@ function parseCfgLoose(txt){
     for (let i = start; i < t.length; i++) {
       if (t[i] === '{') depth++;
       else if (t[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
-    }
+ }
     if (end === -1) return null;
     const c = JSON.parse(t.slice(start, end + 1));
     if (c && c.apiKey) return c;
-  } catch (e) {}
+ } catch (e) {}
   return null;
 }
 function loadScript(src){
@@ -1672,28 +1663,6 @@ function setSyncUI(state, txt){
   const el = $('syncTime'); if (el) el.textContent = txt;
 }
 /* ---------- بانر حالة الاتصال — يفرّق بين قطع نت عادي (مطمّن) ورفض السيرفر (تحذير حقيقي) ---------- */
-function updateOfflineBar(){
-  let bar = $('offlineBar');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'offlineBar';
-    bar.style.cssText = 'display:none;position:fixed;bottom:1rem;right:50%;transform:translateX(50%);color:#fff;font-size:.82rem;font-weight:800;padding:.55rem 1.1rem;border-radius:999px;box-shadow:0 10px 15px -3px rgba(0,0,0,.2);z-index:390;max-width:92vw;text-align:center;line-height:1.8';
-    document.body.appendChild(bar);
-  }
-  const midOffline = bootDone && (navigator.onLine === false || fbConnected === false);
-  if (accessDenied) {
-    /* السيرفر رفض الاتصال فعلياً (مش مجرد نت مقطوع) — تحذير أوضح ودائم لحد ما يتحل */
-    bar.style.background = '#b91c1c';
-    bar.innerHTML = '⚠️ <b>السيرفر رفض الاتصال</b> — شغلك بيتسجل عندك بس مش بيوصل السيرفر. افتح الإعدادات ← الاتصال والمزامنة';
-    bar.style.display = 'block';
-  } else if (midOffline) {
-    bar.style.background = '#b45309';
-    bar.innerHTML = '📡 النت قطع — <b>كمّل جردك عادي</b>. كل حاجة بتتسجل وهتترفع لوحدها أول ما النت يرجع ✅';
-    bar.style.display = 'block';
-  } else {
-    bar.style.display = 'none';
-  }
-}
 async function connectFirebase(silent, retryCount){
   const cfg = effectiveCfg();
   if (!cfg || !cfg.apiKey) { setSyncUI('off', 'وضع محلي'); return false; }
@@ -1705,18 +1674,18 @@ async function connectFirebase(silent, retryCount){
         loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js'),
         loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js')
       ]);
-    }
+ }
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     /* دخول مجهول إجباري — القواعد الجديدة بتتطلب auth != null لأي قراءة/كتابة،
        فلو ده فشل، مفيش أي وصول للبيانات أصلاً ولازم نوقف ونوضح السبب */
     try {
       await firebase.auth().signInAnonymously();
-    } catch (e) {
+ } catch (e) {
       setSyncUI('off', 'فشل الدخول المجهول ⚠️');
       lastSyncErr = 'الدخول المجهول فشل: ' + (e && e.message ? e.message : String(e));
       toast('⚠️ لازم تفعّل "Anonymous" في Firebase Console ← Authentication ← Sign-in method عشان البرنامج يقدر يتصل', 'error');
       return false;
-    }
+ }
     db = firebase.database();
     try { db.setPersistenceEnabled && db.setPersistenceEnabled(true); } catch (e) {}
     try {
@@ -1725,20 +1694,13 @@ async function connectFirebase(silent, retryCount){
         if (s.val() === true) {
           fbConnected = true;
           setSyncUI('on', 'متصل — مزامنة حية');
-          /* النت رجع؟ ارفع أي تعديلات محلية معلّقة — كل صنف لوحده، مش استبدال شامل */
-          if (pendingOfflinePush && seenData) {
-            pendingOfflinePush = false;
-            flushDirtyItems();
-            if (wasOff && bootDone) toast('✅ النت رجع — اترفعت تعديلاتك المعلّقة', 'success');
-          }
           /* pendingMetaPush بيتفضّى بس بعد ما يجيلنا snapshot من السيرفر — يعني m2 هياخد باله */
-        } else if (syncOn) {
+ } else if (syncOn) {
           fbConnected = false;
-          setSyncUI('mid', 'أوفلاين — كمّل شغلك عادي، وهيترفع لوحده أول ما النت يرجع');
-        }
-        updateOfflineBar();
-      });
-    } catch (e) {}
+          setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط');
+ }
+ });
+ } catch (e) {}
     /* نستنى إثبات الاتصال الحقيقي بحد أقصى 8 ثوان */
     await Promise.race([
       db.ref('.info/connected').once('value'),
@@ -1758,14 +1720,12 @@ async function connectFirebase(silent, retryCount){
         bigBlock('🚫', 'الحساب ده مفتوح على جهاز تاني',
           'اتسجل دخول "<b>' + esc(sessionUser.name) + '</b>" من جهاز آخر.<br>سجّل خروجه من هناك الأول وبعدين ادخل من جديد.',
           'حسنًا', () => logoutUser());
-      }
-    });
-    /* ⚖️ ممنوع نستبدل بيانات السيرفر بنسخة محلية قديمة — نرفع بس التعديلات المعلّقة فعلياً، صنف صنف */
-    if (pendingOfflinePush && seenData) { pendingOfflinePush = false; flushDirtyItems(); }
+ }
+ });
     /* meta: ميتفضاش هنا — لازم يوصل snapshot الأول */
     if (!silent) toast('تم الاتصال — المزامنة شغالة بين كل الأجهزة', 'success');
     return true;
-  } catch (e) {
+ } catch (e) {
     syncOn = false;
     lastSyncErr = e && e.message ? e.message : String(e);
     /* ❗ المهم: منرجعش لوضع محلي نهائي — نعيد المحاولة كل شوية للأبد */
@@ -1774,7 +1734,7 @@ async function connectFirebase(silent, retryCount){
     connectRetryTimer = setTimeout(() => connectFirebase(true, (retryCount || 0) + 1), 6000);
     if (!silent) toast('لسه مفيش اتصال — هنحاول تاني تلقائيًا', 'warning');
     return false;
-  }
+ }
 }
 function findItemIndexByCode(code){
   for (let i = 0; i < inventoryData.length; i++) if (inventoryData[i].code === code) return i;
@@ -1799,8 +1759,8 @@ function attachSync(){
       updateStats(); renderCategoryButtons();
       if (editingCount > 0) pendingRemote = true; else updateTable();
       flashDot();
-    }, 50);
-  }
+ }, 50);
+ }
 
   const hAdded = itemsRef.on('child_added', snap => {
     const item = normItem(snap.val(), snap.key);
@@ -1810,13 +1770,13 @@ function attachSync(){
     if (idx === -1) {
       if (!initialLoadDone) bootCodeIndex.set(item.code, inventoryData.length);
       inventoryData.push(item);
-    } else {
+ } else {
       /* دفاعية: نادراً ما يتكرر child_added لنفس الكود، لكن لو حصل خد الأحدث */
       const local = inventoryData[idx];
       inventoryData[idx] = (Number(item.editedAt)||0) >= (Number(local.editedAt)||0) ? item : local;
-    }
+ }
     scheduleBulkRefresh();
-  });
+ });
 
   const hChanged = itemsRef.on('child_changed', snap => {
     const incoming = normItem(snap.val(), snap.key);
@@ -1833,15 +1793,15 @@ function attachSync(){
       if (editingCount > 0) { pendingRemote = true; }
       else { patchSingleRow(finalItem); updateStats(); }
       flashDot();
-    } else {
+ } else {
       /* حالة نادرة: صنف مش موجود محلياً وصله child_changed (مثلاً بعد إعادة اتصال) —
          نتعامل معاه زي إضافة جديدة كاملة عشان رقم التسلسل ياخد قيمة صحيحة ومايتصادمش مع صنف تاني */
       inventoryData.push(finalItem);
       if (!initialLoadDone) return;
       calculateRow(finalItem);
       scheduleBulkRefresh();
-    }
-  });
+ }
+ });
 
   const hRemoved = itemsRef.on('child_removed', snap => {
     const val = snap.val();
@@ -1850,9 +1810,9 @@ function attachSync(){
     if (idx !== -1) {
       selectedSerials.delete(inventoryData[idx].serial);
       inventoryData.splice(idx, 1);
-    }
+ }
     scheduleBulkRefresh();
-  });
+ });
 
   itemsRef.once('value').then(() => {
     initialLoadDone = true;
@@ -1861,19 +1821,17 @@ function attachSync(){
     maybeFinishBoot();
     renumberSerials();
     updateTable(); updateStats(); renderCategoryButtons();
-    pendingOfflinePush = false;
     flashDot();
-    flushDirtyItems();
-  }).catch(err => {
+ }).catch(err => {
     seenData = true;
     maybeFinishBoot();
     syncOn = false;
     accessDenied = true;
     lastSyncErr = err && err.message ? err.message : String(err);
     setSyncUI('off', 'مرفوض من السيرفر ⚠️');
-    updateOfflineBar();
+ 
     toast('السيرفر رفض المزامنة — افتح الإعدادات ← "🔌 الاتصال والمزامنة" واضغط "ربط قاعدة البيانات" عشان تشوف السبب', 'error');
-  });
+ });
 
   const h2 = ref.child('meta').on('value', snap => {
     const meta = snap.val() || {};
@@ -1892,8 +1850,8 @@ function attachSync(){
         toast('💥 تم مسح البيانات من جهاز آخر — الصفحة هتتحدث خلال لحظة', 'warning');
         setTimeout(() => location.reload(), 1500);
         return;
-      }
-    }
+ }
+ }
     /* setupDone لازم يتحدّث قبل seenMeta/maybeFinishBoot عشان قرار "نزرع admin تلقائي ولا لأ"
        ياخد قيمة صح من أول snapshot، مش من واحد جاي بعده */
     if (meta.setupDone) setupDone = true;
@@ -1917,8 +1875,8 @@ function attachSync(){
         store.setItem(S('usersList'), JSON.stringify(usersList));
         applyUserUI();
         if (loginRequired() && !sessionUser && !document.querySelector('.lock-overlay')) showLock();
-      }
-    } else {
+ }
+ } else {
       /* نفس النسخة أو بيانات قديمة (من قبل ختم النسخة) → دمج اتحاد للزيادات المحلية (ممنوع فقدان حد) */
       const byName = {};
       incoming.forEach(u => { if (u && u.name) byName[u.name] = u; });
@@ -1930,20 +1888,20 @@ function attachSync(){
         applyUserUI();
         /* جهاز جديد استلم المستخدمين من السيرفر → اعرض شاشة الدخول فورًا */
         if (loginRequired() && !sessionUser && !document.querySelector('.lock-overlay')) showLock();
-      }
+ }
       if (usersList.length > incoming.length) scheduleMetaPush(); /* احنا عندنا زيادة لسه السيرفر معندوش — نرفعها */
-    }
+ }
     if (meta.dt && meta.dt !== store.getItem(S('selectedDateTime'))) {
       store.setItem(S('selectedDateTime'), meta.dt);
       const dtEl = $('currentDateTime'); if (dtEl) dtEl.value = meta.dt;
-    }
+ }
     if (meta.logo && meta.logo !== store.getItem(S('customLogo'))) {
       store.setItem(S('customLogo'), meta.logo);
       applyLogo(meta.logo);
-    }
+ }
     /* أول snapshot وصل ← دلوقتي آمن نفضي المعلّق */
     if (pendingMetaPush) { pendingMetaPush = false; pushMeta(true); /* المعلّق دايمًا بيشمل المستخدمين */ }
-  }, () => {});
+ }, () => {});
   try { if (isAdmin() && sessionUser) attachNotifListener(); } catch(e){}
   refOff = () => {
     itemsRef.off('child_added', hAdded);
@@ -1951,15 +1909,23 @@ function attachSync(){
     itemsRef.off('child_removed', hRemoved);
     ref.child('meta').off('value', h2);
     try{ detachNotifListener(); }catch(e){}
-  };
+ };
 }
 /* ---------- دفع صنف واحد لحظياً — القلب الجديد للمزامنة ----------
    بدل ما كل تعديل (كتابة رقم / مسح باركود) يبعت المصفوفة كاملة، كل صنف بيتبعت
    لمساره الخاص بس (jard/items/{code}) — الصنف اللي اتعدل هو اللي بيتحرك، مش الباقي */
+/* ---------- الجرد أونلاين فقط ----------
+   مفيش أي تسجيل محلي ولا طابور أوفلاين: لو مفيش اتصال، العملية ما تحصلش أصلاً
+   ونقولها للمستخدم بصراحة. كده مستحيل حد يعدّ والنت مقطوع ويكتشف بعدين إن عدّته راحت. */
+function onlineGuard(action){
+  if (syncOn && db && !(navigator && navigator.onLine === false)) return false;
+  setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط');
+  toast('📡 مفيش اتصال بالإنترنت — الجرد أونلاين فقط. ' + (action || 'العملية دي') + ' مااتسجلتش، حاول تاني لما النت يرجع', 'error');
+  return true;
+}
 function schedulePushItem(item){
   if (!item || !item.code) return;
-  dirtyItemCodes.add(item.code);
-  if (!syncOn || !db) { pendingOfflinePush = true; setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت'); updateOfflineBar(); return; }
+  if (!syncOn || !db) { setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط'); return; }
   clearTimeout(itemPushTimers[item.code]);
   itemPushTimers[item.code] = setTimeout(() => pushItemNow(item), 450);
 }
@@ -1967,35 +1933,32 @@ function schedulePushItem(item){
    عشان تعديل اسم صنف مايقدرش يمسح حصص حد تاني كان بيعدّ في نفس اللحظة */
 function pushItemNow(item){
   if (!item || !item.code) return;
-  if (!syncOn || !db) { pendingOfflinePush = true; return; }
+  if (!syncOn || !db) { return; }
   clearTimeout(itemPushTimers[item.code]); itemPushTimers[item.code] = null;
   const key = itemKey(item.code);
   const code = item.code;
   pendingItemWrites[key] = true;
-  if (navigator && navigator.onLine === false) { pendingOfflinePush = true; setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت'); updateOfflineBar(); }
+  if (navigator && navigator.onLine === false) { setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط'); }
   db.ref(fbPath() + '/items/' + key).transaction(cur => {
     return applyMetaPatch(cur, item, code);
-  }, (err, committed, snap) => {
+ }, (err, committed, snap) => {
     delete pendingItemWrites[key];
     if (err || !committed) {
-      dirtyItemCodes.add(code);
-      pendingOfflinePush = true;
       lastSyncErr = err && err.message ? err.message : String(err || 'transaction not committed');
       if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
         accessDenied = true;
         setSyncUI('off', 'مرفوض من السيرفر ⚠️');
         toast('⚠️ السيرفر رفض الكتابة — افتح الإعدادات ← "🔌 الاتصال والمزامنة" ← "ربط قاعدة البيانات"', 'error');
-      } else {
+ } else {
         setSyncUI('mid', 'انقطع مؤقتًا — محفوظ عندك وهيترفع تلقائيًا');
-      }
-      updateOfflineBar();
+ }
+ 
       return;
-    }
+ }
     committedItemKeys[key] = true;
     adoptCommittedItem(code, snap ? snap.val() : null);
-    dirtyItemCodes.delete(code);
-    flashDot(); accessDenied = false; updateOfflineBar();
-  }, false /* applyLocally=false: منحدّثش الكاش المحلي بالقيمة المؤقتة — عندنا optimistic UI أصلاً،
+    flashDot(); accessDenied = false; 
+ }, false /* applyLocally=false: منحدّثش الكاش المحلي بالقيمة المؤقتة — عندنا optimistic UI أصلاً،
                وكده المراقبين (child_added/child_changed) مايشوفوش صنف ناقص في نص العملية */);
 }
 /* ---------- رفع نوايا الجرد جوه Transaction — ده قلب إصلاح التعددية ----------
@@ -2009,8 +1972,7 @@ function enqueueCountOp(code, op){
 }
 function scheduleCountPush(code, delay){
   if (!code) return;
-  dirtyItemCodes.add(code);
-  if (!syncOn || !db) { pendingOfflinePush = true; setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت'); updateOfflineBar(); return; }
+  if (!syncOn || !db) { setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط'); return; }
   clearTimeout(countPushTimers[code]);
   countPushTimers[code] = setTimeout(() => pushCountOpsNow(code), delay == null ? 350 : delay);
 }
@@ -2018,13 +1980,12 @@ function pushCountOpsNow(code){
   if (!code) return;
   clearTimeout(countPushTimers[code]); countPushTimers[code] = null;
   const ops = pendingCountOps[code];
-  if (!ops || !ops.length) { delete pendingCountOps[code]; dirtyItemCodes.delete(code); return; }
+  if (!ops || !ops.length) { delete pendingCountOps[code];  return; }
   if (!syncOn || !db || (navigator && navigator.onLine === false)) {
-    pendingOfflinePush = true;
-    setSyncUI('mid', 'أوفلاين — هيترفع عند عودة النت');
-    updateOfflineBar();
+    setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط');
+ 
     return;
-  }
+ }
   const key = itemKey(code);
   const local = inventoryData.find(i => i.code === code) || null;
   const me = sessionUser ? sessionUser.name : '';
@@ -2035,7 +1996,7 @@ function pushCountOpsNow(code){
     /* الدالة دي Firebase بيناديها أكتر من مرة لو حصل تعارض، وأول مرة بـ null لو
        بيانات الصنف مش في الكاش — عشان كده نقية تماماً ومابتعتمدش على أي حالة بره ops */
     return applyCountOps(cur, ops, me, code, local);
-  }, (err, committed, snap) => {
+ }, (err, committed, snap) => {
     delete pendingItemWrites[key];
     if (err || !committed) {
       requeueCountOps(code, ops);
@@ -2044,20 +2005,19 @@ function pushCountOpsNow(code){
         accessDenied = true;
         setSyncUI('off', 'مرفوض من السيرفر ⚠️');
         toast('⚠️ السيرفر رفض الكتابة — افتح الإعدادات ← "🔌 الاتصال والمزامنة" ← "ربط قاعدة البيانات"', 'error');
-      } else {
+ } else {
         setSyncUI('mid', 'انقطع مؤقتًا — العدّ محفوظ عندك وهيترفع تلقائيًا');
-      }
-      updateOfflineBar();
+ }
+ 
       return;
-    }
+ }
     countRetry[code] = 0;
     committedItemKeys[key] = true;
     adoptCommittedItem(code, snap ? snap.val() : null);
-    dirtyItemCodes.delete(code);
-    flashDot(); accessDenied = false; updateOfflineBar();
+    flashDot(); accessDenied = false; 
     /* لو اتجمعت نيّات جديدة وإحنا بنكتب، نرفعها على طول */
     if (pendingCountOps[code] && pendingCountOps[code].length) scheduleCountPush(code);
-  }, false /* applyLocally=false — نفس سبب pushItemNow */);
+ }, false /* applyLocally=false — نفس سبب pushItemNow */);
 }
 /* فشلت الكتابة → النيّات ترجع الطابور بالترتيب ونعيد المحاولة بـ backoff.
    مانفضلش نحاول للأبد لو السيرفر رافض الصلاحية؛ هنرفعها مع رجوع النت */
@@ -2065,13 +2025,11 @@ function requeueCountOps(code, ops){
   if (!code || !ops || !ops.length) return;
   const rest = pendingCountOps[code] || [];
   pendingCountOps[code] = ops.concat(rest); /* الأقدم يفضل في الأول */
-  dirtyItemCodes.add(code);
-  pendingOfflinePush = true;
   countRetry[code] = (countRetry[code] || 0) + 1;
   if (countRetry[code] > 5) {
     toast('⚠️ تعذّر رفع عدّ "' + code + '" دلوقتي — محفوظ عندك وهيترفع أول ما الاتصال يستقر', 'warning');
     return;
-  }
+ }
   if (syncOn && db && !accessDenied) scheduleCountPush(code, 1200 * countRetry[code]);
 }
 /* النتيجة المعتمدة من السيرفر هي الحقيقة — بنرجّعها على الشاشة زي ما هي */
@@ -2084,10 +2042,10 @@ function adoptCommittedItem(code, raw){
       selectedSerials.delete(inventoryData[idx].serial);
       inventoryData.splice(idx, 1);
       updateTable(); updateStats(); renderCategoryButtons();
-    }
+ }
     flashDot();
     return;
-  }
+ }
   const item = normItem(raw, code);
   if (idx === -1) inventoryData.push(item);
   else { item.serial = inventoryData[idx].serial; inventoryData[idx] = item; }
@@ -2097,44 +2055,35 @@ function adoptCommittedItem(code, raw){
   updateStats();
   flashDot();
 }
-/* إعادة رفع أي تعديلات معلّقة (حصلت وإحنا أوفلاين) بمجرد ما النت يرجع — كل صنف لوحده برضه */
-function flushDirtyItems(){
-  if (!syncOn || !db || !dirtyItemCodes.size) return;
-  Array.from(dirtyItemCodes).forEach(code => {
-    if (pendingCountOps[code] && pendingCountOps[code].length) { countRetry[code] = 0; pushCountOpsNow(code); return; }
-    const item = inventoryData.find(i => i.code === code);
-    if (item) pushItemNow(item); else dirtyItemCodes.delete(code);
-  });
-}
 /* ---------- عمليات جماعية حقيقية (استيراد/استبدال/استرجاع) ----------
    دي العمليات الوحيدة اللي فعلاً لازم تلمس أكتر من صنف مرة واحدة — استبدال كامل
    بيكتب كل حاجة بطلب واحد (set بيمسح أي حاجة مش موجودة في القايمة الجديدة تلقائياً) */
 function pushFullReplace(items){
-  if (!syncOn || !db) { pendingOfflinePush = true; toast('مفيش اتصال — هيترفع لما النت يرجع', 'warning'); return Promise.resolve(false); }
+  if (!syncOn || !db) { toast('📡 مفيش اتصال — العملية دي أونلاين فقط ومااتنفذتش', 'error'); return Promise.resolve(false); }
   const obj = {};
   items.forEach(it => { obj[itemKey(it.code)] = it; });
-  return db.ref(fbPath() + '/items').set(obj).then(() => { flashDot(); accessDenied = false; updateOfflineBar(); return true; }).catch(err => {
+  return db.ref(fbPath() + '/items').set(obj).then(() => { flashDot(); accessDenied = false; return true; }).catch(err => {
     lastSyncErr = err && err.message ? err.message : String(err);
     if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
       toast('⚠️ العملية دي (استبدال كامل/استرجاع) محصورة على الأدمن الحقيقي فقط — سجّل دخول admin من الإعدادات وحاول تاني', 'error');
-    } else {
+ } else {
       toast('⚠️ فشل رفع البيانات (' + lastSyncErr + ')', 'error');
-    }
+ }
     return false;
-  });
+ });
 }
 /* دمج جزئي: بيلمس بس الأصناف اللي اتضافت/اتغيّرت/اتشالت — الباقي مايتحركش خالص */
 function pushMergeUpdate(changedItems, removedCodes){
-  if (!syncOn || !db) { pendingOfflinePush = true; toast('مفيش اتصال — هيترفع لما النت يرجع', 'warning'); return Promise.resolve(false); }
+  if (!syncOn || !db) { toast('📡 مفيش اتصال — العملية دي أونلاين فقط ومااتنفذتش', 'error'); return Promise.resolve(false); }
   const patch = {};
   (changedItems||[]).forEach(it => { patch[itemKey(it.code)] = it; });
   (removedCodes||[]).forEach(code => { patch[itemKey(code)] = null; });
   if (!Object.keys(patch).length) return Promise.resolve(true);
-  return db.ref(fbPath() + '/items').update(patch).then(() => { flashDot(); accessDenied = false; updateOfflineBar(); return true; }).catch(err => {
+  return db.ref(fbPath() + '/items').update(patch).then(() => { flashDot(); accessDenied = false; return true; }).catch(err => {
     lastSyncErr = err && err.message ? err.message : String(err);
     toast('⚠️ فشل رفع التغييرات (' + lastSyncErr + ')', 'error');
     return false;
-  });
+ });
 }
 function pushMeta(withUsers){
   if (!syncOn || !db) { pendingMetaPush = true; return; } /* لو الاتصال لسه ما اتبنيش، هنرفع لما يتصل */
@@ -2151,16 +2100,16 @@ function pushMeta(withUsers){
     if (usersList.length) {
       meta.users = {};
       usersList.forEach(u => { if (u && u.name) meta.users['u_' + sessionKey(u.name)] = u; });
-    } else {
+ } else {
       meta.users = null; /* لو القايمة فاضت فعلًا بقرار الأدمن → حذف صريح (update بـ null بيمسح العقدة) */
-    }
+ }
     /* ختم النسخة: الأعلى على السيرفر هو القانون — كده حذف مستخدم ينفّد على كل الأجهزة وميرجعش لوحده */
     meta.usersRev = firebase.database.ServerValue.TIMESTAMP;
     /* فورًا بعد الدفع، هنحدّث lastUsersRev محليًا عشان لما الـ snapshot يرجع بعد ثانيتين
        مايعتبرش نفسنا «عندنا نسخة أقدم» ويمسح المستخدم اللي لسه ضايفينه.
        (القيمة الحقيقية هتتأكد أول ما snapshot meta.usersRev يوصل من السيرفر) */
     lastUsersRev = Date.now();
-  }
+ }
   const logo = store.getItem(S('customLogo'));
   if (logo) meta.logo = logo;
   const dt = store.getItem(S('selectedDateTime'));
@@ -2172,9 +2121,9 @@ function pushMeta(withUsers){
       db.ref(fbPath() + '/meta/usersRev').once('value').then(s => {
         const v = s.val();
         if (v) lastUsersRev = v;
-      }).catch(() => {});
-    }
-  }).catch(e => { lastSyncErr = e.message || String(e); });
+ }).catch(() => {});
+ }
+ }).catch(e => { lastSyncErr = e.message || String(e); });
 }
 /* الـ meta (مستخدمين/لوجو/إعدادات) بيتزامن على الجذر — كل الأجهزة بتشوف نفس النسخة */
 
@@ -2187,7 +2136,7 @@ function setupBarcodeInput(){
     v.split(/[\n\r,;\t]+/).map(s => s.trim()).filter(Boolean).forEach(processCode);
     inp.value = '';
     setTimeout(() => inp.focus(), 30);
-  };
+ };
   /* أهم سطر: الحقل جوه <form> — زر Go/إدخال/بحث في كيبورد الموبايل بيعمل submit تلقائيًا */
   const form = document.getElementById('codeForm');
   if (form) form.addEventListener('submit', e => { e.preventDefault(); commit(); });
@@ -2196,13 +2145,13 @@ function setupBarcodeInput(){
     if (e.key === 'Enter' || e.key === 'Tab' || e.keyCode === 13 || e.which === 13) {
       e.preventDefault();
       commit();
-    }
-  };
+ }
+ };
   /* تحويل فوري لإنجليزي أثناء الكتابة — لو الموبايل بيكتب بالعربي */
   inp.addEventListener('input', () => {
     const v = sanitizeCode(inp.value);
     if (v !== inp.value) inp.value = v;
-  });
+ });
   inp.addEventListener('keydown', keyHandler);
   inp.addEventListener('keyup', e => { if ((e.key === 'Enter' || e.keyCode === 13) && inp.value.trim()) commit(); });
   /* اتشال listener بتاع change عشان ميعملش إضافة لما تلمس أي مكان تاني في الشاشة */
@@ -2213,8 +2162,8 @@ function setupBarcodeInput(){
       e.preventDefault();
       txt.split(/[\n\r,;\t]+/).map(s => s.trim()).filter(Boolean).forEach(processCode);
       setTimeout(() => inp.focus(), 30);
-    }
-  });
+ }
+ });
   /* زر الكاميرا */
   const cb = $('camBtn'); if (cb) cb.onclick = openCameraScanner;
 }
@@ -2227,8 +2176,8 @@ function setupTableEvents(){
     if (e.target.closest && e.target.closest('td[contenteditable]')) {
       editingCount = Math.max(0, editingCount - 1);
       if (editingCount === 0 && pendingRemote) { pendingRemote = false; updateTable(); }
-    }
-  });
+ }
+ });
   tb.addEventListener('focusout', e => {
     const td = e.target.closest('td[contenteditable]');
     if (!td) return;
@@ -2236,7 +2185,7 @@ function setupTableEvents(){
     const serial = parseInt(tr.dataset.serial);
     if (td.dataset.edit === 'name' || td.dataset.edit === 'note') updateField(serial, td.dataset.edit, td.innerText);
     else if (td.dataset.qty) updateQty(serial, td.dataset.qty, td.innerText, tr);
-  });
+ });
   tb.addEventListener('change', e => {
     const tr = e.target.closest('tr'); if (!tr) return;
     const serial = parseInt(tr.dataset.serial);
@@ -2244,8 +2193,8 @@ function setupTableEvents(){
     else if (e.target.classList.contains('item-checkbox')) {
       if (e.target.checked) selectedSerials.add(serial); else selectedSerials.delete(serial);
       tr.classList.toggle('selected-for-print', e.target.checked);
-    }
-  });
+ }
+ });
   /* اختصار كيبورد: Enter ينقل لنفس الخانة في الصف اللي بعده (زي برامج الجداول)، Esc يلغي ويرجع القيمة الأصلية */
   tb.addEventListener('keydown', e => {
     const td = e.target.closest('td[contenteditable]');
@@ -2260,21 +2209,21 @@ function setupTableEvents(){
         const sel = td.dataset.edit ? '[data-edit="' + key + '"]' : '[data-qty="' + key + '"]';
         const nextTd = nextTr.querySelector(sel);
         if (nextTd) { nextTd.focus(); document.execCommand('selectAll', false, null); }
-      }
-    } else if (e.key === 'Escape') {
+ }
+ } else if (e.key === 'Escape') {
       const item = inventoryData.find(x => x.serial === parseInt(td.closest('tr').dataset.serial));
       if (item) {
         if (td.dataset.edit === 'name') td.innerText = item.name;
         else if (td.dataset.edit === 'note') td.innerText = item.note;
         else if (td.dataset.qty) td.innerText = fmtQ(item[td.dataset.qty]);
-      }
+ }
       td.blur();
-    }
-  });
+ }
+ });
   $('categoryButtonsContainer').addEventListener('click', e => {
     const b = e.target.closest('[data-cat]');
     if (b) setCategoryFilter(b.dataset.cat);
-  });
+ });
   let searchTimer = null;
   $('smartSearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(updateTable, 200); });
 }
@@ -2283,12 +2232,12 @@ function toggleSelectAll(master){
   const filtered = getFiltered();
   filtered.forEach(item => {
     if (master.checked) selectedSerials.add(item.serial); else selectedSerials.delete(item.serial);
-  });
+ });
   document.querySelectorAll('#tableBody .item-checkbox').forEach(cb => {
     cb.checked = master.checked;
     const tr = cb.closest('tr');
     tr.classList.toggle('selected-for-print', master.checked);
-  });
+ });
 }
 
 
@@ -2304,12 +2253,11 @@ function pushUndoHistory(label){
 function withUndo(applyFn, label){
   pushUndoHistory(label);
   applyFn();
-  touchLocal();
   localSave();
   updateTable(); updateStats(); renderCategoryButtons();
   pushFullReplace(inventoryData).then(ok => {
     if (!ok) toast('⚠️ اتحفظ عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
-  });
+ });
   toast(label, 'success', { actionLabel: 'تراجع', onAction: () => restoreSnapshot(0) });
 }
 function restoreSnapshot(idx){
@@ -2318,12 +2266,11 @@ function restoreSnapshot(idx){
   inventoryData = normData(JSON.parse(entry.snapshot));
   undoHistory.splice(0, idx + 1); /* امسح كل اللي بعد النقطة اللي رجعنالها عشان الترتيب يفضل منطقي */
   selectedSerials.clear();
-  touchLocal();
   localSave();
   updateTable(); updateStats(); renderCategoryButtons();
   pushFullReplace(inventoryData).then(ok => {
     toast(ok ? 'تم التراجع بنجاح - رجعت البيانات لكل الأجهزة' : '⚠️ اتراجعت عندك بس السيرفر لم يستجب — حاول تاني', ok ? 'info' : 'error');
-  });
+ });
   addLog('تراجع: ' + entry.label);
 }
 function doUndo(){ restoreSnapshot(0); }
@@ -2338,7 +2285,7 @@ function openUndoHistory(){
         '<div><div style="font-weight:700;font-size:.85rem">' + esc(h.label) + '</div><div style="font-size:.7rem;color:#94a3b8">' + t + '</div></div>' +
         '<button class="mbtn primary" style="padding:.3rem .8rem" onclick="restoreFromHistory(' + i + ')">استرجع</button>' +
       '</div>';
-    }).join('');
+ }).join('');
   showModal('سجل التراجع (آخر ' + undoHistory.length + ' عملية)', body, [{ label: 'إغلاق', kind: 'ghost', onClick: () => {} }]);
 }
 function restoreFromHistory(i){
@@ -2359,7 +2306,6 @@ let pendingWipe = false; /* مسح فشل يوصل للسيرفر — بيحاو
 async function doWipeAll(){
   inventoryData = [];
   selectedSerials.clear();
-  touchLocal();
   try { localSave(); } catch(e){}
   updateTable(); updateStats(); renderCategoryButtons();
   let serverOk = false;
@@ -2369,8 +2315,8 @@ async function doWipeAll(){
       await db.ref(fbPath() + '/items').set(null);
       await db.ref(fbPath() + '/notifs').remove();
       serverOk = true;
-    }
-  } catch(e){ failReason = e && e.message ? e.message : String(e); }
+ }
+ } catch(e){ failReason = e && e.message ? e.message : String(e); }
   if (!serverOk) {
     try {
       const cfg = effectiveCfg();
@@ -2381,22 +2327,22 @@ async function doWipeAll(){
         const r2 = await fetch(base + '/' + fbPath() + '/notifs.json' + tok, { method: 'DELETE' });
         serverOk = !!(r1.ok && r2.ok);
         if (!serverOk) failReason = 'HTTP ' + r1.status + '/' + r2.status;
-      } else if (!failReason) {
+ } else if (!failReason) {
         failReason = 'مفيش اتصال بقاعدة البيانات دلوقتي';
-      }
-    } catch(e){ failReason = e && e.message ? e.message : String(e); }
-  }
+ }
+ } catch(e){ failReason = e && e.message ? e.message : String(e); }
+ }
   try { clearAllLocalCaches(); } catch(e){}
   if (serverOk) {
     pendingWipe = false;
     toast('🔥 تم مسح كل البيانات نهائياً من السيرفر والكاش - البرنامج فاضي', 'success');
     addLog('مسح نهائي كامل');
-  } else {
+ } else {
     pendingWipe = true;
     toast('⚠️ اتمسح عندك، لكن السيرفر لم يستجب (' + (failReason || 'خطأ اتصال') + ') — هيتحاول المسح تلقائياً تاني أول ما النت يرجع. لو قفلت الصفحة قبل ما ينجح، اضغط "مسح الكل" تاني بعد ما ترجع، أو استخدم صفحة wipe.html', 'error');
     addLog('مسح محلي فقط - فشل مسح السيرفر: ' + failReason);
     scheduleWipeRetry();
-  }
+ }
 }
 function scheduleWipeRetry(){
   clearTimeout(wipeRetryTimer);
@@ -2409,8 +2355,8 @@ function scheduleWipeRetry(){
       pendingWipe = false;
       toast('✅ نجح المسح المؤجل — البيانات اتمسحت من السيرفر فعلياً', 'success');
       addLog('نجح إعادة محاولة المسح');
-    } catch(e){ scheduleWipeRetry(); }
-  }, 8000);
+ } catch(e){ scheduleWipeRetry(); }
+ }, 8000);
 }
 async function deleteSelected(){
   if (needAdmin()) return;
@@ -2425,14 +2371,13 @@ async function deleteSelected(){
   inventoryData = inventoryData.filter(i => serials.indexOf(i.serial) === -1);
   renumberSerials();
   serials.forEach(s => selectedSerials.delete(s));
-  touchLocal();
   updateTable(); updateStats(); renderCategoryButtons();
   const okServer = await pushMergeUpdate([], removedCodes);
   if (okServer) {
     toast('تم حذف ' + serials.length + ' صنف نهائياً من كل الأجهزة', 'success', { actionLabel: 'تراجع', onAction: () => restoreSnapshot(0) });
-  } else {
+ } else {
     toast('⚠️ اتحذف عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
-  }
+ }
   addLog('حذف محدد نهائي - ' + serials.length + ' صنف');
 }
 
@@ -2448,7 +2393,7 @@ function loadExcelFile(){
       .then(() => readImportFile(file, inp, isCsv))
       .catch(() => { toast('لا يوجد إنترنت لقراءة xlsx — احفظ الملف كـ CSV وارفعه', 'error'); inp.value = ''; });
     return;
-  }
+ }
   readImportFile(file, inp, isCsv);
 }
 function readImportFile(file, inp, isCsv){
@@ -2459,23 +2404,23 @@ function readImportFile(file, inp, isCsv){
         workbookData = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
         sheetNames = workbookData.SheetNames;
         isCsvSource = false;
-      } else if (typeof XLSX !== 'undefined' && isCsv) {
+ } else if (typeof XLSX !== 'undefined' && isCsv) {
         workbookData = XLSX.read(new TextDecoder().decode(new Uint8Array(e.target.result)), { type: 'string' });
         sheetNames = workbookData.SheetNames;
         isCsvSource = false;
-      } else {
+ } else {
         csvRows = parseCSV(new TextDecoder().decode(new Uint8Array(e.target.result)));
         sheetNames = ['CSV'];
         isCsvSource = true;
         if (!csvRows.length) throw new Error('empty');
-      }
+ }
       toast('تم قراءة الملف — اضغط "إضافة جرد" لإتمام الاستيراد', 'success');
-    } catch (err) {
+ } catch (err) {
       workbookData = null; csvRows = [];
       toast('تعذر قراءة الملف — جرب ملف xlsx أو csv', 'error');
-    }
+ }
     inp.value = '';
-  };
+ };
   reader.readAsArrayBuffer(file);
 }
 function parseCSV(text){
@@ -2489,15 +2434,15 @@ function parseCSV(text){
     if (q) {
       if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
       else f += c;
-    } else if (c === '"') q = true;
+ } else if (c === '"') q = true;
     else if (c === d) { row.push(f); f = ''; }
     else if (c === '\n' || c === '\r') {
       if (c === '\r' && text[i + 1] === '\n') i++;
       row.push(f); f = '';
       if (row.some(x => String(x).trim() !== '')) rows.push(row);
       row = [];
-    } else f += c;
-  }
+ } else f += c;
+ }
   if (f !== '' || row.length) { row.push(f); if (row.some(x => String(x).trim() !== '')) rows.push(row); }
   return rows;
 }
@@ -2520,12 +2465,12 @@ function openImportModal(){
       const el = $(id);
       if (!el) return;
       el.innerHTML = cols.map((c, i) => '<option value="' + i + '">' + esc(String(c).trim() || ('عمود ' + (i + 1))) + '</option>').join('');
-    });
+ });
     guessCol(cols, 'codeColumn', ['كود', 'code', 'barcode', 'باركود', 'item']);
     guessCol(cols, 'nameColumn', ['اسم', 'name', 'صنف', 'desc', 'وصف']);
     guessCol(cols, 'quantityColumn', ['كمية', 'qty', 'quantity', 'رصيد', 'stock']);
     guessCol(cols, 'groupColumn', ['مجموع', 'group', 'فئة', 'قسم', 'categ']);
-  };
+ };
   sheetSel.onchange = fillCols;
   fillCols();
   const colMod = $('columnSelectors'); if (colMod) colMod.style.display = 'flex';
@@ -2536,7 +2481,7 @@ function guessCol(cols, id, keys){
   for (let i = 0; i < cols.length; i++) {
     const h = String(cols[i]).toLowerCase();
     if (keys.some(k => h.indexOf(k) !== -1)) { sel.value = i; return; }
-  }
+ }
 }
 async function confirmImport(){
   const allRows = getSheetRows(+$('sheetSel').value) || [];
@@ -2546,7 +2491,7 @@ async function confirmImport(){
   function isHeaderCell(v){
     const s = String(v||'').trim().toLowerCase();
     return headerKeys.some(k=> s === k.toLowerCase() || s.includes(k.toLowerCase()));
-  }
+ }
   /* تسجيل نقاط لكل صف: تطابق كامل (الخلية = الكلمة بالظبط) نقطتين، تطابق جزئي نقطة واحدة —
      عشان صف بيانات فيه كلمة شبيهة بالصدفة (زي "وحدة تخزين") ما يتلخبطش مع صف الرأس الحقيقي */
   function headerScore(row){
@@ -2556,14 +2501,14 @@ async function confirmImport(){
       if (!s) continue;
       if (headerKeys.some(k => s === k.toLowerCase())) score += 2;
       else if (headerKeys.some(k => s.includes(k.toLowerCase()))) score += 1;
-    }
+ }
     return score;
-  }
+ }
   let headerIdx = -1, bestScore = 1; /* لازم نقطتين على الأقل (زي ما كان قبل كده) عشان نعتبره رأس */
   for (let i=0;i<Math.min(allRows.length, 15);i++){
     const sc = headerScore(allRows[i]||[]);
     if (sc > bestScore) { bestScore = sc; headerIdx = i; }
-  }
+ }
   const dataRows = headerIdx >=0 ? allRows.slice(headerIdx+1) : allRows.slice(1);
   const ci = +$('codeColumn').value, ni = +$('nameColumn').value, qi = +$('quantityColumn').value, gi = +$('groupColumn').value;
   const mode = document.querySelector('input[name="imode"]:checked').value;
@@ -2584,7 +2529,7 @@ async function confirmImport(){
     let headerCells = 0;
     for (const cell of r) {
       if (isHeaderCell(cell)) headerCells++;
-    }
+ }
     if (headerCells >= 2 && r.length <= 8) { skippedHeader++; return; }
     // تجاهل أعمدة فاضية: لو الاسم والكمية فاضيين والكود فاضي يعتبر فاضي (اتغطى فوق)
     const nameRaw = String(r[ni] == null ? '' : r[ni]).trim();
@@ -2597,8 +2542,8 @@ async function confirmImport(){
       name: nameRaw || 'صنف غير مسمى',
       group: groupRaw || 'عام',
       sys: parseQty(qtyRaw)
-    });
-  });
+ });
+ });
   if (!incoming.length) { toast('لم يتم العثور على بيانات بعد تجاهل الرؤوس والفارغ', 'error'); return; }
   if (mode === 'replace') {
     if (needAdmin()) return;
@@ -2618,18 +2563,18 @@ async function confirmImport(){
       inventoryData = incoming.map(r => {
         const item = { serial: s++, code: r.code, name: r.name, group: r.group, systemQuantity: r.sys, actualQuantity: 0, isJarded: false, difference: -r.sys, status: r.sys === 0 ? 'متساوي' : 'عجز', note: '', countedBy: '', counts: {}, editedAt: Date.now() };
         return item;
-      });
+ });
       selectedSerials.clear();
-    }, 'تم استيراد ' + incoming.length + ' صنف (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس) - اتبعت لكل الأجهزة');
+ }, 'تم استيراد ' + incoming.length + ' صنف (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس) - اتبعت لكل الأجهزة');
     addLog('استيراد باستبدال — ' + incoming.length + ' صنف (تجاهل رؤوس/فارغ)');
-  } else {
+ } else {
     if (needAdmin()) return;
     const resetActual = !!($('resetActualOnMerge') && $('resetActualOnMerge').checked);
     const willUpdate = [], willAdd = [];
     incoming.forEach(r => {
       const ex = inventoryData.find(i => i.code === r.code);
       if (ex) willUpdate.push({ r, ex }); else willAdd.push(r);
-    });
+ });
     const msg = 'هيتم تحديث اسم/مجموعة/كمية السيستم لـ ' + willUpdate.length + ' صنف موجود، وإضافة ' + willAdd.length + ' صنف جديد. ' +
       (resetActual ? 'هيتصفّر الجرد الفعلي للأصناف الموجودة (عدّ جديد).' : 'الجرد الفعلي الحالي للأصناف الموجودة هيفضل زي ما هو.') +
       ' تم تجاهل ' + (skippedEmpty+skippedHeader) + ' صف فاضي/رأس.';
@@ -2663,24 +2608,23 @@ async function confirmImport(){
         ex.editedAt = now;
         calculateRow(ex); updated++;
         changed.push(ex);
-      } else {
+ } else {
         const ns = inventoryData.length ? Math.max.apply(null, inventoryData.map(i => i.serial)) + 1 : 1;
         const nv = { serial: ns, code: r.code, name: r.name, group: r.group, systemQuantity: r.sys, actualQuantity: 0, isJarded: false, difference: -r.sys, status: r.sys === 0 ? 'متساوي' : 'عجز', note: '', countedBy: '', counts: {}, editedAt: now };
         inventoryData.push(nv);
         added++;
         changed.push(nv);
-      }
-    });
+ }
+ });
     renumberSerials();
-    touchLocal();
     localSave();
     updateTable(); updateStats(); renderCategoryButtons();
     pushMergeUpdate(changed, []).then(okServer => {
       if (!okServer) toast('⚠️ اتدمج عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
-    });
+ });
     toast('تم الدمج: ' + added + ' جديد + ' + updated + ' محدّث (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس)', 'success', { actionLabel: 'تراجع', onAction: () => restoreSnapshot(0) });
     addLog('دمج ملف — ' + added + ' جديد / ' + updated + ' محدّث');
-  }
+ }
   closeModal('columnSelectors');
 }
 
@@ -2698,7 +2642,7 @@ function exportToExcel(){
       '<td>' + i.serial + '</td><td>' + esc(i.code) + '</td><td>' + esc(i.name) + '</td><td>' + esc(i.group) + '</td>' +
       '<td>' + fmtQ(i.systemQuantity) + '</td><td>' + fmtQ(i.actualQuantity) + '</td><td><b>' + fmtQ(i.difference) + '</b></td>' +
       '<td>' + esc(i.status) + '</td><td>' + esc(i.countedBy || '—') + '</td><td>' + esc(i.note) + '</td></tr>';
-  });
+ });
   const html = '<html dir="rtl"><head><meta charset="utf-8"></head><body>' +
     '<h3 style="font-family:tahoma">تقرير جرد الأصناف — بيمبو ستور</h3>' +
     '<table border="1" cellspacing="0" cellpadding="5" style="border-collapse:collapse;font-family:tahoma;font-size:11pt">' +
@@ -2722,7 +2666,7 @@ function exportToCSV(){
   let csv = headers.map(csvEscape).join(',') + '\r\n';
   inventoryData.forEach(i => {
     csv += [i.serial, i.code, i.name, i.group, fmtQ(i.systemQuantity), fmtQ(i.actualQuantity), fmtQ(i.difference), i.status, i.countedBy || '', i.note].map(csvEscape).join(',') + '\r\n';
-  });
+ });
   downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }), 'Jard-' + stamp() + '.csv');
   addLog('تصدير CSV — ' + inventoryData.length + ' صنف');
   toast('تم تصدير CSV بنجاح', 'success');
@@ -2757,12 +2701,12 @@ function restoreJSON(){
           inventoryData = items;
           if (data.dt) { store.setItem(S('selectedDateTime'), data.dt); $('currentDateTime').value = data.dt; scheduleMetaPush(); }
           selectedSerials.clear();
-        }, 'تمت الاستعادة (' + items.length + ' صنف)');
+ }, 'تمت الاستعادة (' + items.length + ' صنف)');
         addLog('استعادة نسخة احتياطية — ' + items.length + ' صنف');
-      } catch (err) { toast('ملف النسخة غير صالح', 'error'); }
-    };
+ } catch (err) { toast('ملف النسخة غير صالح', 'error'); }
+ };
     r.readAsText(f);
-  };
+ };
   inp.click();
 }
 
@@ -2809,13 +2753,13 @@ function showUserReport(){
       byUser[w] = byUser[w] || { count: 0, qty: 0 };
       byUser[w].count++;
       byUser[w].qty += Math.abs(q || 0);
-    });
-  });
+ });
+ });
   const names = Object.keys(byUser);
   let html;
   if (!names.length) {
     html = '<div style="color:#94a3b8;font-size:.85rem;text-align:center;padding:1rem">لم يتم جرد أي صنف بعد</div>';
-  } else {
+ } else {
     html = names.sort((a, b) => byUser[b].count - byUser[a].count).map(n =>
       '<div class="urep-row">' +
       '<span class="who">👤 ' + esc(n) + '<div class="meta">إجمالي القطع: ' + fmtQ(byUser[n].qty) + '</div></span>' +
@@ -2824,7 +2768,7 @@ function showUserReport(){
       '<button class="view" data-u="' + esc(n) + '">عرض الأصناف</button>' +
       '</span></div>'
     ).join('');
-  }
+ }
   const m = showModal('📊 تقرير الجرد حسب المستخدم', '<div style="max-height:55vh;overflow-y:auto">' + html + '</div>', [{ label: 'إغلاق', kind: 'ghost' }]);
   m.body.querySelectorAll('.view').forEach(b => b.onclick = () => {
     const u = b.dataset.u === 'بدون مستخدم' ? '' : b.dataset.u;
@@ -2834,15 +2778,15 @@ function showUserReport(){
       closeSidebar();
       toast('يعرض الآن أصناف "' + u + '" فقط — اضغط الشريط البرتقالي لإلغاء الفلتر', 'info');
       updateStatsForUser(u);
-    }
-  });
+ }
+ });
 }
 function updateStatsForUser(name){
   /* عدّاد مؤقت للمستخدم في التوست */
   setTimeout(() => {
     const items = inventoryData.filter(i => i.countedBy === name && i.isJarded);
     toast(name + ' جرد ' + items.length + ' صنف من أصل ' + inventoryData.length, 'info');
-  }, 50);
+ }, 50);
 }
 /* ---------- سجل تتبع الجرد (آخر جرد بالوقت) ---------- */
 async function loadCountLog(){
@@ -2860,10 +2804,10 @@ async function loadCountLog(){
       const d = ev.ts ? new Date(ev.ts) : new Date();
       const time = d.toLocaleString('ar-EG', { hour12:false });
       html += '<tr style="border-bottom:1px dashed #e2e8f0"><td style="padding:5px;direction:ltr;text-align:center">' + time + '</td><td style="padding:5px">👤 ' + esc(ev.by||'') + '</td><td style="padding:5px;font-family:monospace">' + esc(ev.code||'') + '</td><td style="padding:5px">' + esc(ev.name||'') + '</td><td style="padding:5px;font-weight:800;text-align:center;color:#16a34a">' + fmtQ(ev.qty||1) + '</td></tr>';
-    });
+ });
     html += '</tbody></table>';
     box.innerHTML = html;
-  } catch(e){ box.innerHTML = '<div style="color:#ef4444">خطأ: ' + esc(e.message||'') + '</div>'; }
+ } catch(e){ box.innerHTML = '<div style="color:#ef4444">خطأ: ' + esc(e.message||'') + '</div>'; }
 }
 async function clearCountLog(){
   if (needAdmin()) return;
@@ -2874,7 +2818,7 @@ async function clearCountLog(){
     if (syncOn && db) {
       await db.ref(fbPath() + '/notifs').remove();
       okServer = true;
-    } else {
+ } else {
       const cfg = effectiveCfg();
       if (cfg && cfg.databaseURL) {
         const base = cfg.databaseURL.replace(/\/$/, '');
@@ -2882,17 +2826,17 @@ async function clearCountLog(){
         const r = await fetch(base + '/' + fbPath() + '/notifs.json' + tok, { method: 'DELETE' });
         okServer = r.ok;
         if (!okServer) failReason = 'HTTP ' + r.status;
-      } else {
+ } else {
         failReason = 'مفيش اتصال بقاعدة البيانات دلوقتي';
-      }
-    }
-  } catch(e) { failReason = e && e.message ? e.message : String(e); }
+ }
+ }
+ } catch(e) { failReason = e && e.message ? e.message : String(e); }
   if (okServer) {
     toast('تم مسح سجل الجرد فعلياً من السيرفر', 'success');
     addLog('مسح سجل الجرد');
-  } else {
+ } else {
     toast('⚠️ فشل مسح السجل من السيرفر (' + (failReason || 'خطأ اتصال') + ') — حاول تاني لما النت يرجع', 'error');
-  }
+ }
   loadCountLog();
 }
 function exportCountLog(){
@@ -2904,10 +2848,10 @@ function exportCountLog(){
     items.forEach(ev=>{
       const d = ev.ts ? new Date(ev.ts).toISOString() : '';
       csv += '"' + d + '","' + (ev.by||'') + '","' + (ev.code||'') + '","' + (ev.name||'').replace(/"/g,'""') + '",' + (ev.qty||1) + '\n';
-    });
+ });
     const blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8;'});
     const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='jard-log-' + stamp() + '.csv'; a.click();
-  });
+ });
 }
 /* تصدير سجل الجرد PDF — نافذة طباعة منسقة A4، المتصفح يحفظها PDF من نافذة الطباعة */
 function exportCountLogPDF(){
@@ -2920,7 +2864,7 @@ function exportCountLogPDF(){
       const d = ev.ts ? new Date(ev.ts) : new Date();
       const time = d.toLocaleString('ar-EG', { hour12:false });
       rows += '<tr><td>' + esc(time) + '</td><td>' + esc(ev.by||'') + '</td><td>' + esc(ev.code||'') + '</td><td>' + esc(ev.name||'') + '</td><td>' + fmtQ(ev.qty||1) + '</td></tr>';
-    });
+ });
     const html = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>سجل الجرد</title><style>' +
       '@page{ size:A4; margin:14mm; } body{ font-family:Cairo,Tahoma,Arial,sans-serif; direction:rtl; } ' +
       'h1{ font-size:18px; text-align:center; margin-bottom:4px; } .sub{ text-align:center; color:#64748b; font-size:11px; margin-bottom:16px; } ' +
@@ -2935,7 +2879,7 @@ function exportCountLogPDF(){
     w.document.write(html);
     w.document.close();
     w.onload = () => { w.focus(); w.print(); };
-  });
+ });
 }
 
 
@@ -2960,7 +2904,7 @@ async function factoryReset(){
   async function deleteNode(path){
     if (syncOn && db) {
       try { await db.ref(path).remove(); return true; } catch(e){}
-    }
+ }
     try {
       const cfg = effectiveCfg();
       if (cfg && cfg.databaseURL) {
@@ -2968,16 +2912,16 @@ async function factoryReset(){
         const tok = '?auth=' + encodeURIComponent(await getAnonIdToken(cfg));
         const r = await fetch(base + path + '.json' + tok, { method: 'DELETE' });
         return r.ok;
-      }
-    } catch(e){}
+ }
+ } catch(e){}
     return false;
-  }
+ }
 
   /* 1) امسح الأصناف والإشعارات والجلسات والسجل */
   for (const n of nodesToDelete){
     const ok = await deleteNode('/' + fbRoot() + '/' + n);
     if (!ok) { serverOk = false; failReason = 'فشل مسح ' + n; }
-  }
+ }
 
   /* 2) امسح meta بالكامل ما عدا config/configRev (بيانات الربط) */
   let keepConfig = null, keepConfigRev = null;
@@ -2987,8 +2931,8 @@ async function factoryReset(){
       const mv = snap.val() || {};
       keepConfig = mv.config || null;
       keepConfigRev = mv.configRev || null;
-    }
-  } catch(e){}
+ }
+ } catch(e){}
   const metaOk = await deleteNode('/' + fbRoot() + '/meta');
   if (!metaOk) serverOk = false;
   /* رجّع بيانات الربط بس + علامة setupDone (عشان النظام يعرف إنه اتظبط قبل كده
@@ -2999,8 +2943,8 @@ async function factoryReset(){
       if (keepConfig) toSet.config = keepConfig;
       if (keepConfigRev) toSet.configRev = keepConfigRev;
       await db.ref(fbRoot() + '/meta').update(toSet);
-    }
-  } catch(e){}
+ }
+ } catch(e){}
 
   /* 3) اضف علامة forceWipe لكل الأجهزة عشان أي جهاز فاتح ياخد باله فورًا ويمسح الكاش بتاعه.
      بعد ما نكتبها بنستنى قيمتها الحقيقية من السيرفر ونحفظها في lastForceWipe عشان
@@ -3013,9 +2957,9 @@ async function factoryReset(){
       try {
         const s = await wipeRef.get();
         if (s.exists()) serverWipeTs = Number(s.val()) || serverWipeTs;
-      } catch(e){}
-    }
-  } catch(e){}
+ } catch(e){}
+ }
+ } catch(e){}
   // 2) امسح كل حاجة محلية — لكن **احفظ إعدادات الربط** (firebaseCfg) وآخر forceWipe اللي كتبناه دلوقتي عشان مايعملش reload تاني بعد المسح
   let savedCfg = null;
   try { savedCfg = store.getItem('firebaseCfg'); } catch(e){}
@@ -3032,12 +2976,12 @@ async function factoryReset(){
     if (savedCfg) store.setItem('firebaseCfg', savedCfg);
     /* علامة للـ session الحالي عشان مايدخلش حلقة reload */
     sessionStorage.setItem('forceWipeHandled_' + serverWipeTs, '1');
-  } catch(e){}
+ } catch(e){}
   if (serverOk) {
     toast('💥 تمت إعادة ضبط المصنع - اتمسح كل شيء (الأصناف + المستخدمين) من السيرفر والكاش', 'success');
-  } else {
+ } else {
     toast('⚠️ اتمسح عندك بس السيرفر لم يستجب (' + (failReason || 'خطأ اتصال') + ') — البيانات القديمة ممكن ترجع من أي جهاز تاني متصل. جرب تاني لما النت يرجع', 'error');
-  }
+ }
   setTimeout(() => location.reload(), 1000);
 }
 
@@ -3061,13 +3005,13 @@ async function openSettings(){
     if (!isAdmin()) {
       const ok = await ensureAdmin();
       if (!ok) { toast('الإعدادات للمسؤول فقط', 'error'); return; }
-    } else if (!adminAuthedLive) {
+ } else if (!adminAuthedLive) {
       /* نقطة 4: الجلسة ممكن تكون مرمّمة — الأدمن يأكد الباسورد مرة واحدة في كل تحميل صفحة.
          كده أي تلاعب بالتخزين/DevTools مش هيفتح الإعدادات من غير الباسورد الحقيقي. */
       const ok = await ensureAdmin();
       if (!ok) { toast('لازم تأكيد كلمة مرور admin قبل فتح الإعدادات', 'error'); return; }
-    }
-  }
+ }
+ }
   const cfg = effectiveCfg();
   const body =
     '<div class="set-tabs">' +
@@ -3154,8 +3098,8 @@ async function openSettings(){
       tab.classList.add('active');
       const pane = m.body.querySelector('[data-pane="' + tab.dataset.tab + '"]');
       if (pane) pane.classList.add('active');
-    };
-  });
+ };
+ });
 
   /* ---------- إدارة المستخدمين ---------- */
   let onlineSess = [];
@@ -3175,7 +3119,7 @@ async function openSettings(){
         '<button class="icon-btn utoggle ' + (on ? 'on' : 'off') + '" data-tg="' + i + '" title="' + (on ? 'إيقاف مؤقت' : 'تشغيل') + '">' + (on ? '✅ شغّال' : '⛔ موقوف') + '</button>' +
         '<button class="icon-btn del" data-i="' + i + '">🗑️ حذف</button>' +
         '</div></td></tr>';
-    }).join('');
+ }).join('');
     /* زرار التعديل */
     box.querySelectorAll('[data-editu]').forEach(b => b.onclick = async () => { await editUser(+b.dataset.editu); renderUsers(); });
     /* زر الطرد — للمسؤول */
@@ -3186,7 +3130,7 @@ async function openSettings(){
       await kickUserOut(name);
       onlineSess = onlineSess.filter(s => s.name !== name);
       renderUsers();
-    });
+ });
     /* مفتاح تشغيل/إيقاف للمستخدم */
     box.querySelectorAll('[data-tg]').forEach(b => b.onclick = () => {
       const u = usersList[+b.dataset.tg];
@@ -3196,7 +3140,7 @@ async function openSettings(){
       addLog((u.active ? 'تشغيل المستخدم: ' : 'إيقاف المستخدم: ') + u.name);
       toast(u.active ? '✅ ' + u.name + ' شغّال تاني' : '⛔ ' + u.name + ' اتوقف — هيقدرش يدخل', u.active ? 'success' : 'warning');
       renderUsers();
-    });
+ });
     box.querySelectorAll('.del').forEach(b => b.onclick = async () => {
       const u = usersList[+b.dataset.i];
       const idx = +b.dataset.i;
@@ -3213,9 +3157,9 @@ async function openSettings(){
         pushMeta(true);
         addLog('استرجاع مستخدم: ' + u.name);
         renderUsers();
-      }});
-    });
-  };
+ }});
+ });
+ };
   renderUsers();
   /* تحميل قائمة المتصلين لعرض حالة كل مستخدم + زر الطرد */
   getOnlineSessions().then(list => { onlineSess = list; renderUsers(); });
@@ -3231,7 +3175,7 @@ async function openSettings(){
       toast('الخطوة الأخيرة: أنشئ كلمة مرور admin (هتدخل بها على الإعدادات)', 'info');
       const ok = await ensureAdmin();
       if (!ok) { toast('لازم تنشئ كلمة مرور admin الأول', 'error'); return; }
-    }
+ }
     usersList.push({ name, hash: await hashPass(pass), role });
     store.setItem(S('usersList'), JSON.stringify(usersList));
     pushMeta(true);
@@ -3240,7 +3184,7 @@ async function openSettings(){
     addLog('إضافة مستخدم: ' + name);
     toast('تمت إضافة ' + name + ' — يقدر يدخل بيها من أي جهاز', 'success');
     renderUsers();
-  };
+ };
 
   /* ---------- اللوجو ---------- */
   /* اللوجو ممكن يتغير من مكان واحد ويمثل البرنامج كله */
@@ -3263,13 +3207,13 @@ async function openSettings(){
       resultBox.style.color = ok ? '#166534' : '#b91c1c';
       resultBox.style.border = '1px solid ' + (ok ? '#86efac' : '#fca5a5');
       resultBox.textContent = msg;
-    };
+ };
     if (txt) {
       const cfg2 = parseCfgLoose(txt);
       if (!cfg2) { showRes(false, '❌ فشل — الكود اللي اتلصق مش مفهوم'); toast('تعذّر فهم الكود — انسخه كاملًا من Firebase كما هو والصقه هنا', 'error'); return; }
       firebaseCfgLS = cfg2;
       store.setItem('firebaseCfg', JSON.stringify(cfg2));
-    }
+ }
     /* الجذر بيتحفظ على المفتاح syncPath، والفرع الرئيسي بيرثه تلقائيًا */
     store.setItem('syncPath', path);
     const btn = m.body.querySelector('#saveFb');
@@ -3289,50 +3233,50 @@ async function openSettings(){
         showRes(true, '✅ نجح الاتصال — الكتابة والقراءة شغالين تمام. ابعت لينك البرنامج لكل المستخدمين دلوقتي 📲');
         toast('✅ نجح الاتصال والمزامنة شغالة — ابعت اللينك للمستخدمين', 'success');
         addLog('اختبار الاتصال نجح');
-      } else {
+ } else {
         showRes(false, '❌ فشل — القراءة رجعت بيانات غير متوقعة');
-      }
-    } catch (e) {
+ }
+ } catch (e) {
       const msg = e && e.message ? e.message : String(e);
       if (msg.indexOf('PERMISSION_DENIED') !== -1) {
         showRes(false, '❌ فشل — القواعد رافضة: اكتب ".read": true ".write": true في Rules');
-      } else if (msg.indexOf('auth') !== -1) {
+ } else if (msg.indexOf('auth') !== -1) {
         showRes(false, '❌ فشل — فعّل Anonymous Auth في Firebase Console');
-      } else {
+ } else {
         showRes(false, '❌ فشل — ' + msg);
-      }
-    }
-  };
+ }
+ }
+ };
   m.body.querySelector('#loginReqChk').onchange = async e => {
     if (e.target.checked && !adminHash) {
       const ok = await ensureAdmin();
       if (!ok) { e.target.checked = false; return; }
-    }
+ }
     loginRequiredExplicit = e.target.checked;
     pushMeta(false);
     toast(loginRequiredExplicit ? '🔒 نظام الدخول اتفعّل على كل الأجهزة' : '🔓 نظام الدخول اتلغى — البرنامج هيشتغل من غير تسجيل دخول', 'success');
     applyUserUI();
-  };
+ };
   m.body.querySelector('#lockChk').onchange = async e => {
     if (e.target.checked && !adminHash) {
       const ok = await ensureAdmin();
       if (!ok) { e.target.checked = false; return; }
-    }
+ }
     lockOnOpen = e.target.checked;
     store.setItem('lockOnOpen', lockOnOpen ? '1' : '0');
-  };
+ };
   m.body.querySelector('#soundChk').onchange = e => {
     soundOn = e.target.checked;
     store.setItem('soundOn', soundOn ? '1' : '0');
     if (soundOn) beep('ok');
-  };
+ };
   m.body.querySelector('#chgPass').onclick = async () => {
     let old = '';
     if (adminHash) {
       old = await inputDlg('كلمة المرور الحالية', 'أدخل كلمة المرور الحالية', true);
       if (old === null) return;
       if (await hashPass(old) !== adminHash) { toast('كلمة المرور الحالية غير صحيحة', 'error'); return; }
-    }
+ }
     const p1 = await inputDlg('كلمة مرور جديدة', '3 أحرف على الأقل', true);
     if (p1 === null) return;
     if (p1.length < 3) { toast('كلمة المرور قصيرة', 'error'); return; }
@@ -3347,10 +3291,10 @@ async function openSettings(){
       const cu = firebase.auth && firebase.auth().currentUser;
       if (cu && cu.email === adminAuthEmail()) await cu.updatePassword(p1);
       else await ensureFirebaseAdminAuth(p1); /* أول مرة أو الحساب مش موجود لسه */
-    } catch (e) {}
+ } catch (e) {}
     addLog('تغيير كلمة المرور');
     toast('تم تغيير كلمة المرور', 'success');
-  };
+ };
   m.body.querySelector('#bkpBtn').onclick = backupJSON;
   m.body.querySelector('#rstBtn').onclick = () => { m.close(); restoreJSON(); };
   m.body.querySelector('#logBtn').onclick = () => { m.close(); showLog(); };
@@ -3363,7 +3307,7 @@ async function openSettings(){
     const rb = m.body.querySelector('#resetNotifCnt');
     if (rb) rb.onclick = () => { store.setItem('lastNotifTs', String(Date.now())); lastNotifTs = Date.now(); toast('تم تصفير العداد', 'success'); };
     updateNotifUI();
-  } catch(e){}
+ } catch(e){}
   try {
     const rBtn = m.body.querySelector('#refreshLogBtn');
     if (rBtn) rBtn.onclick = () => loadCountLog();
@@ -3375,7 +3319,7 @@ async function openSettings(){
     if (pBtn) pBtn.onclick = () => exportCountLogPDF();
     // حمل السجل تلقائي لما تفتح تبويب السجل
     setTimeout(()=>{ loadCountLog(); }, 300);
-  } catch(e){}
+ } catch(e){}
   const frBtn = m.body.querySelector('#factoryResetBtn');
   if (frBtn) frBtn.onclick = () => { m.close(); factoryReset(); };
 }
@@ -3386,7 +3330,7 @@ async function openCameraScanner(){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast('الكاميرا غير مدعومة على هذا الجهاز/المتصفح', 'error');
     return;
-  }
+ }
   primeAudio();
   const bodyHTML =
     '<div class="cam-stage">' +
@@ -3412,12 +3356,12 @@ async function openCameraScanner(){
   try {
     if (typeof Html5Qrcode === 'undefined') {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js');
-    }
-  } catch (e) {
+ }
+ } catch (e) {
     m.close();
     toast('تعذر تحميل مكتبة الكاميرا — تحتاج إنترنت في أول مرة فقط', 'error');
     return;
-  }
+ }
   if (!document.getElementById('qrReader')) return; // المستخدم قفل النافذة
   /* أجهزة ضعيفة (كور قليلة) بناخد fps أقل عشان مايهنجش، الباقي ياخد سرعة قراءة أعلى */
   const camFps = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ? 10 : 18;
@@ -3437,7 +3381,7 @@ async function openCameraScanner(){
         Html5QrcodeSupportedFormats.CODABAR, Html5QrcodeSupportedFormats.DATA_MATRIX,
         Html5QrcodeSupportedFormats.PDF_417, Html5QrcodeSupportedFormats.AZTEC
       ]
-    });
+ });
     const cams = await Html5Qrcode.getCameras();
     const camId = cams && cams.length ? (cams.find(c => /back|rear|environment/i.test(c.label)) || cams[cams.length - 1]).id : undefined;
     /* ⚠️ مهم جدًا: لما تُمرَّر videoConstraints للمكتبة، بتتجاهل تمامًا أي كاميرا محددة في
@@ -3452,14 +3396,14 @@ async function openCameraScanner(){
     const videoConstraints = Object.assign({}, camTarget, {
       width: { ideal: 1920 }, height: { ideal: 1080 },
       advanced: [{ focusMode: 'continuous' }, { exposureMode: 'continuous' }, { whiteBalanceMode: 'continuous' }]
-    });
+ });
     const camConfig = {
       fps: camFps,
       qrbox: (w, h) => ({ width: Math.floor(w * 0.9), height: Math.floor(h * 0.62) }),
       aspectRatio: 1.7778,
       disableFlip: false,
       videoConstraints
-    };
+ };
     /* الباراميتر الأول لسه لازم يكون قيمة "صح" (المكتبة بترفض null/undefined) حتى لو
        هيتجاهل فعليًا لصالح videoConstraints أعلاه */
     const baseTarget = camTarget;
@@ -3483,10 +3427,10 @@ async function openCameraScanner(){
           if (f) {
             f.classList.add('show', 'err');
             setTimeout(() => { f.classList.remove('show', 'err'); camBusy = false; }, 1200);
-          }
+ }
           if (sc) sc.innerHTML = '⚠️ قراءة مرفوضة — الكود ناقص — عدد المسحات: <b id="scanCountNum">' + qrScanCount + '</b>';
           return;
-        }
+ }
 
         lastCamCode = txt; lastCamTime = now; camBusy = true;
         qrScanCount++;
@@ -3501,24 +3445,24 @@ async function openCameraScanner(){
         if (f) {
           f.classList.add('show');
           setTimeout(() => { f.classList.remove('show'); camBusy = false; }, 1000);
-        } else camBusy = false;
+ } else camBusy = false;
         if (sc) sc.innerHTML = '✅ تم مسح <b style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة' + (before ? '' : ' — (كود جديد)');
-    }
+ }
     /* 🎯 محاولة التشغيل بالإعدادات الكاملة (دقة عالية + فوكس/إضاءة مستمر) — لو سفاري/جهاز قديم
        رفض combination معينة (OverconstrainedError)، نتراجع تدريجيًا لحد ما نلاقي إعداد شغال،
        بدل ما نفشل بالكامل ونطلع رسالة خطأ ومفيش كاميرا خالص */
     try {
       await startScanner(baseTarget, camConfig);
-    } catch (e1) {
+ } catch (e1) {
       try {
         /* تراجع 1: من غير قيود advanced (بعض أجهزة iOS بترفض focusMode/exposureMode/whiteBalanceMode مع بعض)،
            بس لسه محتفظين باختيار الكاميرا الخلفية + الدقة العالية جوه videoConstraints */
         await startScanner(baseTarget, { fps: camFps, qrbox: camConfig.qrbox, aspectRatio: 1.7778, disableFlip: false, videoConstraints: Object.assign({}, camTarget, { width: { ideal: 1920 }, height: { ideal: 1080 } }) });
-      } catch (e2) {
+ } catch (e2) {
         /* تراجع 2: من غير أي قيود دقة، وكاميرا خلفية "ideal" بدل تحديد جهاز بعينه */
         await startScanner({ facingMode: { ideal: 'environment' } }, { fps: camFps, qrbox: camConfig.qrbox, aspectRatio: 1.7778, disableFlip: false });
-      }
-    }
+ }
+ }
     qrCamOn = true;
     const closeBtn = $('camClose');
     if (closeBtn) closeBtn.onclick = () => { stopCameraScanner(); m.close(); };
@@ -3534,10 +3478,10 @@ async function openCameraScanner(){
         tb.textContent = on ? '🔦 إطفاء الفلاش' : '🔦 تشغيل الفلاش';
         tb.classList.toggle('orange', !on);
         tb.classList.toggle('red', on);
-      }
+ }
       const hint = $('lowLightHint');
       if (hint) hint.style.display = (on && !manual) ? '' : 'none';
-    }
+ }
     /* زر الفلاش — يظهر دائمًا لو الكاميرا بتدعمه، وبتقدر تشغّله وتطفّيه يدويًا في أي وقت
        (اللمس اليدوي بيوقف التحكم التلقائي في الإضاءة الضعيفة عشان مايتلخبطش مع اختيارك) */
     try {
@@ -3547,7 +3491,7 @@ async function openCameraScanner(){
         const tb = $('camTorch');
         tb.style.display = '';
         tb.onclick = () => setTorch(!torchOn, true);
-      }
+ }
       /* 🔍 تكبير رقمي — يفيد جدًا في مسح باركود صغير أو بعيد. بيظهر بس لو الكاميرا بتدعم zoom */
       if (caps && caps.zoom && caps.zoom.max && caps.zoom.max > (caps.zoom.min || 1)) {
         const wrap = $('camZoomWrap'), slider = $('camZoom'), val = $('camZoomVal');
@@ -3561,10 +3505,10 @@ async function openCameraScanner(){
             const z = parseFloat(slider.value);
             if (val) val.textContent = z.toFixed(1) + 'x';
             qrScanner.applyVideoConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
-          };
-        }
-      }
-    } catch (e) {}
+ };
+ }
+ }
+ } catch (e) {}
 
     /* 💡 كشف الإضاءة الضعيفة تلقائيًا: بنعاين متوسط سطوع الفريم كل ثانية ونحوّه، لو معتم
        لمدة لقطتين متتاليتين والفلاش موجود ومش متحكم فيه يدويًا، نشغّله لوحده. لو الإضاءة
@@ -3585,10 +3529,10 @@ async function openCameraScanner(){
         const avg = sum / (data.length / 4);
         if (avg < 55) { dimStreak++; if (dimStreak >= 2 && torchCapable && !torchOn) setTorch(true, false); }
         else { dimStreak = 0; if (torchCapable && torchOn && avg > 90) setTorch(false, false); }
-      } catch (e) {}
-    }, 1000);
+ } catch (e) {}
+ }, 1000);
     qrScanner.__lightTimer = lightTimer;
-  } catch (e) {
+ } catch (e) {
     m.close();
     let msg = 'تعذر فتح الكاميرا — تأكد من السماح بالوصول للكاميرا';
     const name = e && e.name;
@@ -3596,14 +3540,14 @@ async function openCameraScanner(){
     else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') msg = 'مفيش كاميرا متاحة على الجهاز ده';
     else if (name === 'NotReadableError' || name === 'TrackStartError') msg = 'الكاميرا مستخدمة في تطبيق تاني دلوقتي — قفله وحاول تاني';
     toast(msg, 'error');
-  }
+ }
 }
 function stopCameraScanner(){
   if (qrScanner && qrCamOn) {
     qrCamOn = false;
     if (qrScanner.__lightTimer) { clearInterval(qrScanner.__lightTimer); qrScanner.__lightTimer = null; }
     qrScanner.stop().then(() => { try { qrScanner.clear(); } catch (e) {} }).catch(() => {});
-  }
+ }
 }
 
 /* ---------- خدمة الأوفلاين (Service Worker) ---------- */
@@ -3625,7 +3569,7 @@ function toggleFullScreen(){
   try {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen();
     else document.exitFullscreen();
-  } catch (e) {}
+ } catch (e) {}
 }
 function openSidebar(){ $('sidebar').classList.add('open'); $('sidebarOverlay').classList.add('show'); }
 function closeSidebar(){ $('sidebar').classList.remove('open'); $('sidebarOverlay').classList.remove('show'); }
@@ -3642,7 +3586,7 @@ function maybeFinishBoot(){
   if (usersList.length === 0) {
     seedDefaultAdmin().then(done);
     return;
-  }
+ }
   /* نقطة 9: فيه جلسة محفوظة من قبل الريفريش؟ → السيرفر يأكدها الأول (نقطة 4) */
   if (sessionUser && loginRequired()) {
     bootMsg('جاري الاتصال بقاعدة البيانات...');
@@ -3656,16 +3600,16 @@ function maybeFinishBoot(){
           'اتسجل دخول "<b>' + esc(takenName) + '</b>" من جهاز آخر بعد آخر مرة اشتغلت هنا.<br>سجّل خروجه من هناك الأول — أو استنى دقيقة ونص والجلسة القديمة هتقفل لوحدها وبعدين ادخل من هنا.',
           '🔑 تسجيل الدخول', () => { document.querySelectorAll('.big-block-ov').forEach(x => x.remove()); showLock(); });
         return;
-      }
+ }
       if (res === true) {
         done();
         toast('رجعناك تاني يا ' + sessionUser.name + ' 👋', 'success');
         return;
-      }
+ }
       done(); /* الجلسة باطلة (مستخدم اتمسح/اتوقف) → finalize هيعرض شاشة الدخول */
-    }).catch(() => done());
+ }).catch(() => done());
     return;
-  }
+ }
   done();
 }
 function finalize(){
@@ -3676,15 +3620,15 @@ function finalize(){
     // تنبيه بسيط لو الكتالوج كبر جداً — مش منع، مجرد وعي بإن الأداء ممكن يتأثر
     if (isAdmin() && inventoryData.length > 3000) {
       toast('ℹ️ الكتالوج فيه ' + inventoryData.length + ' صنف — مع الأعداد الكبيرة جداً، بعض العمليات (زي المزامنة الكاملة) ممكن تبقى أبطأ شوية', 'info');
-    }
-  } catch(e){}
+ }
+ } catch(e){}
 }
 // لو الرابط فيه ?clear=1 أو ?wipe=1 → امسح الكاش المحلي فوراً (عشان تشوف الملف فاضي)
 try {
   const qs = location.search||'';
   if (qs.includes('clear=1') || qs.includes('wipe=1') || qs.includes('factory=1')) {
     store.clear();
-  }
+ }
 } catch(e){}
 window.addEventListener('load', () => {
   try {
@@ -3693,7 +3637,7 @@ window.addEventListener('load', () => {
     l.rel = 'manifest';
     l.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(man));
     document.head.appendChild(l);
-  } catch (e) {}
+ } catch (e) {}
   const dt = $('currentDateTime');
   dt.value = nowLocalDT();
   setupBarcodeInput();
@@ -3705,25 +3649,14 @@ window.addEventListener('load', () => {
   /* فك قفل الصوت على iOS/Chrome من أول لمسة */
   document.addEventListener('pointerdown', primeAudio, { once: true });
   document.addEventListener('keydown', primeAudio, { once: true });
-  window.addEventListener('offline', () => { setSyncUI('mid', 'انقطع الاتصال — كمّل جردك عادي وهيترفع لوحده'); updateOfflineBar(); });
-  window.addEventListener('online', () => {
-    if (!syncOn) connectFirebase(true);
-    else if (pendingOfflinePush) { pendingOfflinePush = false; flushDirtyItems(); }
-    updateOfflineBar();
-  });
-  /* ⛔ تحذير قبل قفل/تحديث الصفحة لو فيه جرد لسه مترفعش والنت مقطوع */
-  window.addEventListener('beforeunload', e => {
-    if ((pendingOfflinePush || pendingMetaPush) && (navigator.onLine === false || fbConnected === false)) {
-      e.preventDefault();
-      e.returnValue = ''; /* المتصفح بيظهر تحذير "التغييرات مترفعتش — متأكد إنك عايز تخرج؟" */
-    }
-  });
-  /* ضمانة رفع المعلّق: كل 10 ثواني، لو النت راجع وفيه حاجة معلقة → ارفعها لوحدك */
+  /* النت قطع → بنقولها بصراحة: الجرد أونلاين بس، مفيش تسجيل محلي */
+  window.addEventListener('offline', () => { setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط'); });
+  /* النت رجع → لو الاتصال نفسه واقع نعيد ربطه */
+  window.addEventListener('online', () => { if (!syncOn) connectFirebase(true); });
+  /* ضمانة رفع الإعدادات: لو فيه meta اتأجل لأن الاتصال لسه ما اتبنيش */
   setInterval(() => {
-    if (navigator && navigator.onLine === false) return;
-    if (syncOn && pendingOfflinePush) { pendingOfflinePush = false; flushDirtyItems(); }
     if (syncOn && seenMeta && pendingMetaPush) { pendingMetaPush = false; pushMeta(true); }
-  }, 10000);
+ }, 10000);
 
   /* ---- منطق الإقلاع الجديد: أونلاين 100% ----
      ⛔ ممنوع تشغيل البرنامج في أكتر من تبويب/متصفح على نفس الجهاز في نفس الوقت */
@@ -3749,18 +3682,18 @@ window.addEventListener('load', () => {
           /* أول ما القاعدة تتوصّل → شاشة الدخول على طول (admin / 123456).
              مفيش دخول مباشر للواجهة من غير تسجيل دخول أبداً */
           showLock();
-        }
-      };
+ }
+ };
       return;
-    }
+ }
     /* نعرض شاشة "جاري الاتصال" من أول لحظة حتى لو الكونفيج موجودة — عشان مايحصلش
        وميض للواجهة قبل ما نحدد هل فيه دخول مطلوب ولا لأ */
     bootShow();
     /* أول تشغيل على الجهاز ده خالص: البرنامج يشتغل لحاله لما البيانات توصل — من غير أي شاشة انتظار */
     updateTable(); updateStats(); renderCategoryButtons(); applyLogo();
-    updateOfflineBar();
+ 
     connectFirebase(true);
-  }
+ }
   /* إعادة اتصال تلقائية لما النت يرجع — بدون أي أزرار أو نصايح تظهر للمستخدم */
   let bootRetryTimer = null;
   const tryAutoReconnect = () => {
@@ -3774,9 +3707,9 @@ window.addEventListener('load', () => {
         if (ic) ic.textContent = '🔁';
         clearTimeout(bootRetryTimer);
         bootRetryTimer = setTimeout(tryAutoReconnect, 5000);
-      }
-    });
-  };
+ }
+ });
+ };
   /* لو المستخدم قطع النت ورجّعه وهو على شاشة التحميل، نعيد الاتصال فورًا */
   window.addEventListener('online', tryAutoReconnect);
   tabGuard(startApp);

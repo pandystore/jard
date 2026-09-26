@@ -1,48 +1,40 @@
 /* ============================================================
-   البيانات كلها على Firebase (أصناف/مستخدمين/إعدادات/سجل) — أونلاين بالكامل.
-   مفيش أي localStorage في البرنامج خالص. التخزين الوحيد المؤقت هو sessionStorage
-   (جلسة الدخول + هوية الجهاز) عشان تحديث الصفحة مايطلّعش المستخدم بره، وده بيتمسح
-   لوحده أوتوماتيك لما تقفل التبويب/المتصفح — مفيش أي بيانات بتفضل على الجهاز بعد كده.
+   البرنامج أونلاين 100% — مفيش أي تخزين على الجهاز خالص.
+   البيانات والمستخدمين والإعدادات كلها على Firebase، وإعدادات الاتصال نفسها
+   مكتوبة في index.html (يعني على GitHub مع الكود).
+   الدخول مطلوب دايماً: أول تشغيل من غير كونفيج بيفتح شاشة الإعدادات مباشرة،
+   وبعد ما تتوصّل قاعدة البيانات بتظهر شاشة الدخول (admin / 123456).
+   تحديث الصفحة = تسجيل خروج، لأن الجلسة في الذاكرة بس ومش بتتسجل على الجهاز.
 ============================================================ */
 const store = (() => {
-  /* التخزين الوحيد: هوية الجهاز + جلسة الدخول، وبقى sessionStorage مش localStorage —
-     يعني بيتمسح لوحده لما تقفل التبويب/المتصفح، ومفيش أي بيانات بتتخزن دائم على الجهاز.
-     كل حاجة تانية (الأصناف، المستخدمين، الإعدادات) مصدرها Firebase أونلاين بس. */
-  const PERSIST = { deviceId: 'jard::deviceId', sessionUser: 'jard::sessionUser', lastWipe: 'jard::lastWipe', notifEnabled: 'jard::notifEnabled', lastNotifTs: 'jard::lastNotifTs' };
-  const mem = new Map(); /* ذاكرة داخلية لكل حاجة تانية */
+  /* ⛔ مفيش أي تخزين على الجهاز خالص — لا localStorage ولا sessionStorage.
+     "store" بقت ذاكرة داخلية (Map) في الرام بس، بتختفي أول ما تقفل التبويب أو تعمل Refresh.
+     يعني: تحديث الصفحة = تسجيل خروج ولازم تدخل تاني، ومفيش أي أثر للبرنامج على الجهاز.
+     مصدر كل حاجة (الأصناف/المستخدمين/الإعدادات/الجلسة) هو Firebase أونلاين. */
+  const mem = new Map();
   return {
-    getItem: k => {
-      if (k in PERSIST) { try { return sessionStorage.getItem(PERSIST[k]); } catch (e) { return mem.has(k) ? mem.get(k) : null; } }
-      return mem.has(k) ? mem.get(k) : null;
-    },
-    setItem: (k, v) => {
-      v = String(v);
-      if (k in PERSIST) { try { sessionStorage.setItem(PERSIST[k], v); } catch (e) {} }
-      mem.set(k, v);
-    },
-    removeItem: k => {
-      if (k in PERSIST) { try { sessionStorage.removeItem(PERSIST[k]); } catch (e) {} }
-      mem.delete(k);
-    },
-    clear: () => {
-      try { Object.keys(PERSIST).forEach(k => sessionStorage.removeItem(PERSIST[k])); } catch (e) {}
-      mem.clear();
-    }
+    getItem: k => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => { mem.set(k, String(v)); },
+    removeItem: k => { mem.delete(k); },
+    clear: () => { mem.clear(); }
   };
 })();
-/* تنظيف لمرة واحدة لأي بقايا من نسخ قديمة كانت بتخزن على localStorage —
-   البرنامج مش بيكتب على localStorage خالص بعد كده، النظافة دي بس عشان تمسح القديم */
-(function purgeLegacyLS(){
-  try {
-    const kill = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      /* مفاتيح البرنامج القديمة بس — مفاتيح أي موقع تاني على نفس الدومين متتلمسش */
-      if (/^jard::/.test(k) || /^(inventoryData|localRev|logBook|selectedDateTime|customLogo|adminHash|usersList|sessionUser|firebaseCfg|soundOn|lockOnOpen|syncPath|deviceId|branchesList|branch)(::.*)?$/.test(k)) kill.push(k);
-    }
-    kill.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
-  } catch (e) {}
+/* تنظيف لمرة واحدة لأي بقايا من نسخ قديمة كانت بتخزن على الجهاز —
+   البرنامج مش بيكتب على localStorage ولا sessionStorage خالص بعد كده */
+(function purgeLegacyStorage(){
+  const KILL = /^(jard::.*)|(inventoryData|localRev|logBook|selectedDateTime|customLogo|adminHash|usersList|sessionUser|firebaseCfg|soundOn|lockOnOpen|syncPath|deviceId|branchesList|branch|lastForceWipe|lastNotifTs|notifEnabled)(::.*)?$/;
+  ['localStorage', 'sessionStorage'].forEach(kind => {
+    try {
+      const box = window[kind];
+      const kill = [];
+      for (let i = 0; i < box.length; i++) {
+        const k = box.key(i);
+        /* مفاتيح البرنامج بس — مفاتيح أي موقع تاني على نفس الدومين متتلمسش */
+        if (k && KILL.test(k)) kill.push(k);
+      }
+      kill.forEach(k => { try { box.removeItem(k); } catch (e) {} });
+    } catch (e) {}
+  });
 })();
 
 const FIREBASE_CONFIG = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey !== undefined) ? window.FIREBASE_CONFIG : { apiKey: "", authDomain: "", databaseURL: "", projectId: "", appId: "" };
@@ -668,10 +660,10 @@ function isOnlyDefaultAdmin(){ return usersList.length === 1 && usersList[0].nam
 /* ---------- تسجيل الدخول (مستخدمين) ---------- */
 let loginRequiredExplicit = null; /* null = مفيش قرار صريح لسه (يرجع للسلوك القديم) | true/false = قرار الأدمن الصريح، متزامن على كل الأجهزة */
 function loginRequired(){
-  if (loginRequiredExplicit !== null) return loginRequiredExplicit;
-  /* fallback قديم: الدخول مطلوب بس لما يكون فيه مستخدمين إضافيين فوق الـ admin الافتراضي */
-  const extras = usersList.filter(u => u.name !== DEFAULT_ADMIN.user);
-  return extras.length > 0 || (lockOnOpen && !!adminHash);
+  /* الدخول مطلوب دايماً — مفيش وضع "مفيش مستخدمين فالكل مسؤول".
+     الحالة الوحيدة اللي من غير دخول هي أول تشغيل خالص والكونفيج لسه متحطتش،
+     ووقتها البرنامج بيفتح شاشة الإعدادات مباشرة (مش الواجهة) */
+  return true;
 }
 function isAdmin(){
   /* مفيش نظام مستخدمين مفعل = الكل مسؤول */
@@ -715,6 +707,9 @@ function applyUserUI(){
   ['btnExport', 'btnExportCsv', 'btnPrint', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnUndoHist'].forEach(id => {
     const b = $(id); if (b) b.style.display = elev ? '' : 'none';
   });
+  /* لازم الجدول يترسم من جديد بعد الدخول/الخروج — عشان صلاحيات التعديل
+     (contenteditable) بتتحسب وقت الرسم، فلو مرسمناش هتفضل صلاحيات اللي قبلها */
+  try { updateTable(); } catch (e) {}
   try {
     if (adm && sessionUser && syncOn) {
       if (store.getItem('notifEnabled') === '1' && window.Notification && Notification.permission === 'granted') {
@@ -1311,6 +1306,10 @@ function getFiltered(){
 function updateTable(){
   const filtered = getFiltered();
   const groups = groupsList();
+  /* المستخدم العادي "جرد فقط": يشوف كل حاجة ويعدّ، لكن مايعدّلش أي بيانات
+     (اسم/مجموعة/ملاحظة/كمية السيستم) — التعديل والحذف والاستيراد للأدمن والمشرف بس.
+     الخانة الوحيدة اللي يقدر يكتب فيها هي الكمية اللي هو جردها */
+  const canEdit = isElevated();
   let html = '';
   filtered.forEach(item => {
     /* لو فلتر بمستخدم شغال → نعرض كميته هو بس (counts أول، لو مفيش نرجع لـ countedBy للبيانات القديمة) */
@@ -1328,13 +1327,13 @@ function updateTable(){
       '<td class="tc no-print"><input type="checkbox" class="item-checkbox"' + (sel ? ' checked' : '') + '></td>' +
       '<td class="p3 txs fwb tc">' + item.serial + '</td>' +
       '<td class="p3 fw6">' + esc(item.code) + '</td>' +
-      '<td class="p3 tsm" contenteditable="true" data-edit="name">' + esc(item.name) + '</td>' +
-      '<td class="p3 txs"><select data-gsel class="rowselect">' + opts + '</select></td>' +
-      '<td class="tc fwb" contenteditable="' + (userFilter ? 'false' : 'true') + '" data-qty="systemQuantity" data-cell="sys">' + fmtQ(item.systemQuantity) + '</td>' +
+      '<td class="p3 tsm" contenteditable="' + (canEdit ? 'true' : 'false') + '" data-edit="name">' + esc(item.name) + '</td>' +
+      '<td class="p3 txs"><select data-gsel class="rowselect"' + (canEdit ? '' : ' disabled') + '>' + opts + '</select></td>' +
+      '<td class="tc fwb" contenteditable="' + ((userFilter || !canEdit) ? 'false' : 'true') + '" data-qty="systemQuantity" data-cell="sys">' + fmtQ(item.systemQuantity) + '</td>' +
       '<td class="tc fwb tblue" contenteditable="' + (userFilter ? 'false' : 'true') + '" data-qty="actualQuantity" data-cell="act">' + fmtQ(dispAct) + '</td>' +
       '<td class="tc fwb" data-cell="diff">' + fmtQ(dispDiff) + '</td>' +
       '<td class="tc txs fwb" data-cell="status">' + esc(dispStatus) + '</td>' +
-      '<td class="p3 txs" contenteditable="true" data-edit="note">' + esc(item.note) + '</td>' +
+      '<td class="p3 txs" contenteditable="' + (canEdit ? 'true' : 'false') + '" data-edit="note">' + esc(item.note) + '</td>' +
     '</tr>';
   });
   const tb = $('tableBody');
@@ -1423,6 +1422,8 @@ function calculateRow(item){
 function updateField(serial, field, value){
   const item = inventoryData.find(x => x.serial === serial);
   if (!item) return;
+  /* بيانات الصنف (اسم/مجموعة/ملاحظة) للأدمن والمشرف بس — المستخدم العادي جرد فقط */
+  if (needAdmin()) return;
   const v = String(value).trim();
   if (item[field] === v) return;
   item[field] = v;
@@ -1435,6 +1436,9 @@ function updateQty(serial, field, value, tr){
   if (!item) return;
   const v = parseQty(value);
   if (item[field] === v) return;
+  /* كمية السيستم بيانات صنف مش جرد — للأدمن/المشرف بس.
+     المستخدم العادي يقدر يعدّل الكمية الفعلية (دي عدّته هو) وميلمسش حاجة تانية */
+  if (field === 'systemQuantity' && needAdmin()) return;
   const prevQty = item.actualQuantity;
   const who = sessionUser ? sessionUser.name : '';
   const whoRole = sessionUser ? (sessionUser.role||'user') : 'user';
@@ -3633,12 +3637,9 @@ function maybeFinishBoot(){
   if (!seenData || !seenMeta) return;
   bootDone = true;
   const done = () => { bootHide(); finalize(); };
-  /* لو السيرفر نفسه مفيش فيه مستخدمين: فرّق بين حالتين —
-     1) أول تشغيل فعلي أبداً (مفيش meta.setupDone) → ازرع admin/123456 تلقائي عشان تقدر تدخل.
-     2) بعد إعادة ضبط مصنع (meta.setupDone = true فضلت من قبل) → متزرعش حاجة، سيبها من غير
-        مستخدمين فعلاً (وضع مفتوح بدون تسجيل دخول) لحد ما حد يضيف مستخدم جديد بنفسه من الإعدادات */
+  /* الدخول بقى إجباري دايماً — فلو السيرفر مفيهوش مستخدمين خالص لازم نزرع
+     admin/123456 عشان حد يقدر يدخل. من غيرها البرنامج هيقفل على نفسه. */
   if (usersList.length === 0) {
-    if (setupDone) { done(); return; }
     seedDefaultAdmin().then(done);
     return;
   }
@@ -3742,7 +3743,13 @@ window.addEventListener('load', () => {
         firebaseCfgLS = c;
         bootMsg('جاري الربط...');
         const ok = await connectFirebase(true);
-        if (ok) { wrap.style.display = 'none'; bootHide(); }
+        if (ok) {
+          wrap.style.display = 'none';
+          bootHide();
+          /* أول ما القاعدة تتوصّل → شاشة الدخول على طول (admin / 123456).
+             مفيش دخول مباشر للواجهة من غير تسجيل دخول أبداً */
+          showLock();
+        }
       };
       return;
     }

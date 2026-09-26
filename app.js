@@ -168,7 +168,7 @@ let qrScanner = null, qrScanCount = 0, qrCamOn = false;
 /* ⏱️ المهلة بين المسحة والتانية — عشان الجهاز مايسجلش نفس الحاجة مرتين.
    الكاميرا: 4 ثوانى كاملة بين كل مسحة والتانية (مش ورا بعض بسرعة).
    الباركود العادى: ثانية وربع. */
-const CAM_DEDUPE_MS  = 4000;
+const CAM_DEDUPE_MS  = 2000;
 const SCAN_DEDUPE_MS = 1200;
 let firebaseCfgLS = JSON.parse(store.getItem('firebaseCfg') || 'null');
 /* ملحوظة: المرجع الفعلي لمسار المزامنة = fbPath() — متغير syncPath القديم اتحذف */

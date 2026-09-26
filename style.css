@@ -37,6 +37,7 @@ thead th{ position:sticky; top:0; background:#1e293b !important; color:#fff !imp
 .b-red{ background:var(--red); } .b-red:hover{ background:#dc2626; }
 .b-orange{ background:var(--orange); } .b-orange:hover{ background:#ea580c; }
 .b-dark{ background:#475569; } .b-dark:hover{ background:#334155; }
+.b-teal{ background:#0d9488; } .b-teal:hover{ background:#0f766e; }
 .sbtn.wide{ grid-column:1 / -1; }
 label.sbtn{ margin:0; }
 .expand-btn{ position:absolute; top:1rem; right:1rem; background:none; border:none; color:#9ca3af; cursor:pointer; transition:color .2s; padding:4px; }
@@ -285,3 +286,22 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 #initialLock .il-sub{ font-size:.75rem; color:#94a3b8; margin:.4rem 0 1rem; }
 #initialLock .il-spinner{ font-size:2rem; padding:.5rem 0; animation: il-spin 1s linear infinite; display:inline-block; }
 @keyframes il-spin{ from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+/* ---------- كروت التقارير ---------- */
+.rep-card{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.65rem .7rem; border:1px solid var(--border); border-radius:.6rem; margin-bottom:.5rem; background:#fff; }
+.rep-info{ min-width:0; }
+.rep-name{ font-weight:800; font-size:.9rem; }
+.rep-desc{ font-size:.72rem; color:#64748b; margin-top:.15rem; }
+.rep-acts{ display:flex; gap:.4rem; flex-shrink:0; }
+.rep-acts .mbtn{ white-space:nowrap; }
+@media (max-width:520px){ .rep-card{ flex-direction:column; align-items:stretch; } .rep-acts{ justify-content:stretch; } .rep-acts .mbtn{ flex:1; } }
+
+/* ---------- ترقيم صفحات الجدول ---------- */
+.pager{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; padding:.5rem .6rem; margin-top:.5rem; background:#fff; border:1px solid var(--border); border-radius:.6rem; }
+.pager-info{ font-size:.75rem; font-weight:700; color:#475569; }
+.pager-ctrl{ display:flex; align-items:center; gap:.3rem; }
+.pager-ctrl select{ padding:.3rem .4rem; border:1px solid var(--border); border-radius:.4rem; font-size:.75rem; background:#fff; font-weight:700; }
+.pager-ctrl button{ min-width:2rem; padding:.3rem .5rem; border:1px solid var(--border); border-radius:.4rem; background:#f8fafc; cursor:pointer; font-size:.8rem; font-weight:800; color:#334155; }
+.pager-ctrl button:hover{ background:#e2e8f0; }
+.pager-pos{ font-size:.78rem; font-weight:800; color:#0f172a; min-width:3.5rem; text-align:center; }
+@media (max-width:520px){ .pager{ justify-content:center; } .pager-info{ width:100%; text-align:center; } }

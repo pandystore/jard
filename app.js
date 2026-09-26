@@ -153,7 +153,6 @@ let currentCategory = 'all';
 let currentStatus = 'all';
 let workbookData = null, sheetNames = [], isCsvSource = false, csvRows = [];
 let selectedSerials = new Set();
-let undoHistory = [];
 let logBook = JSON.parse(store.getItem(S('logBook')) || '[]');
 let soundOn = store.getItem('soundOn') !== '0';
 let adminHash = store.getItem(S('adminHash')) || '';
@@ -166,6 +165,11 @@ let sessionUser = JSON.parse(store.getItem('sessionUser') || 'null');
 let setupDone = false;
 let userFilter = '';
 let qrScanner = null, qrScanCount = 0, qrCamOn = false;
+/* ⏱️ المهلة بين المسحة والتانية — عشان الجهاز مايسجلش نفس الحاجة مرتين.
+   الكاميرا: 4 ثوانى كاملة بين كل مسحة والتانية (مش ورا بعض بسرعة).
+   الباركود العادى: ثانية وربع. */
+const CAM_DEDUPE_MS  = 4000;
+const SCAN_DEDUPE_MS = 1200;
 let firebaseCfgLS = JSON.parse(store.getItem('firebaseCfg') || 'null');
 /* ملحوظة: المرجع الفعلي لمسار المزامنة = fbPath() — متغير syncPath القديم اتحذف */
 let db = null, syncOn = false, refOff = null;
@@ -700,7 +704,7 @@ function applyUserUI(){
   const adm = isAdmin();
   const elev = isElevated();
   if (sb) sb.style.display = adm ? '' : 'none';
-  ['btnExport', 'btnExportCsv', 'btnPrint', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnUndoHist'].forEach(id => {
+  ['btnExport', 'btnExportCsv', 'btnPrint', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnReports'].forEach(id => {
     const b = $(id); if (b) b.style.display = elev ? '' : 'none';
  });
   /* لازم الجدول يترسم من جديد بعد الدخول/الخروج — عشان صلاحيات التعديل
@@ -1297,19 +1301,69 @@ function getFiltered(){
 }
 
 /* ---------- عرض الجدول ---------- */
+/* ---------- ترقيم صفحات الجدول ----------
+   الجدول كان بيرسم كل الأصناف مرة واحدة، وده كان بيبطّأ الجهاز جداً مع آلاف
+   الأصناف (2000 صنف = 2000 صف في الـ DOM). دلوقتي بنرسم صفحة واحدة بس في كل مرة،
+   فعدد اللي بيتحط في الـ DOM بقى ثابت مهما كبر الجرد. */
+let currentPage = 0;
+let pageSize = 100;        /* 0 = اعرض الكل */
+let printAllRows = false;  /* وقت الطباعة بنرسم كل الصفوف عشان التقرير يطلع كامل */
+
+function updatePager(total, pages){
+  const box = $('pager');
+  if (!box) return;
+  if (total === 0 || printAllRows) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const perPage = pageSize > 0 ? pageSize : total;
+  const from = pages > 1 ? currentPage * perPage + 1 : 1;
+  const to = Math.min(total, (currentPage + 1) * perPage);
+  const info = $('pagerInfo');
+  if (info) info.textContent = 'بنعرض ' + from + '–' + to + ' من ' + total + ' صنف';
+  const pos = $('pagerPos');
+  if (pos) pos.textContent = pages > 1 ? (currentPage + 1) + ' / ' + pages : '1 / 1';
+}
+function gotoPage(where){
+  const total = getFiltered().length;
+  const perPage = pageSize > 0 ? pageSize : total;
+  const pages = perPage > 0 ? Math.max(1, Math.ceil(total / perPage)) : 1;
+  if (where === 'first') currentPage = 0;
+  else if (where === 'last') currentPage = pages - 1;
+  else if (where === 'prev') currentPage = Math.max(0, currentPage - 1);
+  else if (where === 'next') currentPage = Math.min(pages - 1, currentPage + 1);
+  else currentPage = Math.max(0, Math.min(pages - 1, Number(where) || 0));
+  updateTable();
+  const tc = document.querySelector('.table-container');
+  if (tc && tc.scrollIntoView) tc.scrollIntoView({ block:'start', behavior:'smooth' });
+}
+function setPageSize(v){
+  pageSize = Math.max(0, parseInt(v, 10) || 0);
+  currentPage = 0;
+  updateTable();
+}
+/* أي فلتر أو بحث جديد = ارجع لأول صفحة */
+function resetPage(){ currentPage = 0; }
+
 function updateTable(){
   const filtered = getFiltered();
   /* المستخدم العادي "جرد فقط": يشوف كل حاجة ويعدّ، لكن مايعدّلش أي بيانات
      (اسم/مجموعة/ملاحظة/كمية السيستم) — التعديل والحذف والاستيراد للأدمن والمشرف بس.
      الخانة الوحيدة اللي يقدر يكتب فيها هي الكمية اللي هو جردها */
   const canEdit = isElevated();
+  /* ✂️ بنرسم الصفحة الحالية بس — مش كل الأصناف */
+  const totalAll = filtered.length;
+  const perPage = (printAllRows || pageSize <= 0) ? totalAll : pageSize;
+  const pages = perPage > 0 ? Math.max(1, Math.ceil(totalAll / perPage)) : 1;
+  if (currentPage > pages - 1) currentPage = pages - 1;
+  if (currentPage < 0) currentPage = 0;
+  const startIdx = perPage > 0 ? currentPage * perPage : 0;
+  const view = perPage > 0 ? filtered.slice(startIdx, startIdx + perPage) : filtered;
   /* ⚡ array + join أسرع بكتير من += على نص بيوصل لمئات الكيلوبايت */
-  const rows = new Array(filtered.length);
+  const rows = new Array(view.length);
   const ceName = canEdit ? 'true' : 'false';
   const ceSys = (userFilter || !canEdit) ? 'false' : 'true';
   const ceAct = userFilter ? 'false' : 'true';
-  for (let i = 0; i < filtered.length; i++) {
-    const item = filtered[i];
+  for (let i = 0; i < view.length; i++) {
+    const item = view[i];
     const d = displayQty(item);
     const sel = selectedSerials.has(item.serial);
     /* المستخدم العادي ما يعدّلش المجموعة → نص عادي بدل <select> فيه كل المجموعات.
@@ -1332,7 +1386,19 @@ function updateTable(){
   }
   const tb = $('tableBody');
   if (tb) tb.innerHTML = rows.join('');
-  const selAll = $('selectAll'); if (selAll) selAll.checked = filtered.length > 0 && filtered.every(i => selectedSerials.has(i.serial));
+  const selAll = $('selectAll'); if (selAll) selAll.checked = view.length > 0 && view.every(i => selectedSerials.has(i.serial));
+  updatePager(totalAll, pages);
+}
+/* بعد مسح باركود لصنف جديد: لو الصنف وقع في صفحة تانية ننقل المستخدم لها عشان يشوفه */
+function ensureItemVisible(code){
+  if (printAllRows || pageSize <= 0) return;
+  const filtered = getFiltered();
+  const idx = filtered.findIndex(i => i.code === code);
+  if (idx < 0) return;
+  const pg = Math.floor(idx / pageSize);
+  if (pg === currentPage) return;
+  currentPage = pg;
+  updateTable();
 }
 function refreshRow(tr, item){
   tr.className = (item.status === 'زيادة' ? 'row-surplus' : item.status === 'عجز' ? 'row-deficit' : '') + (selectedSerials.has(item.serial) ? ' selected-for-print' : '');
@@ -1435,6 +1501,7 @@ function updateStats(){
 /* ---------- الفلاتر ---------- */
 function setUserFilter(name){
   userFilter = name || '';
+  resetPage();
   const chip = $('userChip');
   if (userFilter) { chip.classList.add('show'); $('userChipText').textContent = 'جرد: ' + userFilter; }
   else chip.classList.remove('show');
@@ -1442,13 +1509,14 @@ function setUserFilter(name){
 }
 function setStatusFilter(s){
   currentStatus = s;
+  resetPage();
   document.querySelectorAll('.filter-toolbar .filter-btn').forEach(b => b.classList.remove('active'));
   const map = { 'all': 'status-all', 'زيادة': 'status-plus', 'عجز': 'status-minus', 'hide_equal': 'status-ne', 'not_jarded': 'status-nj' };
   const el = $(map[s]); if (el) el.classList.add('active');
   document.querySelectorAll('#categoryButtonsContainer .filter-btn').forEach(b => { if (b.dataset.cat === currentCategory) b.classList.add('active'); });
   updateTable();
 }
-function setCategoryFilter(c){ currentCategory = c; renderCategoryButtons(); updateTable(); }
+function setCategoryFilter(c){ currentCategory = c; resetPage(); renderCategoryButtons(); updateTable(); }
 function renderCategoryButtons(){
   const box = $('categoryButtonsContainer');
   if (!box) return;
@@ -1543,8 +1611,9 @@ function processCode(code){
   /* مفيش نت؟ مفيش عدّ — منسجلش حاجة محلياً خالص */
   if (onlineGuard('العدّة دي')) return;
   const nowTs = Date.now();
-  if (code === lastScanCode && (nowTs - lastScanTime) < 500) {
+  if (code === lastScanCode && (nowTs - lastScanTime) < SCAN_DEDUPE_MS) {
     toast('⏱️ نفس الكود اتسجل من لحظة — اتجاهل عشان مايتحسبش مرتين', 'warning');
+    beep('bad');
     return;
  }
   lastScanCode = code; lastScanTime = nowTs;
@@ -1557,6 +1626,7 @@ function processCode(code){
     const prevBy = item.countedBy;
     if (item.isJarded && who && prevBy && prevBy !== who) {
       toast('⚠️ "' + item.name + '" اتجرد بواسطة ' + prevBy + ' قبل كده — كميته كانت ' + fmtQ(item.actualQuantity), 'warning');
+      beep('bad');
       addLog('تنبيه تعدد جرد: ' + item.code + ' بواسطة ' + prevBy + ' ثم ' + who);
  }
     /* بيانات قديمة من غير حصص؟ ننسب الكمية الموجودة لصاحبها الأصلي الأول */
@@ -1580,9 +1650,9 @@ function processCode(code){
     isNewItem = true;
     /* الصنف جديد على السيرفر كمان — النيّة هتتبني عليه من الصفر هناك */
     ops.push({ t: 'delta', who: bag, d: 1, ts: nowTs });
-    beep('ok');
-    if (!eanOk(code)) toast('⚠️ كود غير معروف واحتمال قراءة غلط (checksum مش سليم) — اتسجل كزيادة: ' + code, 'warning');
-    else toast('كود غير معروف — اتسجل كزيادة: ' + code, 'warning');
+    /* 🔊 صوت مختلف لكل حالة: كود غلط = صوت خطأ، كود جديد سليم = صوت تنبيه */
+    if (!eanOk(code)) { beep('bad'); toast('⚠️ كود غير معروف واحتمال قراءة غلط (checksum مش سليم) — اتسجل كزيادة: ' + code, 'warning'); }
+    else { beep('unk'); toast('كود غير معروف — اتسجل كزيادة: ' + code, 'warning'); }
     done = nv; qty = 1;
     try { if (sessionUser && (!sessionUser.role || sessionUser.role === 'user')) pushCountNotif(nv, 1); } catch(e){}
  }
@@ -1590,7 +1660,7 @@ function processCode(code){
   /* ⚡ رسم الجدول كامل مع كل مسحة كان بياخد ثواني لما الأصناف كتير (2000 صنف = ~3.6 ثانية).
      الصف اللي اتغير بس هو اللي بيتحدّث — نفس النتيجة في أجزاء من الثانية.
      الرسم الكامل بيحصل بس لو الصنف جديد (صف لسه مش موجود) */
-  if (isNewItem) { updateTable(); renderCategoryButtons(); }
+  if (isNewItem) { updateTable(); renderCategoryButtons(); ensureItemVisible(code); }
   else if (done) { patchSingleRow(done); }
   updateStats();
   if (done && ops.length) {
@@ -1976,6 +2046,7 @@ function attachSync(){
 function onlineGuard(action){
   if (syncOn && db && !(navigator && navigator.onLine === false)) return false;
   setSyncUI('off', '📡 مفيش اتصال — الجرد أونلاين فقط');
+  beep('bad');
   toast('📡 مفيش اتصال بالإنترنت — الجرد أونلاين فقط. ' + (action || 'العملية دي') + ' مااتسجلتش، حاول تاني لما النت يرجع', 'error');
   return true;
 }
@@ -2141,6 +2212,45 @@ function pushMergeUpdate(changedItems, removedCodes){
     return false;
  });
 }
+/* دمج بيانات الأصناف (اسم/مجموعة/كمية السيستم) من غير ما نلمس عدّة أي حد.
+   بتشتغل Transaction على السيرفر لكل صنف، فلو مستخدم تاني بيعدّ نفس الصنف
+   في نفس اللحظة — عدّته بتفضل محفوظة ومابتضيعش.
+   changes = [{ code, name, group, sys, reset }] */
+function pushMergeMeta(changes){
+  if (!syncOn || !db) { toast('📡 مفيش اتصال — العملية دي أونلاين فقط ومااتنفذتش', 'error'); return Promise.resolve(false); }
+  const list = (changes || []).filter(Boolean);
+  if (!list.length) return Promise.resolve(true);
+  let failed = false;
+  /* دفعات صغيرة عشان مانغرقش السيرفر بمئات المعاملات في نفس اللحظة */
+  const CHUNK = 25;
+  const runOne = ch =>
+    db.ref(fbPath() + '/items/' + itemKey(ch.code)).transaction(cur => {
+      const base = (cur && typeof cur === 'object') ? cur : {};
+      const sys = Number(ch.sys) || 0;
+      const out = Object.assign({}, base, { code: ch.code, name: ch.name, group: ch.group, systemQuantity: sys, editedAt: Date.now() });
+      if (ch.reset) { out.actualQuantity = 0; out.isJarded = false; out.counts = {}; out.countedBy = ''; }
+      out.actualQuantity = Number(out.actualQuantity) || 0;
+      out.difference = out.actualQuantity - sys;
+      out.status = out.difference > 0 ? 'زيادة' : out.difference < 0 ? 'عجز' : 'متساوي';
+      return out;
+    }, (err, committed, snap) => {
+      if (err || !committed) { failed = true; return; }
+      /* ناخد القيمة الحقيقية من السيرفر — يمكن حد تاني عدّ في نفس اللحظة */
+      try { adoptCommittedItem(ch.code, snap ? snap.val() : null); } catch (e) {}
+    }, false);
+  let i = 0;
+  const step = () => {
+    if (i >= list.length) return Promise.resolve(!failed);
+    const batch = list.slice(i, i + CHUNK);
+    i += CHUNK;
+    return Promise.all(batch.map(runOne)).then(step);
+  };
+  return step().then(ok => {
+    if (ok) { flashDot(); accessDenied = false; }
+    else { lastSyncErr = 'بعض الأصناف ماترفعتش'; toast('⚠️ بعض الأصناف ماترفعتش — حاول تاني', 'error'); }
+    return ok;
+ });
+}
 function pushMeta(withUsers){
   if (!syncOn || !db) { pendingMetaPush = true; return; } /* لو الاتصال لسه ما اتبنيش، هنرفع لما يتصل */
   pendingMetaPush = false;
@@ -2288,7 +2398,7 @@ function setupTableEvents(){
     if (b) setCategoryFilter(b.dataset.cat);
  });
   let searchTimer = null;
-  $('smartSearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(updateTable, 200); });
+  $('smartSearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { resetPage(); updateTable(); }, 200); });
 }
 function toggleSelectAll(master){
   /* "تحديد الكل" لازم يشتغل على كل الأصناف المفلترة، مش صفحة العرض الحالية بس */
@@ -2304,61 +2414,26 @@ function toggleSelectAll(master){
 }
 
 
-/* ---------- مسح وحذف + تراجع ---------- */
-/* آخر 5 عمليات — {ts, label, snapshot} — متاحة طول الجلسة مش 10 ثواني بس */
-function pushUndoHistory(label){
-  // عدد نسخ التراجع بيقل تلقائياً كل ما الجرد يكبر — عشان نتجنب استهلاك ذاكرة كبير
-  // مع كتالوجات فيها آلاف الأصناف (كل نسخة = صورة كاملة من البيانات)
-  const maxHist = inventoryData.length > 3000 ? 2 : inventoryData.length > 1000 ? 3 : 5;
-  undoHistory.unshift({ ts: Date.now(), label, snapshot: JSON.stringify(inventoryData) });
-  if (undoHistory.length > maxHist) undoHistory.length = maxHist;
-}
-function withUndo(applyFn, label){
-  pushUndoHistory(label);
+/* ---------- مسح وحذف ---------- */
+/* ⚠️ التراجع اتلغى نهائياً من البرنامج.
+   السبب: التراجع كان بياخد صورة قديمة من البيانات ويمسح بيها كل اللي على السيرفر،
+   فأي حد كان بيعدّ في اللحظة دي كانت عدّته بتضيع من غير أي تنبيه.
+   دلوقتي مفيش عملية بترجع البيانات لورا خالص. */
+
+/* عملية إدارية بتغيّر البيانات وتبعتها للسيرفر على طول (من غير تراجع) */
+function applyAndPush(applyFn, label){
   applyFn();
   localSave();
   updateTable(); updateStats(); renderCategoryButtons();
   pushFullReplace(inventoryData).then(ok => {
     if (!ok) toast('⚠️ اتحفظ عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
  });
-  toast(label, 'success', { actionLabel: 'تراجع', onAction: () => restoreSnapshot(0) });
-}
-function restoreSnapshot(idx){
-  const entry = undoHistory[idx];
-  if (!entry) return;
-  inventoryData = normData(JSON.parse(entry.snapshot));
-  undoHistory.splice(0, idx + 1); /* امسح كل اللي بعد النقطة اللي رجعنالها عشان الترتيب يفضل منطقي */
-  selectedSerials.clear();
-  localSave();
-  updateTable(); updateStats(); renderCategoryButtons();
-  pushFullReplace(inventoryData).then(ok => {
-    toast(ok ? 'تم التراجع بنجاح - رجعت البيانات لكل الأجهزة' : '⚠️ اتراجعت عندك بس السيرفر لم يستجب — حاول تاني', ok ? 'info' : 'error');
- });
-  addLog('تراجع: ' + entry.label);
-}
-function doUndo(){ restoreSnapshot(0); }
-function openUndoHistory(){
-  if (needAdmin()) return;
-  if (!undoHistory.length) { toast('مفيش عمليات محفوظة للتراجع عنها في الجلسة دي', 'info'); return; }
-  const body = '<div class="hint" style="font-size:.8rem;margin-bottom:.5rem">آخر العمليات في الجلسة دي — اضغط "استرجع" لأي نقطة عشان ترجع البيانات لحالتها وقتها (وكل اللي بعدها هيتلغى):</div>' +
-    undoHistory.map((h, i) => {
-      const d = new Date(h.ts);
-      const t = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.5rem;border:1px solid #e2e8f0;border-radius:.5rem;margin-bottom:.4rem">' +
-        '<div><div style="font-weight:700;font-size:.85rem">' + esc(h.label) + '</div><div style="font-size:.7rem;color:#94a3b8">' + t + '</div></div>' +
-        '<button class="mbtn primary" style="padding:.3rem .8rem" onclick="restoreFromHistory(' + i + ')">استرجع</button>' +
-      '</div>';
- }).join('');
-  showModal('سجل التراجع (آخر ' + undoHistory.length + ' عملية)', body, [{ label: 'إغلاق', kind: 'ghost', onClick: () => {} }]);
-}
-function restoreFromHistory(i){
-  restoreSnapshot(i);
-  document.querySelectorAll('.modal-overlay').forEach(x => x.remove());
+  toast(label, 'success');
 }
 async function openClearModal(){
   if (needAdmin()) return;
   if (!(await ensureAdmin())) return;
-  const ok = await confirmDlg('مسح كل الأصناف نهائياً؟', 'سيتم مسح كل الأصناف من السيرفر ومن كل الأجهزة نهائياً ومش هترجع إلا لما ترفع ملف جديد. حتى الأجهزة اللي كانت أوفلاين هتتمسح لما تفتح النت. متأكد؟', 'نعم - امسح نهائي', true);
+  const ok = await confirmDlg('مسح كل الأصناف نهائياً؟', 'سيتم مسح كل الأصناف من السيرفر ومن كل الأجهزة نهائياً ومش هترجع إلا لما ترفع ملف جديد. متأكد؟' + wipeWarningHTML(), 'نعم - امسح نهائي', true);
   if (!ok) return;
   await doWipeAll();
 }
@@ -2430,14 +2505,13 @@ async function deleteSelected(){
   /* الحذف عملية حساسة — القواعد الجديدة على السيرفر بتتطلب هوية الأدمن الحقيقية (مش مجرد صلاحية داخل البرنامج) */
   if (!(await ensureAdmin())) { toast('لازم تأكيد كلمة مرور الأدمن للحذف', 'error'); return; }
   const removedCodes = inventoryData.filter(i => serials.indexOf(i.serial) !== -1).map(i => i.code);
-  pushUndoHistory('تراجع عن حذف ' + serials.length + ' صنف');
   inventoryData = inventoryData.filter(i => serials.indexOf(i.serial) === -1);
   renumberSerials();
   serials.forEach(s => selectedSerials.delete(s));
   updateTable(); updateStats(); renderCategoryButtons();
   const okServer = await pushMergeUpdate([], removedCodes);
   if (okServer) {
-    toast('تم حذف ' + serials.length + ' صنف نهائياً من كل الأجهزة', 'success', { actionLabel: 'تراجع', onAction: () => restoreSnapshot(0) });
+    toast('تم حذف ' + serials.length + ' صنف نهائياً من كل الأجهزة', 'success');
  } else {
     toast('⚠️ اتحذف عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
  }
@@ -2617,11 +2691,11 @@ async function confirmImport(){
     ).join('');
     const rowsHTML = '<thead><tr style="background:#f8fafc;font-weight:700"><td style="padding:.3rem .5rem">الكود</td><td style="padding:.3rem .5rem">الاسم</td><td style="padding:.3rem .5rem;text-align:center">كمية السيستم</td></tr></thead><tbody>' +
       previewRows + (incoming.length > 15 ? '<tr><td colspan="3" style="padding:.4rem;text-align:center;color:#94a3b8">و ' + (incoming.length - 15) + ' صنف تاني...</td></tr>' : '') + '</tbody>';
-    const ok = await importPreviewDlg('استبدال البيانات — معاينة', 'سيتم استبدال كل البيانات الحالية (' + inventoryData.length + ' صنف) بمحتوى الملف (' + incoming.length + ' صنف). تم تجاهل ' + (skippedEmpty+skippedHeader) + ' صف فاضي/رأس. سيتم إرسال الجرد الجديد لكل الأجهزة فوراً.', rowsHTML, 'استبدال');
+    const ok = await importPreviewDlg('استبدال البيانات — معاينة', 'سيتم استبدال كل البيانات الحالية (' + inventoryData.length + ' صنف) بمحتوى الملف (' + incoming.length + ' صنف). تم تجاهل ' + (skippedEmpty+skippedHeader) + ' صف فاضي/رأس. سيتم إرسال الجرد الجديد لكل الأجهزة فوراً.' + wipeWarningHTML(), rowsHTML, 'استبدال');
     if (!ok) return;
     /* الاستبدال بيمسح أصناف قديمة — لازم هوية الأدمن الحقيقية زي الحذف بالظبط */
     if (!(await ensureAdmin())) { toast('لازم تأكيد كلمة مرور الأدمن للاستبدال', 'error'); return; }
-    withUndo(() => {
+    applyAndPush(() => {
       let s = 1;
       inventoryData = incoming.map(r => {
         const item = { serial: s++, code: r.code, name: r.name, group: r.group, systemQuantity: r.sys, actualQuantity: 0, isJarded: false, difference: -r.sys, status: r.sys === 0 ? 'متساوي' : 'عجز', note: '', countedBy: '', counts: {}, editedAt: Date.now() };
@@ -2638,9 +2712,17 @@ async function confirmImport(){
       const ex = inventoryData.find(i => i.code === r.code);
       if (ex) willUpdate.push({ r, ex }); else willAdd.push(r);
  });
+    /* ⚠️ تحذير قبل ما نمسح أي عدّة: نحسب كام صنف فيه عدّة فعلية من الناس */
+    const countedAffected = resetActual ? willUpdate.filter(({ex}) => ex.isJarded || (ex.counts && Object.keys(ex.counts).length) || Number(ex.actualQuantity) > 0) : [];
+    const countedPieces = countedAffected.reduce((a,{ex}) => a + (Number(ex.actualQuantity) || 0), 0);
     const msg = 'هيتم تحديث اسم/مجموعة/كمية السيستم لـ ' + willUpdate.length + ' صنف موجود، وإضافة ' + willAdd.length + ' صنف جديد. ' +
-      (resetActual ? 'هيتصفّر الجرد الفعلي للأصناف الموجودة (عدّ جديد).' : 'الجرد الفعلي الحالي للأصناف الموجودة هيفضل زي ما هو.') +
-      ' تم تجاهل ' + (skippedEmpty+skippedHeader) + ' صف فاضي/رأس.';
+      (resetActual ? 'هيتصفّر الجرد الفعلي للأصناف الموجودة (عدّ جديد).' : 'الجرد الفعلي الحالي للأصناف الموجودة هيفضل زي ما هو — مش هنتلمس عدّة أي حد.') +
+      ' تم تجاهل ' + (skippedEmpty+skippedHeader) + ' صف فاضي/رأس.' +
+      (countedAffected.length
+        ? '<div style="margin-top:.6rem;padding:.6rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#991b1b;font-weight:700">' +
+          '⚠️ انتبه: فيه ' + countedAffected.length + ' صنف متجرد فعلاً بإجمالي ' + fmtQ(countedPieces) +
+          ' قطعة — التصفير هيمسح عدّة الناس دي كلها ومش هترجع.<br>العملية دي ملهاش تراجع.</div>'
+        : '');
     const updRows = willUpdate.slice(0, 15).map(({r, ex}) =>
       '<tr><td style="padding:.3rem .5rem;border-bottom:1px solid #f1f5f9">' + esc(r.code) + '</td>' +
       '<td style="padding:.3rem .5rem;border-bottom:1px solid #f1f5f9">' + esc(ex.name) + (ex.name !== r.name ? ' → ' + esc(r.name) : '') + '</td>' +
@@ -2661,31 +2743,34 @@ async function confirmImport(){
     if (!ok) return;
     let added = 0, updated = 0;
     const changed = [];
-    pushUndoHistory('تراجع عن دمج ملف');
     const now = Date.now();
     incoming.forEach(r => {
       const ex = inventoryData.find(i => i.code === r.code);
       if (ex) {
         ex.name = r.name; ex.group = r.group; ex.systemQuantity = r.sys;
+        /* ⚠️ لو التصفير مش مطلوب مابنلمسش العدّة خالص — لا محلياً ولا على السيرفر */
         if (resetActual) { ex.actualQuantity = 0; ex.isJarded = false; ex.counts = {}; ex.countedBy = ''; }
         ex.editedAt = now;
         calculateRow(ex); updated++;
-        changed.push(ex);
+        changed.push({ code: r.code, name: r.name, group: r.group, sys: r.sys, reset: !!resetActual });
  } else {
         const ns = inventoryData.length ? Math.max.apply(null, inventoryData.map(i => i.serial)) + 1 : 1;
         const nv = { serial: ns, code: r.code, name: r.name, group: r.group, systemQuantity: r.sys, actualQuantity: 0, isJarded: false, difference: -r.sys, status: r.sys === 0 ? 'متساوي' : 'عجز', note: '', countedBy: '', counts: {}, editedAt: now };
         inventoryData.push(nv);
         added++;
-        changed.push(nv);
+        /* صنف جديد تماماً — مفيهوش عدّة لحد أصلاً */
+        changed.push({ code: r.code, name: r.name, group: r.group, sys: r.sys, reset: true });
  }
  });
     renumberSerials();
     localSave();
     updateTable(); updateStats(); renderCategoryButtons();
-    pushMergeUpdate(changed, []).then(okServer => {
+    /* الرفع بقى Transaction لكل صنف على حدة — لو حد تاني بيعدّ نفس الصنف دلوقتي
+       عدّته هتفضل محفوظة بدل ما نكتب فوقها */
+    pushMergeMeta(changed).then(okServer => {
       if (!okServer) toast('⚠️ اتدمج عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
  });
-    toast('تم الدمج: ' + added + ' جديد + ' + updated + ' محدّث (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس)', 'success', { actionLabel: 'تراجع', onAction: () => restoreSnapshot(0) });
+    toast('تم الدمج: ' + added + ' جديد + ' + updated + ' محدّث (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس)', 'success');
     addLog('دمج ملف — ' + added + ' جديد / ' + updated + ' محدّث');
  }
   closeModal('columnSelectors');
@@ -2742,6 +2827,190 @@ function downloadBlob(blob, name){
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
 
+/* ================= التقارير (PDF + إكسيل) =================
+   كل التقارير بتتبنى من دالة واحدة (buildReport) عشان PDF وإكسيل يطلعوا نفس الأرقام بالظبط.
+   التقرير نفسه بيتحسب من البيانات الحالية — مفيش أي نسخ مخزّنة ممكن تختلف. */
+const REPORTS = [
+  { id:'full',    name:'تقرير الجرد الكامل',        desc:'كل الأصناف: السيستم والفعلي والفرق والحالة' },
+  { id:'byUser',  name:'تقرير نهاية اليوم — بالمستخدمين', desc:'كل مستخدم جرد كام صنف وكام قطعة' },
+  { id:'deficit', name:'تقرير العجز',               desc:'الأصناف اللي فعليها أقل من السيستم بس' },
+  { id:'surplus', name:'تقرير الزيادة',             desc:'الأصناف اللي فعليها أكتر من السيستم بس' },
+  { id:'uncounted', name:'تقرير الأصناف اللي مجردتش', desc:'الأصناف اللي محدش جردها لسه' }
+];
+
+function reportWhen(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '  ' +
+         pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+
+/* بيرجّع {title, subtitle, headers[], rows[][], foot[]} — أرقام جاهزة للعرض وللتصدير */
+function buildReport(kind){
+  const when = reportWhen();
+  const dt = ($('currentDateTime') && $('currentDateTime').value || '').replace('T',' ');
+  const base = { subtitle:'تاريخ الجرد: ' + (dt || '—') + '   •   وقت التقرير: ' + when };
+
+  if (kind === 'byUser') {
+    /* تجميع حسب المستخدم: عدد الأصناف + إجمالي القطع */
+    const per = {};
+    inventoryData.forEach(it => {
+      const cs = it.counts && typeof it.counts === 'object' ? it.counts : null;
+      if (cs && Object.keys(cs).length) {
+        Object.keys(cs).forEach(u => {
+          const q = Number(cs[u]) || 0;
+          if (!per[u]) per[u] = { items:0, qty:0 };
+          if (q > 0) per[u].items++;
+          per[u].qty += q;
+        });
+      } else if (it.countedBy && Number(it.actualQuantity) > 0) {
+        /* بيانات قديمة: كمية على الصنف من غير حصص — تُنسب للي مكتوب في countedBy */
+        const u = it.countedBy;
+        if (!per[u]) per[u] = { items:0, qty:0 };
+        per[u].items++; per[u].qty += Number(it.actualQuantity) || 0;
+      }
+    });
+    const names = Object.keys(per).sort((a,b) => per[b].qty - per[a].qty);
+    const rows = names.map((u,i) => [i+1, u, getUserRole(u) === 'admin' ? 'مسؤول' : getUserRole(u) === 'supervisor' ? 'مشرف' : 'مستخدم', per[u].items, fmtQ(per[u].qty)]);
+    const ti = names.reduce((a,u) => a + per[u].items, 0);
+    const tq = names.reduce((a,u) => a + per[u].qty, 0);
+    return Object.assign(base, {
+      title:'تقرير نهاية اليوم — بالمستخدمين',
+      headers:['م','المستخدم','الصلاحية','عدد الأصناف','إجمالي القطع'],
+      rows, foot:['الإجمالي', names.length + ' مستخدم', '', fmtQ(ti), fmtQ(tq)]
+    });
+  }
+
+  /* التقارير اللي بتعرض أصناف */
+  let items;
+  if (kind === 'deficit')        items = inventoryData.filter(i => i.difference < 0);
+  else if (kind === 'surplus')   items = inventoryData.filter(i => i.difference > 0);
+  else if (kind === 'uncounted') items = inventoryData.filter(i => !i.isJarded || !(Number(i.actualQuantity) > 0));
+  else                           items = inventoryData.slice();
+
+  const titles = { full:'تقرير الجرد الكامل', deficit:'تقرير العجز', surplus:'تقرير الزيادة', uncounted:'تقرير الأصناف اللي مجردتش' };
+  const rows = items.map(i => [
+    i.serial, i.code, i.name, i.group,
+    fmtQ(i.systemQuantity), fmtQ(i.actualQuantity), fmtQ(i.difference),
+    i.status, i.countedBy || '—', i.note || ''
+  ]);
+  const sum = f => items.reduce((a,i) => a + (Number(i[f]) || 0), 0);
+  return Object.assign(base, {
+    title: titles[kind] || 'تقرير الجرد',
+    headers:['م','الكود','اسم الصنف','المجموعة','السيستم','الفعلي','الفرق','الحالة','بواسطة','ملاحظات'],
+    rows,
+    foot:['الإجمالي', items.length + ' صنف', '', '', fmtQ(sum('systemQuantity')), fmtQ(sum('actualQuantity')), fmtQ(sum('actualQuantity') - sum('systemQuantity')), '', '', '']
+  });
+}
+
+/* ---------- تصدير إكسيل ---------- */
+function reportToExcel(kind){
+  if (needAdmin()) return;
+  const r = buildReport(kind);
+  if (!r.rows.length) { toast('مفيش بيانات للتقرير ده', 'warning'); return; }
+  const th = r.headers.map(h => '<th style="background:#1e293b;color:#fff;padding:6px;border:1px solid #94a3b8">' + esc(h) + '</th>').join('');
+  const tr = r.rows.map(row =>
+    '<tr>' + row.map(c => '<td style="padding:5px;border:1px solid #cbd5e1">' + esc(c == null ? '' : c) + '</td>').join('') + '</tr>'
+  ).join('');
+  const tf = r.foot ? '<tr style="background:#f1f5f9;font-weight:bold">' + r.foot.map(c => '<td style="padding:6px;border:1px solid #94a3b8">' + esc(c == null ? '' : c) + '</td>').join('') + '</tr>' : '';
+  const html = '<html dir="rtl"><head><meta charset="utf-8"></head><body>' +
+    '<h3 style="font-family:tahoma">' + esc(r.title) + '</h3>' +
+    '<div style="font-family:tahoma;font-size:10pt;color:#475569">' + esc(r.subtitle) + '</div><br>' +
+    '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;font-family:tahoma;font-size:10pt">' +
+    '<thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody><tfoot>' + tf + '</tfoot></table></body></html>';
+  downloadBlob(new Blob(['\uFEFF' + html], { type:'application/vnd.ms-excel' }), 'Jard-' + kind + '-' + stamp() + '.xls');
+  addLog('تصدير تقرير إكسيل: ' + r.title);
+  toast('تم تصدير التقرير إكسيل', 'success');
+}
+
+/* ---------- تصدير PDF ----------
+   بنعمل iframe مخفي فيه التقرير متنسّق، ونستدعي طباعة المتصفح —
+   ومن نافذة الطباعة المستخدم يختار "حفظ كـ PDF". ده بيطلع PDF حقيقي
+   بالعربي مظبوط من غير أي مكتبة خارجية. */
+function reportToPDF(kind){
+  if (needAdmin()) return;
+  const r = buildReport(kind);
+  if (!r.rows.length) { toast('مفيش بيانات للتقرير ده', 'warning'); return; }
+  const th = r.headers.map(h => '<th>' + esc(h) + '</th>').join('');
+  const tr = r.rows.map(row =>
+    '<tr>' + row.map(c => '<td>' + esc(c == null ? '' : c) + '</td>').join('') + '</tr>'
+  ).join('');
+  const tf = r.foot ? '<tfoot><tr>' + r.foot.map(c => '<td>' + esc(c == null ? '' : c) + '</td>').join('') + '</tr></tfoot>' : '';
+  const doc = '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8">' +
+    '<title>' + esc(r.title) + '</title><style>' +
+    '@page{ size:A4 landscape; margin:12mm; }' +
+    'body{ font-family:"Segoe UI",Tahoma,Arial,sans-serif; color:#0f172a; }' +
+    'h1{ font-size:18pt; margin:0 0 4px; }' +
+    '.sub{ font-size:9.5pt; color:#475569; margin-bottom:10px; }' +
+    'table{ width:100%; border-collapse:collapse; font-size:9pt; }' +
+    'th{ background:#1e293b; color:#fff; padding:6px; border:1px solid #94a3b8; }' +
+    'td{ padding:5px; border:1px solid #cbd5e1; }' +
+    'tfoot td{ background:#f1f5f9; font-weight:700; }' +
+    'tr:nth-child(even) td{ background:#f8fafc; }' +
+    '</style></head><body>' +
+    '<h1>' + esc(r.title) + '</h1><div class="sub">' + esc(r.subtitle) + '</div>' +
+    '<table><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody>' + tf + '</table>' +
+    '</body></html>';
+
+  const old = document.getElementById('reportPrintFrame');
+  if (old) old.remove();
+  const fr = document.createElement('iframe');
+  fr.id = 'reportPrintFrame';
+  fr.setAttribute('aria-hidden', 'true');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  const d = fr.contentDocument || fr.contentWindow.document;
+  d.open(); d.write(doc); d.close();
+  /* نستنى الخطوط والتنسيق يستقروا قبل ما نفتح نافذة الطباعة */
+  setTimeout(() => {
+    try { fr.contentWindow.focus(); fr.contentWindow.print(); }
+    catch(e){ toast('مقدرتش أفتح نافذة الطباعة — جرّب تاني', 'error'); }
+  }, 300);
+  addLog('تصدير تقرير PDF: ' + r.title);
+}
+
+/* ⚠️ تحذير موحّد لأي عملية هتمسح عدّة الناس — بيرجّع HTML جاهز للحط في نافذة التأكيد */
+function wipeWarningHTML(scope){
+  const items = scope || inventoryData;
+  const hit = items.filter(i => i.isJarded || (i.counts && Object.keys(i.counts).length) || Number(i.actualQuantity) > 0);
+  if (!hit.length) return '';
+  const pieces = hit.reduce((a,i) => a + (Number(i.actualQuantity) || 0), 0);
+  const who = {};
+  hit.forEach(i => {
+    const cs = i.counts && Object.keys(i.counts).length ? i.counts : (i.countedBy ? { [i.countedBy]: i.actualQuantity } : null);
+    if (cs) Object.keys(cs).forEach(u => { who[u] = (who[u] || 0) + (Number(cs[u]) || 0); });
+  });
+  const names = Object.keys(who);
+  return '<div style="margin-top:.6rem;padding:.65rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#991b1b">' +
+    '<b>⚠️ العملية دي هتمسح عدّة ناس:</b><br>' +
+    hit.length + ' صنف متجرد بإجمالي <b>' + fmtQ(pieces) + '</b> قطعة' +
+    (names.length ? '<br>حسب المستخدم: ' + names.map(u => esc(u) + ' (' + fmtQ(who[u]) + ')').join('، ') : '') +
+    '<br><b>العملية ملهاش تراجع — التراجع اتلغى من البرنامج.</b></div>';
+}
+
+/* ---------- نافذة التقارير ---------- */
+function openReports(){
+  if (needAdmin()) return;
+  const cards = REPORTS.map(r =>
+    '<div class="rep-card">' +
+      '<div class="rep-info"><div class="rep-name">' + esc(r.name) + '</div><div class="rep-desc">' + esc(r.desc) + '</div></div>' +
+      '<div class="rep-acts">' +
+        '<button class="mbtn primary" data-rep-pdf="' + r.id + '">📄 PDF</button>' +
+        '<button class="mbtn" data-rep-xls="' + r.id + '">📊 إكسيل</button>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+  const body = '<div class="hint" style="font-size:.8rem;margin-bottom:.6rem">كل التقارير بتتحسب من البيانات الحالية على طول. PDF بيفتح نافذة الطباعة — اختار منها «حفظ كـ PDF».</div>' + cards;
+  showModal('التقارير', body, [{ label:'إغلاق', kind:'ghost' }]);
+  const ov = document.querySelector('.modal-overlay:last-of-type');
+  if (!ov) return;
+  ov.addEventListener('click', e => {
+    const pdf = e.target.closest('[data-rep-pdf]');
+    const xls = e.target.closest('[data-rep-xls]');
+    if (pdf) reportToPDF(pdf.getAttribute('data-rep-pdf'));
+    else if (xls) reportToExcel(xls.getAttribute('data-rep-xls'));
+  });
+}
+
 function backupJSON(){
   const payload = { app: 'jard', v: 2, exportedAt: new Date().toISOString(), dt: store.getItem(S('selectedDateTime')) || '', items: inventoryData };
   downloadBlob(new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' }), 'Bimbo-Backup-' + stamp() + '.json');
@@ -2758,9 +3027,9 @@ function restoreJSON(){
         const data = JSON.parse(e.target.result);
         const items = normData(data.items || data);
         if (!items.length && !confirm('النسخة فارغة — استعادة فارغة؟')) return;
-        const ok = await confirmDlg('استعادة نسخة احتياطية', 'سيتم استبدال البيانات الحالية بمحتوى النسخة (' + items.length + ' صنف).', 'استعادة', true);
+        const ok = await confirmDlg('استعادة نسخة احتياطية', 'سيتم استبدال البيانات الحالية بمحتوى النسخة (' + items.length + ' صنف).' + wipeWarningHTML(), 'استعادة', true);
         if (!ok) return;
-        withUndo(() => {
+        applyAndPush(() => {
           inventoryData = items;
           if (data.dt) { store.setItem(S('selectedDateTime'), data.dt); $('currentDateTime').value = data.dt; scheduleMetaPush(); }
           selectedSerials.clear();
@@ -2787,7 +3056,15 @@ function prepareAndPrint(){
   $('footDiff').textContent = fmtQ(rows.reduce((a, i) => a + (q(i) - i.systemQuantity), 0));
   $('footCount').textContent = rows.length + ' صنف';
   $('tableFoot').style.display = '';
+  /* الطباعة لازم تطلع كل الصفوف مش الصفحة الحالية بس —
+     نرسم الكل، نطبع، وبعدين نرجع للترقيم تاني */
+  const wasAll = printAllRows;
+  printAllRows = true;
+  updateTable();
+  window.onafterprint = () => { printAllRows = wasAll; updateTable(); window.onafterprint = null; };
   window.print();
+  /* بعض المتصفحات ما بتنفذش onafterprint — نرجع للترقيم بعد شوية على أي حال */
+  setTimeout(() => { if (printAllRows && !window.onafterprint) { printAllRows = wasAll; updateTable(); } }, 1500);
 }
 
 /* ---------- السجل ---------- */
@@ -3473,9 +3750,10 @@ async function openCameraScanner(){
     const startScanner = (target, cfg) => qrScanner.start(target, cfg, onScanSuccess, () => {});
     async function onScanSuccess(txt){
         const now = Date.now();
-        /* تجاهل: لو الشاشة واقفة على الفلاش، أو نفس الكود اتقرا قبل 2.5 ثانية */
+        /* ⏱️ 4 ثوانى كاملة بين كل مسحة والتانية — الكاميرا بتقرا أسرع بكتير من إيد الإنسان،
+           فبدون المهلة دي كانت بتسجل نفس القطعة كذا مرة */
         if (camBusy) return;
-        if (txt === lastCamCode && now - lastCamTime < 2500) return;
+        if (now - lastCamTime < CAM_DEDUPE_MS) return;
 
         const f = $('scanFlash'), ft = $('scanFlashTitle'), fc = $('scanFlashCode'), fi = $('scanFlashItem');
         const sc = $('scanCount');
@@ -3507,10 +3785,25 @@ async function openCameraScanner(){
         if (fi) fi.textContent = (after ? after.name : txt) + ' — القطعة رقم: ' + (after ? fmtQ(after.actualQuantity) : '1');
         if (f) {
           f.classList.add('show');
-          setTimeout(() => { f.classList.remove('show'); camBusy = false; }, 1000);
- } else camBusy = false;
-        if (sc) sc.innerHTML = '✅ تم مسح <b style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة' + (before ? '' : ' — (كود جديد)');
+          setTimeout(() => { f.classList.remove('show'); }, 1000);
  }
+        /* الكاميرا تفضل مقفولة 4 ثوانى كاملة، مع عد تنازلى يوريك تستنى قد إيه */
+        camCountdown(CAM_DEDUPE_MS);
+ }
+    /* عد تنازلى: يوريك كام ثانية فاضلة قبل ما تقدر تمسح تاني */
+    function camCountdown(ms){
+      const sc = $('scanCount');
+      const end = Date.now() + ms;
+      const tick = () => {
+        const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+        if (sc) sc.innerHTML = left > 0
+          ? '✅ تم مسح <b style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة — استنى <b>' + left + '</b> ثانية للمسحة الجاية'
+          : '✅ تم مسح <b style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة — جاهز للمسح';
+        if (left > 0) setTimeout(tick, 250);
+        else camBusy = false;
+      };
+      tick();
+    }
     /* 🎯 محاولة التشغيل بالإعدادات الكاملة (دقة عالية + فوكس/إضاءة مستمر) — لو سفاري/جهاز قديم
        رفض combination معينة (OverconstrainedError)، نتراجع تدريجيًا لحد ما نلاقي إعداد شغال،
        بدل ما نفشل بالكامل ونطلع رسالة خطأ ومفيش كاميرا خالص */

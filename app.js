@@ -1858,8 +1858,8 @@ async function connectFirebase(silent, retryCount){
     /* دخول مجهول إجباري — القواعد الجديدة بتتطلب auth != null لأي قراءة/كتابة،
        فلو ده فشل، مفيش أي وصول للبيانات أصلاً ولازم نوقف ونوضح السبب */
     try {
-      await firebase.auth().signInAnonymously();
- } catch (e) {
+      if (!firebase.auth().currentUser) await firebase.auth().signInAnonymously();
+    } catch (e) {
       setSyncUI('off', 'فشل الدخول المجهول ⚠️');
       lastSyncErr = 'الدخول المجهول فشل: ' + (e && e.message ? e.message : String(e));
       toast('⚠️ لازم تفعّل "Anonymous" في Firebase Console ← Authentication ← Sign-in method عشان البرنامج يقدر يتصل', 'error');

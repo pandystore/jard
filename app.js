@@ -3105,36 +3105,6 @@ function openReports(){
   });
 }
 
-function backupJSON(){
-  const payload = { app: 'jard', v: 2, exportedAt: new Date().toISOString(), dt: store.getItem(S('selectedDateTime')) || '', items: inventoryData };
-  downloadBlob(new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' }), 'Bimbo-Backup-' + stamp() + '.json');
-  addLog('تنزيل نسخة احتياطية');
-}
-function restoreJSON(){
-  const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = '.json';
-  inp.onchange = () => {
-    const f = inp.files[0]; if (!f) return;
-    const r = new FileReader();
-    r.onload = async e => {
-      try {
-        const data = JSON.parse(e.target.result);
-        const items = normData(data.items || data);
-        if (!items.length && !confirm('النسخة فارغة — استعادة فارغة؟')) return;
-        const ok = await confirmDlg('استعادة نسخة احتياطية', 'سيتم استبدال البيانات الحالية بمحتوى النسخة (' + items.length + ' صنف).' + wipeWarningHTML(), 'استعادة', true);
-        if (!ok) return;
-        applyAndPush(() => {
-          inventoryData = items;
-          if (data.dt) { store.setItem(S('selectedDateTime'), data.dt); $('currentDateTime').value = data.dt; scheduleMetaPush(); }
-          selectedSerials.clear();
- }, 'تمت الاستعادة (' + items.length + ' صنف)');
-        addLog('استعادة نسخة احتياطية — ' + items.length + ' صنف');
- } catch (err) { toast('ملف النسخة غير صالح', 'error'); }
- };
-    r.readAsText(f);
- };
-  inp.click();
-}
 
 /* ---------- الطباعة ---------- */
 function prepareAndPrint(){
@@ -3514,10 +3484,8 @@ async function openSettings(){
     '<button class="mbtn ghost" id="rstLogoBtn" style="flex:0;padding:.45rem .7rem">↩️</button>' +
     '</div>' +
     '<div class="modal-foot"><button class="mbtn ghost" id="chgPass">🔑 تغيير كلمة مرور admin</button></div>' +
-    '<div class="sec-title" style="margin-top:.9rem">💾 النسخ الاحتياطي والسجل</div>' +
+    '<div class="sec-title" style="margin-top:.9rem">🕘 السجل</div>' +
     '<div class="modal-foot" style="flex-wrap:wrap;margin-top:.2rem">' +
-    '<button class="mbtn ghost" id="bkpBtn">⬇️ تنزيل نسخة JSON</button>' +
-    '<button class="mbtn ghost" id="rstBtn">⬆️ استعادة نسخة</button>' +
     '<button class="mbtn ghost" id="logBtn">🕘 عرض السجل</button></div>' +
     '<div class="sec-title" style="margin-top:.9rem;color:#b91c1c">منطقة الخطر</div>' +
     '<div class="modal-foot"><button class="mbtn danger" id="factoryResetBtn">💥 إعادة ضبط المصنع (مسح كل حاجة)</button></div>' +
@@ -3733,8 +3701,6 @@ async function openSettings(){
     addLog('تغيير كلمة المرور');
     toast('تم تغيير كلمة المرور', 'success');
  };
-  m.body.querySelector('#bkpBtn').onclick = backupJSON;
-  m.body.querySelector('#rstBtn').onclick = () => { m.close(); restoreJSON(); };
   m.body.querySelector('#logBtn').onclick = () => { m.close(); showLog(); };
 
   try {

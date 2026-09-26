@@ -1299,39 +1299,39 @@ function getFiltered(){
 /* ---------- عرض الجدول ---------- */
 function updateTable(){
   const filtered = getFiltered();
-  const groups = groupsList();
   /* المستخدم العادي "جرد فقط": يشوف كل حاجة ويعدّ، لكن مايعدّلش أي بيانات
      (اسم/مجموعة/ملاحظة/كمية السيستم) — التعديل والحذف والاستيراد للأدمن والمشرف بس.
      الخانة الوحيدة اللي يقدر يكتب فيها هي الكمية اللي هو جردها */
   const canEdit = isElevated();
-  let html = '';
-  filtered.forEach(item => {
-    /* لو فلتر بمستخدم شغال → نعرض كميته هو بس (counts أول، لو مفيش نرجع لـ countedBy للبيانات القديمة) */
-    const hasUCounts = userFilter && item.counts && Object.keys(item.counts).length > 0;
-    const uQty = hasUCounts ? (Number(item.counts[userFilter]) || 0) : (userFilter && item.countedBy === userFilter ? item.actualQuantity : null);
-    const dispAct = uQty !== null ? uQty : item.actualQuantity;
-    const dispDiff = uQty !== null ? (uQty - item.systemQuantity) : item.difference;
-    const dispStatus = uQty !== null ? (dispDiff > 0 ? 'زيادة' : dispDiff < 0 ? 'عجز' : 'متساوي') : item.status;
-    const cls = dispStatus === 'زيادة' ? 'row-surplus' : dispStatus === 'عجز' ? 'row-deficit' : '';
+  /* ⚡ array + join أسرع بكتير من += على نص بيوصل لمئات الكيلوبايت */
+  const rows = new Array(filtered.length);
+  const ceName = canEdit ? 'true' : 'false';
+  const ceSys = (userFilter || !canEdit) ? 'false' : 'true';
+  const ceAct = userFilter ? 'false' : 'true';
+  for (let i = 0; i < filtered.length; i++) {
+    const item = filtered[i];
+    const d = displayQty(item);
     const sel = selectedSerials.has(item.serial);
-    let opts = '<option value="غير مصنف"' + (item.group === 'غير مصنف' ? ' selected' : '') + '>غير مصنف</option>';
-    if (item.group === 'غير معروف') opts += '<option value="غير معروف" selected>غير معروف</option>';
-    groups.forEach(g => { opts += '<option value="' + esc(g) + '"' + (item.group === g ? ' selected' : '') + '>' + esc(g) + '</option>'; });
-    html += '<tr class="' + cls + (sel ? ' selected-for-print' : '') + '" data-serial="' + item.serial + '">' +
+    /* المستخدم العادي ما يعدّلش المجموعة → نص عادي بدل <select> فيه كل المجموعات.
+       ده بيشيل عشرات الآلاف من عناصر DOM من غير ما يغيّر أي حاجة في الشكل */
+    const groupCell = canEdit
+      ? '<td class="p3 txs"><select data-gsel class="rowselect"><option value="' + esc(item.group) + '" selected>' + esc(item.group) + '</option></select></td>'
+      : '<td class="p3 txs">' + esc(item.group) + '</td>';
+    rows[i] = '<tr class="' + rowClass(d.status, item.serial) + '" data-serial="' + item.serial + '">' +
       '<td class="tc no-print"><input type="checkbox" class="item-checkbox"' + (sel ? ' checked' : '') + '></td>' +
       '<td class="p3 txs fwb tc">' + item.serial + '</td>' +
       '<td class="p3 fw6">' + esc(item.code) + '</td>' +
-      '<td class="p3 tsm" contenteditable="' + (canEdit ? 'true' : 'false') + '" data-edit="name">' + esc(item.name) + '</td>' +
-      '<td class="p3 txs"><select data-gsel class="rowselect"' + (canEdit ? '' : ' disabled') + '>' + opts + '</select></td>' +
-      '<td class="tc fwb" contenteditable="' + ((userFilter || !canEdit) ? 'false' : 'true') + '" data-qty="systemQuantity" data-cell="sys">' + fmtQ(item.systemQuantity) + '</td>' +
-      '<td class="tc fwb tblue" contenteditable="' + (userFilter ? 'false' : 'true') + '" data-qty="actualQuantity" data-cell="act">' + fmtQ(dispAct) + '</td>' +
-      '<td class="tc fwb" data-cell="diff">' + fmtQ(dispDiff) + '</td>' +
-      '<td class="tc txs fwb" data-cell="status">' + esc(dispStatus) + '</td>' +
-      '<td class="p3 txs" contenteditable="' + (canEdit ? 'true' : 'false') + '" data-edit="note">' + esc(item.note) + '</td>' +
+      '<td class="p3 tsm" contenteditable="' + ceName + '" data-edit="name">' + esc(item.name) + '</td>' +
+      groupCell +
+      '<td class="tc fwb" contenteditable="' + ceSys + '" data-qty="systemQuantity" data-cell="sys">' + fmtQ(item.systemQuantity) + '</td>' +
+      '<td class="tc fwb tblue" contenteditable="' + ceAct + '" data-qty="actualQuantity" data-cell="act">' + fmtQ(d.act) + '</td>' +
+      '<td class="tc fwb" data-cell="diff">' + fmtQ(d.diff) + '</td>' +
+      '<td class="tc txs fwb" data-cell="status">' + esc(d.status) + '</td>' +
+      '<td class="p3 txs" contenteditable="' + ceName + '" data-edit="note">' + esc(item.note) + '</td>' +
     '</tr>';
- });
+  }
   const tb = $('tableBody');
-  if (tb) tb.innerHTML = html;
+  if (tb) tb.innerHTML = rows.join('');
   const selAll = $('selectAll'); if (selAll) selAll.checked = filtered.length > 0 && filtered.every(i => selectedSerials.has(i.serial));
 }
 function refreshRow(tr, item){
@@ -1342,44 +1342,94 @@ function refreshRow(tr, item){
 /* تحديث صف واحد كامل في الجدول لحظياً وقت وصول تعديل من جهاز/مستخدم تاني —
    لو الصف مش معروض حالياً (صفحة تانية في الترقيم)، مفيش داعي نلمس الـ DOM؛
    البيانات في inventoryData بقت صح بالفعل وهتظهر صح أول ما توصلها */
+/* الأرقام اللي بتتعرض في الصف — لو فلتر بمستخدم شغال نعرض كميته هو بس،
+   غير كده نعرض إجمالي الصنف. مستخدمة في updateTable و patchSingleRow
+   عشان الاتنين يطلعوا نفس الحاجة بالظبط */
+function displayQty(item){
+  const hasUCounts = userFilter && item.counts && Object.keys(item.counts).length > 0;
+  const uQty = hasUCounts ? (Number(item.counts[userFilter]) || 0)
+    : (userFilter && item.countedBy === userFilter ? item.actualQuantity : null);
+  if (uQty === null) return { act: item.actualQuantity, diff: item.difference, status: item.status };
+  const diff = uQty - item.systemQuantity;
+  return { act: uQty, diff: diff, status: diff > 0 ? 'زيادة' : diff < 0 ? 'عجز' : 'متساوي' };
+}
+function rowClass(status, serial){
+  return (status === 'زيادة' ? 'row-surplus' : status === 'عجز' ? 'row-deficit' : '') +
+    (selectedSerials.has(serial) ? ' selected-for-print' : '');
+}
+/* ⚡ قايمة المجموعات بتتعبّى بالكامل أول ما المستخدم يفتحها فعلاً — مش في كل صف.
+   قبل كده كان فيه 2000 قايمة × 31 خيار = 62 ألف عنصر DOM في الصفحة،
+   ودلوقتي فيه خيار واحد لكل صف (المجموعة الحالية) فالشكل زي ما هو بالظبط */
+function expandGroupSelect(gsel){
+  if (!gsel || gsel.options.length > 1) return;
+  const cur = gsel.value;
+  const groups = groupsList();
+  const mk = (v, sel) => { const o = document.createElement('option'); o.value = v; o.textContent = v; if (sel) o.selected = true; return o; };
+  const frag = document.createDocumentFragment();
+  frag.appendChild(mk('غير مصنف', cur === 'غير مصنف'));
+  if (cur === 'غير معروف') frag.appendChild(mk('غير معروف', true));
+  for (let i = 0; i < groups.length; i++) frag.appendChild(mk(groups[i], cur === groups[i]));
+  gsel.textContent = '';
+  gsel.appendChild(frag);
+  gsel.value = cur;
+}
+/* تحديث المجموعة المعروضة في صف من غير ما نعبّي القايمة كاملة */
+function setGroupSelect(gsel, group){
+  if (!gsel) return;
+  if (gsel.options.length > 1) { gsel.value = group; return; }
+  if (gsel.options.length === 1) { gsel.options[0].value = group; gsel.options[0].textContent = group; gsel.options[0].selected = true; }
+  else { const o = document.createElement('option'); o.value = group; o.textContent = group; o.selected = true; gsel.appendChild(o); }
+}
 function patchSingleRow(item){
   const tr = document.querySelector('#tableBody tr[data-serial="' + item.serial + '"]');
   if (!tr) return;
   const nameEl = tr.querySelector('[data-edit="name"]'); if (nameEl && document.activeElement !== nameEl) nameEl.textContent = item.name;
-  const gsel = tr.querySelector('select[data-gsel]'); if (gsel && document.activeElement !== gsel) gsel.value = item.group;
+  const gsel = tr.querySelector('select[data-gsel]'); if (gsel && document.activeElement !== gsel) setGroupSelect(gsel, item.group);
   const sysEl = tr.querySelector('[data-cell="sys"]'); if (sysEl && document.activeElement !== sysEl) sysEl.textContent = fmtQ(item.systemQuantity);
-  const actEl = tr.querySelector('[data-cell="act"]'); if (actEl && document.activeElement !== actEl) actEl.textContent = fmtQ(item.actualQuantity);
+  const d = displayQty(item);
+  const actEl = tr.querySelector('[data-cell="act"]'); if (actEl && document.activeElement !== actEl) actEl.textContent = fmtQ(d.act);
+  const diffEl = tr.querySelector('[data-cell="diff"]'); if (diffEl) diffEl.textContent = fmtQ(d.diff);
+  const stEl = tr.querySelector('[data-cell="status"]'); if (stEl) stEl.textContent = d.status;
   const noteEl = tr.querySelector('[data-edit="note"]'); if (noteEl && document.activeElement !== noteEl) noteEl.textContent = item.note;
-  refreshRow(tr, item);
+  tr.className = rowClass(d.status, item.serial);
 }
 
 /* ---------- الإحصائيات ---------- */
 function updateStats(){
   const total = inventoryData.length;
-  const jarded = inventoryData.filter(i => i.isJarded).length;
+  /* ⚡ مشوار واحد على كل الأصناف بدل 7 مشاوير (كانت 3 filter + forEach + 3 reduce) */
+  let jarded = 0, deficit = 0, surplus = 0, sumSys = 0, sumAct = 0, sumDiff = 0;
+  const gs = {};
+  for (let i = 0; i < total; i++){
+    const it = inventoryData[i];
+    if (it.isJarded) jarded++;
+    if (it.status === 'عجز') deficit++;
+    else if (it.status === 'زيادة') surplus++;
+    sumSys += Number(it.systemQuantity) || 0;
+    sumAct += Number(it.actualQuantity) || 0;
+    sumDiff += Number(it.difference) || 0;
+    let g = gs[it.group];
+    if (!g) { g = gs[it.group] = { d: 0, s: 0 }; }
+    if (it.status === 'عجز') g.d++;
+    else if (it.status === 'زيادة') g.s++;
+  }
   $('completionPercent').textContent = (total ? ((jarded / total) * 100).toFixed(1) : 0) + '%';
   $('cardJarded').textContent = jarded;
   $('cardNotJarded').textContent = total - jarded;
-  $('cardDeficit').textContent = inventoryData.filter(i => i.status === 'عجز').length;
-  $('cardSurplus').textContent = inventoryData.filter(i => i.status === 'زيادة').length;
+  $('cardDeficit').textContent = deficit;
+  $('cardSurplus').textContent = surplus;
 
-  const gs = {};
-  inventoryData.forEach(i => {
-    if (!gs[i.group]) gs[i.group] = { d: 0, s: 0 };
-    if (i.status === 'عجز') gs[i.group].d++;
-    if (i.status === 'زيادة') gs[i.group].s++;
- });
-  let dH = '', sH = '';
+  const dParts = [], sParts = [];
   Object.keys(gs).forEach(g => {
-    if (gs[g].d > 0) dH += '<div class="analysis-row"><span>' + esc(g) + '</span><span class="fwb">' + gs[g].d + ' صنف</span></div>';
-    if (gs[g].s > 0) sH += '<div class="analysis-row"><span>' + esc(g) + '</span><span class="fwb">' + gs[g].s + ' صنف</span></div>';
- });
-  const dg = $('deficitGroups'); if (dg) dg.innerHTML = dH || '<div style="font-size:9px;color:#9ca3af">لا يوجد عجز</div>';
-  const sg = $('surplusGroups'); if (sg) sg.innerHTML = sH || '<div style="font-size:9px;color:#9ca3af">لا يوجد زيادة</div>';
+    if (gs[g].d > 0) dParts.push('<div class="analysis-row"><span>' + esc(g) + '</span><span class="fwb">' + gs[g].d + ' صنف</span></div>');
+    if (gs[g].s > 0) sParts.push('<div class="analysis-row"><span>' + esc(g) + '</span><span class="fwb">' + gs[g].s + ' صنف</span></div>');
+  });
+  const dg = $('deficitGroups'); if (dg) dg.innerHTML = dParts.join('') || '<div style="font-size:9px;color:#9ca3af">لا يوجد عجز</div>';
+  const sg = $('surplusGroups'); if (sg) sg.innerHTML = sParts.join('') || '<div style="font-size:9px;color:#9ca3af">لا يوجد زيادة</div>';
 
-  $('summarySystemQuantity').textContent = fmtQ(inventoryData.reduce((a, i) => a + i.systemQuantity, 0));
-  $('summaryActualQuantity').textContent = fmtQ(inventoryData.reduce((a, i) => a + i.actualQuantity, 0));
-  $('summaryDifference').textContent = fmtQ(inventoryData.reduce((a, i) => a + i.difference, 0));
+  $('summarySystemQuantity').textContent = fmtQ(sumSys);
+  $('summaryActualQuantity').textContent = fmtQ(sumAct);
+  $('summaryDifference').textContent = fmtQ(sumDiff);
 }
 
 /* ---------- الفلاتر ---------- */
@@ -1501,7 +1551,7 @@ function processCode(code){
   const who = sessionUser ? sessionUser.name : '';
   const bag = who || 'بدون مستخدم';
   const item = inventoryData.find(i => i.code === code);
-  let done = null, qty = 0;
+  let done = null, qty = 0, isNewItem = false;
   const ops = [];
   if (item) {
     const prevBy = item.countedBy;
@@ -1527,16 +1577,22 @@ function processCode(code){
     const ns = inventoryData.length ? Math.max.apply(null, inventoryData.map(i => i.serial)) + 1 : 1;
     const nv = { serial: ns, code: code, name: 'صنف جديد', group: 'غير معروف', systemQuantity: 0, actualQuantity: 1, isJarded: true, difference: 1, status: 'زيادة', note: '', countedBy: who, counts: { [bag]: 1 }, conflict: false, editedAt: nowTs };
     inventoryData.push(nv);
+    isNewItem = true;
     /* الصنف جديد على السيرفر كمان — النيّة هتتبني عليه من الصفر هناك */
     ops.push({ t: 'delta', who: bag, d: 1, ts: nowTs });
     beep('ok');
     if (!eanOk(code)) toast('⚠️ كود غير معروف واحتمال قراءة غلط (checksum مش سليم) — اتسجل كزيادة: ' + code, 'warning');
     else toast('كود غير معروف — اتسجل كزيادة: ' + code, 'warning');
     done = nv; qty = 1;
-    renderCategoryButtons();
     try { if (sessionUser && (!sessionUser.role || sessionUser.role === 'user')) pushCountNotif(nv, 1); } catch(e){}
  }
-  localSave(); updateTable(); updateStats();
+  localSave();
+  /* ⚡ رسم الجدول كامل مع كل مسحة كان بياخد ثواني لما الأصناف كتير (2000 صنف = ~3.6 ثانية).
+     الصف اللي اتغير بس هو اللي بيتحدّث — نفس النتيجة في أجزاء من الثانية.
+     الرسم الكامل بيحصل بس لو الصنف جديد (صف لسه مش موجود) */
+  if (isNewItem) { updateTable(); renderCategoryButtons(); }
+  else if (done) { patchSingleRow(done); }
+  updateStats();
   if (done && ops.length) {
     ops.forEach(op => enqueueCountOp(done.code, op));
     scheduleCountPush(done.code);
@@ -2171,7 +2227,14 @@ function setupBarcodeInput(){
 /* ---------- أحداث الجدول (Delegation) ---------- */
 function setupTableEvents(){
   const tb = $('tableBody');
-  document.addEventListener('focusin', e => { if (e.target.closest && e.target.closest('td[contenteditable]')) editingCount++; });
+  document.addEventListener('focusin', e => {
+    if (e.target.closest && e.target.closest('td[contenteditable]')) editingCount++;
+    /* قايمة المجموعات بتتعبّى بالكامل أول ما تفتحها بس */
+    if (e.target.matches && e.target.matches('select[data-gsel]')) expandGroupSelect(e.target);
+  });
+  tb.addEventListener('mousedown', e => {
+    if (e.target.matches && e.target.matches('select[data-gsel]')) expandGroupSelect(e.target);
+  });
   document.addEventListener('focusout', e => {
     if (e.target.closest && e.target.closest('td[contenteditable]')) {
       editingCount = Math.max(0, editingCount - 1);

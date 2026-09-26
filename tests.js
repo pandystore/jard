@@ -147,6 +147,51 @@ console.log('== mergeOneItem (حل تعارض على مستوى صنف واحد)
   eq(m3.actualQuantity, 5, 'اتنين مستخدمين عاديين مختلفين بيعدّوا نفس الصنف — حصصهم بتتجمع (2+3=5)');
 }
 
+console.log('== mergeOneItem: حصص المستخدمين ماتضيعش (نسخة محلية قديمة) ==');
+{
+  /* الاختبارات اللي فوق بتستخدم أصناف من غير حصص (counts فاضية) فبتمشي في فرع
+     الوقت. دي الحالة الأخطر: جهاز عنده نسخة قديمة ما شافش فيها عدّة حد تاني،
+     ووصله تحديث من السيرفر. زمان كان فيه فرعين بيرجّعوا نسخة واحدة كاملة
+     ويسقطوا حصص باقي الناس — فكمية حد كانت بتختفي من غير سبب. */
+  const code = ['getUserRole', 'calculateRow', 'mergeOneItem'].map(extractFn).join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(
+    'let usersList = [{name:"admin",role:"admin"},{name:"محمد",role:"user"},{name:"سعاد",role:"user"}];\n' + code +
+    '\nmodule.exports = { mergeOneItem };',
+    'extracted-merge-safety.js'
+  );
+  const { mergeOneItem } = m.exports;
+
+  const it = (counts, by, ts) => ({ code:'10001', name:'أرز', group:'g', systemQuantity:10,
+    actualQuantity: Object.keys(counts).reduce((a,u)=>a+counts[u],0),
+    isJarded:true, counts, countedBy: by, editedAt: ts });
+
+  /* 1) الأدمن عدّل وجهازه لسه ما شافش إن محمد جرد — عدّة محمد لازم ماتروحش */
+  const r1 = mergeOneItem(it({admin:3}, 'admin', 200), it({'محمد':5}, 'محمد', 100), 'admin');
+  eqMap(r1.counts, { admin:3, 'محمد':5 }, 'تعديل الأدمن مامسحش عدّة محمد (اللي جهازه ماكانش شايفها)');
+  eq(r1.actualQuantity, 8, 'والإجمالي 8 مش 3');
+
+  /* 2) العكس: مستخدم عادي بيعدّل، والسيرفر عنده نسخة أدمن أحدث — عدّته هو ماتروحش */
+  const r2 = mergeOneItem(it({'محمد':4}, 'محمد', 200), it({admin:7}, 'admin', 300), 'محمد');
+  eqMap(r2.counts, { admin:7, 'محمد':4 }, 'نسخة الأدمن الأحدث مابلعتش عدّة محمد');
+  eq(r2.actualQuantity, 11, 'والإجمالي 11 مش 7');
+
+  /* 3) تلات مستخدمين، والنسخة المحلية فيها واحد بس */
+  const r3 = mergeOneItem(it({admin:1}, 'admin', 400), it({'محمد':2, 'سعاد':3}, 'محمد', 350), 'admin');
+  eqMap(r3.counts, { admin:1, 'محمد':2, 'سعاد':3 }, 'التلاتة محفوظين');
+  eq(r3.actualQuantity, 6, 'والإجمالي 6 مش 1');
+
+  /* 4) نسخة محلية قديمة ماتنزّلش عدّة حد حدّثها على السيرفر */
+  const r4 = mergeOneItem(it({admin:2, 'محمد':5}, 'admin', 500), it({'محمد':9}, 'محمد', 600), 'admin');
+  eq(r4.counts['محمد'], 9, 'السيرفر أحدث (9) — النسخة المحلية القديمة (5) ما نزلتوش');
+  eq(r4.actualQuantity, 11, 'والإجمالي 11 مش 7');
+
+  /* 5) مفيش حصص خالص على الطرفين — مفيش حاجة تضيع أصلاً */
+  const r5 = mergeOneItem(it({}, '', 200), it({}, '', 100), 'admin');
+  eq(r5.actualQuantity, 0, 'صنف لسه مجردش — يفضل صفر');
+}
+
 console.log('== النيّات: applyCountOps / legacySeedOp / applyMetaPatch ==');
 {
   const code = ['round2', 'sumCounts', 'normItem', 'calculateRow', 'applyCountOps', 'legacySeedOp', 'applyMetaPatch'].map(extractFn).join('\n');

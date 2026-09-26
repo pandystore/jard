@@ -260,18 +260,11 @@ function normData(arr){
    لكن أبسط بكتير دلوقتي لأنه بيتطبق على صنف واحد بس وقت تعارض حقيقي (نادر جداً مع per-item sync) */
 function mergeOneItem(l, r, me){
   const rRole = getUserRole(r.countedBy);
-  const lRole = getUserRole(l.countedBy);
-  const meRole = getUserRole(me);
   const rTs = Number(r.editedAt) || 0;
   const lTs = Number(l.editedAt) || 0;
-  if (rRole === 'admin' && lRole !== 'admin' && meRole !== 'admin' && (rTs >= lTs || (!rTs && !lTs))) {
-    calculateRow(r);
-    return r;
- }
-  if (lRole === 'admin' && rRole !== 'admin' && meRole === 'admin' && (lTs >= rTs || (!rTs && !lTs))) {
-    calculateRow(l);
-    return l;
- }
+  /* ⚠️ كان فيه هنا فرعين بيرجّعوا نسخة الأدمن كاملة ويسقطوا حصص باقي الناس،
+     فكمية حد كانت بتضيع من غير سبب. اتشالوا نهائياً:
+     العدّة بتزيد بس، ومفيش نسخة واحدة بتكسب على التانية. */
   const counts = Object.assign({}, r.counts || {});
   Object.keys(l.counts || {}).forEach(u => {
     if (u === me || counts[u] === undefined) counts[u] = l.counts[u];
@@ -280,17 +273,11 @@ function mergeOneItem(l, r, me){
   m.counts = counts;
   if (Object.keys(counts).length) {
     const tot = Object.keys(counts).reduce((a, u) => a + (Number(counts[u]) || 0), 0);
-    const remoteSum = Object.keys(r.counts||{}).reduce((a,u)=>a+(Number(r.counts[u])||0),0);
-    if (rRole === 'admin' && Math.abs(r.actualQuantity - remoteSum) > 0.01 && (rTs >= lTs || (!rTs && !lTs))) {
-      m.actualQuantity = r.actualQuantity;
-      m.counts = r.counts;
-      m.countedBy = r.countedBy;
- } else {
-      m.actualQuantity = Math.round(tot * 100) / 100;
-      m.isJarded = true;
-      if (me) m.countedBy = me;
-      if (rRole === 'admin' && rTs >= lTs) m.countedBy = r.countedBy;
- }
+    /* دايماً ناخد مجموع الحصص المدموجة — مفيش حالة واحدة تستبدل الباقي */
+    m.actualQuantity = Math.round(tot * 100) / 100;
+    m.isJarded = true;
+    if (me) m.countedBy = me;
+    else if (rRole === 'admin' && rTs >= lTs) m.countedBy = r.countedBy;
     m.isJarded = true;
  } else {
     if (rTs && lTs) {

@@ -33,8 +33,11 @@
         }
       },
 
-      /* ---------- الإشعارات ---------- */
+      /* ---------- الإشعارات ----------
+         المستخدم يضيف إشعار بعدّته؛ الأدمن الحقيقي يقدر يمسح العقدة كلها
+         (مسح المصنع / تنظيف القديم). القراءة من jard.read = أي مستخدم داخل. */
       "notifs": {
+        ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid",
         "$id": {
           ".write": "auth != null",
           ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber())"
@@ -56,6 +59,7 @@
          اللي هنا يمنع الكتابة الغلط ويثبت شكل البيانات بس.
          الحماية الكاملة محتاجة حساب Firebase حقيقي لكل مستخدم. */
       "sessions": {
+        ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid",
         "$user": {
           ".write": "auth != null",
           ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber() && newData.child('name').isString())"
@@ -97,6 +101,15 @@
           ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
         },
         "forceWipe": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "lastWipe": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "lastWipeRev": {
+          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
+        },
+        "lastWipeBy": {
           ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
         },
 

@@ -615,6 +615,66 @@ console.log('== هوية الأدمن الحقيقية على Firebase (القو
     'دخول مستخدم من القايمة (حتى لو صلاحيته أدمن) مش بيدّعي صلاحية الأدمن الحقيقية — دي بكلمة المرور الرئيسية بس');
   eq(extractFn('logoutUser').indexOf('dropRealAdminAuth') !== -1, true, 'الخروج اليدوي بيسلّم هوية الأدمن');
   eq(extractFn('autoLogout').indexOf('dropRealAdminAuth') !== -1, true, 'والخروج التلقائي للخمول بيسلّمها كمان');
+  eq(/return\s+db\.ref/.test(pmSrc), true, 'pushMeta بيرجع الـ Promise — إضافة المستخدم بتستنى نتيجة السيرفر فعلًا');
+  eq(pmSrc.indexOf('إصلاح هوية الأدمن') !== -1, true, 'رفض الكتابة الإدارية بيوجّه لزر إصلاح الهوية');
+}
+
+console.log('== إشعارات الأدمن (المشروع الصحيح + توكن القواعد المقفولة) ==');
+{
+  const sw = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf-8');
+  eq(sw.indexOf('jard-86baf') === -1, true, 'SW مش مربوط بمشروع Firebase القديم');
+  eq(sw.indexOf('function notifsUrl') !== -1, true, 'عنوان الإشعارات بيتركّب من إعدادات الصفحة مش ثابت');
+  eq(sw.indexOf('swAuth') !== -1, true, 'SW بيبعت توكن الهوية مع طلب الإشعارات');
+  eq(sw.indexOf('swSelfName') !== -1, true, 'SW ما بيظهرش إشعار لعدّة نفس الجهاز');
+  eq(sw.indexOf('jard-22f1c-default-rtdb.firebaseio.com') !== -1, true, 'الاحتياطي لو الصفحة ما بعتتش عنوان = المشروع الحالي');
+  eq(sw.indexOf('JARD_PING') !== -1 && sw.indexOf('d.auth') !== -1, true, 'الـ ping يجدّد التوكن وهو الصفحة متصغّرة');
+
+  const wipe = fs.readFileSync(path.join(__dirname, 'wipe.html'), 'utf-8');
+  eq(wipe.indexOf('jard-86baf') === -1, true, 'صفحة المسح مش على المشروع القديم');
+  eq(wipe.indexOf('jard-22f1c') !== -1, true, 'صفحة المسح على نفس مشروع البرنامج');
+  eq(wipe.indexOf('forceWipe') !== -1, true, 'المسح بيكتب forceWipe عشان الأجهزة التانية تتمسح');
+
+  const rules = fs.readFileSync(path.join(__dirname, 'firebase-rules.json'), 'utf-8');
+  eq(rules.indexOf('"lastWipe"') !== -1, true, 'القواعد بتسمح للأدمن يكتب ختم المسح');
+  eq(rules.indexOf('"lastWipeBy"') !== -1, true, 'وتسجيل مين عمل المسح');
+
+  const an = extractFn('attachNotifListener');
+  eq(an.indexOf('pushNotifConfigToSW(true)') !== -1, true, 'تفعيل الإشعارات بيبعت إعدادات Firebase للـ SW');
+  eq(extractFn('detachNotifListener').indexOf('pushNotifConfigToSW(false)') !== -1, true, 'إيقاف الإشعارات بيوقف الـ SW');
+
+  const cfgSrc = extractFn('pushNotifConfigToSW');
+  eq(cfgSrc.indexOf('databaseURL') !== -1, true, 'عنوان القاعدة بيتبعت من إعدادات المشروع الحالي');
+  eq(cfgSrc.indexOf('getIdToken') !== -1, true, 'توكن هوية Firebase بيتبعت للـ SW عشان القواعد المقفولة');
+  eq(cfgSrc.indexOf('selfName') !== -1, true, 'اسم المستخدم الحالي بيتبعت عشان ما يتشعش بإشعار نفسه');
+
+  const prelude = [
+    'var lastNotifTs = 111;',
+    'var sessionUser = { name: "admin", role: "admin" };',
+    'var sent = [];',
+    'function tellSW(msg){ sent.push(JSON.parse(JSON.stringify(msg))); }',
+    'function fbRoot(){ return "jard"; }',
+    'function effectiveCfg(){ return { databaseURL: "https://jard-22f1c-default-rtdb.firebaseio.com" }; }',
+    'var firebase = { auth: function(){ return { currentUser: { getIdToken: function(){ return { then: function(){ return { catch: function(){} }; } }; } } }; } };'
+  ].join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(prelude + '\n' + extractFn('pushNotifConfigToSW') +
+    '\nmodule.exports = { pushNotifConfigToSW: pushNotifConfigToSW, getSent: function(){ return sent; } };',
+    'notif-extracted.js');
+  const { pushNotifConfigToSW, getSent } = m.exports;
+  pushNotifConfigToSW(true);
+  const first = getSent()[0];
+  eq(!!first, true, 'تفعيل الإشعارات بيبعت رسالة للـ SW فورًا');
+  eq(first.type, 'JARD_NOTIF', 'نوع الرسالة JARD_NOTIF');
+  eq(first.enabled, true, 'الرسالة enabled');
+  eq(first.dbUrl, 'https://jard-22f1c-default-rtdb.firebaseio.com', 'عنوان القاعدة الصحيح (المشروع الحالي)');
+  eq(first.path, 'jard', 'مسار الجرد بيتبعت');
+  eq(first.selfName, 'admin', 'اسم الأدمن بيتبعت');
+  eq(first.lastTs, 111, 'آخر وقت إشعار بيتبعت');
+  const beforeOff = getSent().length;
+  pushNotifConfigToSW(false);
+  const off = getSent()[beforeOff];
+  eq(off && off.enabled, false, 'إيقاف الإشعارات بيبعت enabled=false');
 }
 
 console.log('== تشفير كلمات المرور (salt) ==');

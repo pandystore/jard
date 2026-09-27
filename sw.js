@@ -1,10 +1,22 @@
-const CACHE = 'jard-v11';
+const CACHE = 'jard-v12';
 
 let swNotifEnabled = false;
 let swLastTs = Date.now();
+let swDbUrl = '';
+let swAuth = '';
+let swPath = 'jard';
+let swSelfName = '';
 let pollTimer = null;
 const POLL_MIN = 8000, POLL_MAX = 60000;
 let pollInterval = POLL_MIN;
+
+function notifsUrl(){
+  const base = (swDbUrl || 'https://jard-22f1c-default-rtdb.firebaseio.com').replace(/\/+$/, '');
+  const path = (swPath || 'jard').replace(/^\/+|\/+$/g, '');
+  let url = base + '/' + path + '/notifs.json?orderBy=%22$key%22&limitToLast=15';
+  if (swAuth) url += '&auth=' + encodeURIComponent(swAuth);
+  return url;
+}
 
 function startPolling(){
   if (pollTimer) clearTimeout(pollTimer);
@@ -23,7 +35,7 @@ function scheduleNextPoll(){
 async function pollNotifs(){
   if (!swNotifEnabled) return;
   try {
-    const res = await fetch('https://jard-86baf-default-rtdb.firebaseio.com/jard/notifs.json?orderBy="$key"&limitToLast=15', { cache: 'no-store' });
+    const res = await fetch(notifsUrl(), { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
     if (!data) { pollInterval = Math.min(POLL_MAX, Math.round(pollInterval * 1.5)); return; }
@@ -34,6 +46,7 @@ async function pollNotifs(){
       const ts = Number(ev.ts)||0;
       if (ts && ts <= swLastTs) continue;
       if (ev.role === 'admin') continue;
+      if (swSelfName && ev.by === swSelfName) continue;
       if (ts) swLastTs = Math.max(swLastTs, ts);
       gotNew = true;
       try {
@@ -85,9 +98,14 @@ self.addEventListener('message', e => {
   if (d.type === 'JARD_NOTIF') {
     swNotifEnabled = !!d.enabled;
     if (typeof d.lastTs === 'number' && d.lastTs > swLastTs) swLastTs = d.lastTs;
+    if (typeof d.dbUrl === 'string' && d.dbUrl) swDbUrl = d.dbUrl;
+    if (typeof d.auth === 'string') swAuth = d.auth;
+    if (typeof d.path === 'string' && d.path) swPath = d.path;
+    if (typeof d.selfName === 'string') swSelfName = d.selfName;
     if (swNotifEnabled) startPolling();
     else stopPolling();
   } else if (d.type === 'JARD_PING') {
+    if (typeof d.auth === 'string' && d.auth) swAuth = d.auth;
     if (swNotifEnabled) pollNotifs();
   } else if (d.type === 'JARD_WIPE_CACHE') {
     caches.keys().then(keys=>{ keys.forEach(k=>{ if(k.startsWith('jard-')) caches.delete(k); }); });

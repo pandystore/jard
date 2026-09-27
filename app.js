@@ -717,7 +717,7 @@ function logoutUser(){
 }
 
 let idleTimer = null;
-const IDLE_LIMIT = 15 * 60 * 1000;
+const IDLE_LIMIT = 30 * 60 * 1000;
 function resetIdleTimer(){
   if (idleTimer) clearTimeout(idleTimer);
   if (!sessionUser) return;
@@ -734,7 +734,7 @@ function autoLogout(){
   try { stopCameraScanner(); } catch (e) {}
   document.querySelectorAll('.modal-overlay, .big-block-ov, .lock-overlay').forEach(x => x.remove());
   applyUserUI();
-  toast('⏱️ تم تسجيل الخروج تلقائيًا بعد 15 دقيقة خمول', 'warning');
+  toast('⏱️ تم تسجيل الخروج تلقائيًا بعد 30 دقيقة خمول', 'warning');
   showLock();
 }
 function setupIdleWatch(){
@@ -772,6 +772,9 @@ async function claimSession(u){
 
     try { ref.onDisconnect().remove(); } catch (e) {}
 
+    const kickRef = db.ref(fbRoot() + '/kicks/' + sessionKey(u.name));
+    try { await kickRef.remove(); } catch (e) {}
+
     if (window.__sessBeat) clearInterval(window.__sessBeat);
     const forceOut = () => {
       if (!sessionUser || !loginRequired()) return;
@@ -781,20 +784,45 @@ async function claimSession(u){
         'الأدمن سجّل خروجك من الجهاز ده.<br>لو ده حصل بالخطأ، كلم المسؤول وادخل من جديد.',
         'حسنًا — دخول من جديد', () => logoutUser());
  };
+    const onMissing = async () => {
+      if (!sessionUser || !loginRequired()) return;
+      try {
+        const k = await kickRef.get();
+        if (k.val() !== null) {
+          try { await kickRef.remove(); } catch (e) {}
+          forceOut();
+          return;
+        }
+        const again = await claimSession(sessionUser);
+        if (!again.ok) forceOut();
+      } catch (e) {}
+ };
     window.__sessBeat = setInterval(async () => {
       try {
+        if (!sessionUser || !loginRequired()) { clearInterval(window.__sessBeat); window.__sessBeat = null; return; }
+        const kv = (await kickRef.get()).val();
+        if (kv !== null) {
+          try { await kickRef.remove(); } catch (e) {}
+          clearInterval(window.__sessBeat); window.__sessBeat = null;
+          forceOut();
+          return;
+        }
         const s = await ref.get();
-        if (s.val() === null) { clearInterval(window.__sessBeat); window.__sessBeat = null; forceOut(); return; }
+        if (s.val() === null) {
+          clearInterval(window.__sessBeat); window.__sessBeat = null;
+          onMissing();
+          return;
+        }
         await ref.update({ ts: firebase.database.ServerValue.TIMESTAMP });
- } catch (e) {}
- }, 20000);
+      } catch (e) {}
+    }, 20000);
 
     try { if (window.__sessWatch) window.__sessWatch(); } catch (e) {}
     window.__sessWatch = ref.on('value', snap => {
       if (snap.val() !== null) return;
       if (!sessionUser || !loginRequired()) return;
-      setTimeout(() => { ref.get().then(c => { if (c.val() === null) forceOut(); }).catch(() => {}); }, 1200);
- });
+      setTimeout(() => { ref.get().then(c => { if (c.val() === null) onMissing(); }).catch(() => {}); }, 1200);
+    });
     mySessionRef = ref;
     return { ok: true };
  } catch (e) { return { ok: true }; }
@@ -812,6 +840,7 @@ function releaseSession(){
 async function kickUserOut(userName){
   if (!syncOn || !db) { toast('لازم تكون متصل بالإنترنت عشان تطرد مستخدم', 'error'); return false; }
   try {
+    await db.ref(fbRoot() + '/kicks/' + sessionKey(userName)).set(firebase.database.ServerValue.TIMESTAMP);
     await db.ref(fbRoot() + '/sessions/' + sessionKey(userName)).remove();
     toast('✅ اتطرد ' + userName + ' — جهازه هيسجل خروج خلال ثواني', 'success');
     addLog('طرد يدوي: ' + userName);
@@ -1617,7 +1646,9 @@ function processCode(code){
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
-    const bd = fmtCountsBreakdown(done.counts);
+    const cnt = (done.counts && typeof done.counts === 'object') ? done.counts : {};
+    const nCounters = Object.keys(cnt).filter(k => Number(cnt[k]) > 0).length;
+    const bd = nCounters > 1 ? fmtCountsBreakdown(cnt) : '';
     ls.textContent = '✓ ' + done.name + ' — الكمية الآن: ' + fmtQ(qty) + (bd ? ' — ' + bd : (who ? ' — بواسطة: ' + who : ''));
  }
 }
@@ -2752,7 +2783,7 @@ function reportUsers(){
   return Object.keys(set).sort((a,b) => rank(a) - rank(b) || a.localeCompare(b,'ar'));
 }
 const REPORTS = [
-  { id:'full',    name:'تقرير الجرد الكامل',        desc:'كل الأصناف: السيستم والفعلي والفرق والحالة' },
+  { id:'full',    name:'تقرير الجرد الكامل',        desc:'كل الأصناف: جرد الأدمن في عمود واليوزر في عمود، والفرق والحالة' },
   { id:'detail',  name:'تفاصيل الجرد بالمستخدمين',  desc:'على مستوى الصنف: كل مستخدم (أدمن/يوزر) جرد كام قطعة' },
   { id:'byUser',  name:'تقرير نهاية اليوم — بالمستخدمين', desc:'كل مستخدم جرد كام صنف وكام قطعة' },
   { id:'deficit', name:'تقرير العجز',               desc:'الأصناف اللي فعليها أقل من السيستم بس' },
@@ -2838,6 +2869,33 @@ function buildReport(kind){
     const uq = items.reduce((a,i)=>a+(Number(i.counts&&i.counts[repUser])||0),0);
     return Object.assign(base, { title:'تقرير الجرد الكامل — '+repUser, headers, rows,
       foot:['الإجمالي', items.length+' صنف','','', fmtQ(sum('systemQuantity')), fmtQ(uq), fmtQ(sum('actualQuantity')), fmtQ(sum('actualQuantity')-sum('systemQuantity')),'','',''] });
+  }
+
+  if (kind === 'full') {
+    const adminQty = i => {
+      let s = 0; const c = (i.counts && typeof i.counts === 'object') ? i.counts : {};
+      Object.keys(c).forEach(n => { if (getUserRole(n) === 'admin' && Number(c[n]) > 0) s += Number(c[n]); });
+      return s;
+    };
+    const userQty = i => {
+      let s = 0; const c = (i.counts && typeof i.counts === 'object') ? i.counts : {};
+      Object.keys(c).forEach(n => { if (getUserRole(n) !== 'admin' && Number(c[n]) > 0) s += Number(c[n]); });
+      return s;
+    };
+    const headers = ['م','الكود','اسم الصنف','المجموعة','رصيد السيستم','الادمن','اليوزر','الفرق','الحالة'];
+    const rows = items.map(i => {
+      const a = adminQty(i), uq = userQty(i);
+      const diff = (a + uq) - (Number(i.systemQuantity) || 0);
+      return [ i.serial, i.code, i.name, i.group, fmtQ(i.systemQuantity), fmtQ(a), fmtQ(uq), fmtQ(diff), i.status ];
+    });
+    const sumSys = items.reduce((x,i) => x + (Number(i.systemQuantity) || 0), 0);
+    const sumA = items.reduce((x,i) => x + adminQty(i), 0);
+    const sumU = items.reduce((x,i) => x + userQty(i), 0);
+    return Object.assign(base, {
+      title:'تقرير الجرد الكامل',
+      headers, rows,
+      foot:['الإجمالي', items.length + ' صنف', '', '', fmtQ(sumSys), fmtQ(sumA), fmtQ(sumU), fmtQ(sumA + sumU - sumSys), '']
+    });
   }
 
   const titles = { full:'تقرير الجرد الكامل', deficit:'تقرير العجز', surplus:'تقرير الزيادة', uncounted:'تقرير الأصناف اللي مجردتش' };
@@ -3608,10 +3666,16 @@ async function openCameraScanner(){
         Html5QrcodeSupportedFormats.PDF_417, Html5QrcodeSupportedFormats.AZTEC
       ]
  });
-    const cams = await Html5Qrcode.getCameras();
-    const camId = cams && cams.length ? (cams.find(c => /back|rear|environment/i.test(c.label)) || cams[cams.length - 1]).id : undefined;
-
-    const camTarget = camId ? { deviceId: { exact: camId } } : { facingMode: { ideal: 'environment' } };
+    let camTarget;
+    try {
+      const warm = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      try { warm.getTracks().forEach(t => t.stop()); } catch (e) {}
+      const cams = await Html5Qrcode.getCameras();
+      const back = cams && cams.length ? (cams.find(c => /back|rear|environment/i.test(c.label)) || cams[cams.length - 1]) : null;
+      camTarget = back ? { deviceId: { exact: back.id } } : { facingMode: { ideal: 'environment' } };
+    } catch (e) {
+      camTarget = { facingMode: { ideal: 'environment' } };
+    }
 
     const videoConstraints = Object.assign({}, camTarget, {
       width: { ideal: 1920 }, height: { ideal: 1080 },
@@ -3689,8 +3753,12 @@ async function openCameraScanner(){
 
         await startScanner(baseTarget, { fps: camFps, qrbox: camConfig.qrbox, aspectRatio: 1.7778, disableFlip: false, videoConstraints: Object.assign({}, camTarget, { width: { ideal: 1920 }, height: { ideal: 1080 } }) });
  } catch (e2) {
-
+      try {
         await startScanner({ facingMode: { ideal: 'environment' } }, { fps: camFps, qrbox: camConfig.qrbox, aspectRatio: 1.7778, disableFlip: false });
+ } catch (e3) {
+        await new Promise(r => setTimeout(r, 900));
+        await startScanner({ facingMode: { ideal: 'environment' } }, { fps: camFps, qrbox: camConfig.qrbox, aspectRatio: 1.7778, disableFlip: false });
+ }
  }
  }
     qrCamOn = true;
@@ -3763,7 +3831,7 @@ async function openCameraScanner(){
     let msg = 'تعذر فتح الكاميرا — تأكد من السماح بالوصول للكاميرا';
     const name = e && e.name;
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') msg = '🚫 الإذن مرفوض — افتح إعدادات المتصفح وسمح بالوصول للكاميرا لهذا الموقع';
-    else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') msg = 'مفيش كاميرا متاحة على الجهاز ده';
+    else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') msg = 'مفيش كاميرا متاحة دلوقتي — اتأكد إن مفيش تطبيق تاني ماسك الكاميرا وجرّب تاني';
     else if (name === 'NotReadableError' || name === 'TrackStartError') msg = 'الكاميرا مستخدمة في تطبيق تاني دلوقتي — قفله وحاول تاني';
     toast(msg, 'error');
  }

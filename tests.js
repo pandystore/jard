@@ -493,7 +493,7 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
   const prelude4 = [
     "var $ = function(){ return { value: '' }; };",
     "var inventoryData = [",
-    "  { serial: 1, code: 'A1', name: 'صنف 1', group: 'عام', systemQuantity: 5, actualQuantity: 7, difference: 2, status: 'زيادة', isJarded: true, counts: { 'أحمد': 4, 'منى': 3 }, countedBy: 'أحمد', note: '' },",
+    "  { serial: 1, code: 'A1', name: 'صنف 1', group: 'عام', systemQuantity: 5, actualQuantity: 9, difference: 4, status: 'زيادة', isJarded: true, counts: { 'admin': 2, 'أحمد': 4, 'منى': 3 }, countedBy: 'أحمد', note: '' },",
     "  { serial: 2, code: 'A2', name: 'صنف 2', group: 'عام', systemQuantity: 5, actualQuantity: 5, difference: 0, status: 'متساوي', isJarded: true, counts: { 'منى': 5 }, countedBy: 'منى', note: '' },",
     "  { serial: 3, code: 'A3', name: 'صنف 3', group: 'عام', systemQuantity: 5, actualQuantity: 0, difference: -5, status: 'عجز', isJarded: false, counts: {}, countedBy: '', note: '' }",
     "];",
@@ -528,6 +528,17 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
   eq(f1.headers[5], 'جرد منى', 'التقرير الكامل بمستخدم: عمود «جرد منى» مضاف');
   eq(f1.rows.map(r => r[1]).join(','), 'A1,A2', 'الكامل بمستخدم: الأصناف اللي منى جردها');
   eq(f1.rows[0][5], 3, 'الكامل بمستخدم: جرد منى للصنف الأول = 3');
+
+  setRepUser('');
+  const f0 = buildReport('full');
+  eq(JSON.stringify(f0.headers), JSON.stringify(['م','الكود','اسم الصنف','المجموعة','رصيد السيستم','الادمن','اليوزر','الفرق','الحالة']),
+    'التقرير الكامل: عمود للأدمن وعمود لليوزر والفرق');
+  eq(f0.rows.length, 3, 'الكامل: كل الأصناف (حتى اللي مجردش)');
+  eq(f0.rows[0][5] + ',' + f0.rows[0][6], '2,7', 'الكامل: الصنف الأول — الأدمن جرد 2 واليوزرين (4+3) = 7');
+  eq(f0.rows[0][7], 4, 'الكامل: الفرق = (2+7) − رصيد السيستم 5 = 4');
+  eq(f0.rows[1][5] + ',' + f0.rows[1][6] + ',' + f0.rows[1][7], '0,5,0', 'الكامل: الصنف المتساوي — يوزر 5 والفرق 0');
+  eq(f0.rows[2][5] + ',' + f0.rows[2][6] + ',' + f0.rows[2][7], '0,0,-5', 'الكامل: صنف مجردش — أدمن 0 ويوزر 0 والفرق −5');
+  eq(f0.foot[5] + ',' + f0.foot[6] + ',' + f0.foot[7], '2,12,-1', 'الكامل: إجماليات الأعمدة — أدمن 2، يوزر 12، فرق (14−15) = −1');
   setRepUser('');
 }
 

@@ -62,6 +62,13 @@
         }
       },
 
+      "kicks": {
+        "$user": {
+          ".write": "auth != null",
+          ".validate": "newData.val() == null || newData.isNumber()"
+        }
+      },
+
       "probe-test": {
         ".read": "auth != null",
         ".write": "auth != null"
@@ -90,9 +97,6 @@
           ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
         },
         "forceWipe": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "loginRequiredExplicit": {
           ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
         },
 

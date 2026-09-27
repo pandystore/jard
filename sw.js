@@ -1,10 +1,4 @@
-/* بيمبو جرد — Service Worker (jard-v11) — أونلاين فقط، مفيش كاش نهائياً
-   - مفيش أي نسخة من البرنامج بتتخزن على الجهاز (لا كاش ولا localStorage)
-   - من غير نت البرنامج مش هيفتح خالص
-   - موجود بس عشان إشعارات الجرد تفضل شغالة والتبويب مصغّر
-   - نسخة v11 بتمسح كل كاش النسخ القديمة أوتوماتيك أول ما تتفعّل
-*/
-const CACHE = 'jard-v11'; /* الاسم بس عشان مسح القديم — مفيش كتابة عليه */
+const CACHE = 'jard-v11';
 
 let swNotifEnabled = false;
 let swLastTs = Date.now();
@@ -61,14 +55,11 @@ async function pollNotifs(){
   }
 }
 
-/* ⛔ مفيش كاش خالص — البرنامج أونلاين 100% ومايفتحش من غير نت.
-   الـ Service Worker موجود بس عشان إشعارات الجرد تشتغل والتبويب مصغّر،
-   مش عشان يخزّن نسخة من البرنامج على الجهاز. */
 self.addEventListener('install', e => {
   e.waitUntil(self.skipWaiting());
 });
 self.addEventListener('activate', e => {
-  /* نمسح أي كاش قديم من النسخ السابقة — مفيش أي نسخة من البرنامج تفضل على الجهاز */
+
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k.indexOf('jard') === 0).map(k => caches.delete(k))))
@@ -78,7 +69,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  /* على طول من النت — مفيش fallback على الكاش، فلو النت مقطوع البرنامج مش هيفتح */
+
+  try {
+    const u = new URL(req.url);
+    if (u.origin === self.location.origin) {
+      e.respondWith(fetch(req.url, { cache: 'no-store', credentials: 'same-origin' }));
+      return;
+    }
+  } catch (err) {}
   e.respondWith(fetch(req));
 });
 
@@ -93,8 +91,6 @@ self.addEventListener('message', e => {
     if (swNotifEnabled) pollNotifs();
   } else if (d.type === 'JARD_WIPE_CACHE') {
     caches.keys().then(keys=>{ keys.forEach(k=>{ if(k.startsWith('jard-')) caches.delete(k); }); });
-  } else if (d.type === 'JARD_TEST') {
-    self.registration.showNotification('🔔 بيمبو - اختبار', { body: 'الإشعارات شغالة ✅', tag: 'jard-test-'+Date.now() });
   }
 });
 

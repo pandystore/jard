@@ -440,6 +440,183 @@ console.log('== جرد متزامن فعلي: جهازين على نفس الص�
   eq(Object.keys(offDev.queue()).indexOf('10001'), -1, 'الطابور اتفضى بعد ما الكتابة نجحت');
 }
 
+console.log('== فلاتر الحالة وتفصيل الحصص والتقارير بالمستخدم ==');
+{
+  const Module = require('module');
+
+  /* fmtCountsBreakdown — دالة نقية */
+  const m1 = new Module();
+  m1._compile(extractFn('fmtQ') + '\n' + extractFn('fmtCountsBreakdown') + '\nmodule.exports = { fmtCountsBreakdown };', 'bd-extracted.js');
+  const { fmtCountsBreakdown } = m1.exports;
+  eq(fmtCountsBreakdown(null), '', 'تفصيل الحصص: مفيش حصص → فاضي');
+  eq(fmtCountsBreakdown({}), '', 'قايمة حصص فاضية → فاضي');
+  eq(fmtCountsBreakdown({ 'أحمد': 0, 'منى': -2 }), '', 'الحصص الصفرية والسالبة بتتشال من التفصيل');
+  eq(fmtCountsBreakdown({ 'أحمد': 3, 'منى': 2 }), 'أحمد: 3 + منى: 2', 'الحصص بتتجمع "أحمد: 3 + منى: 2"');
+  eq(fmtCountsBreakdown({ 'س': 1.5 }), 'س: 1.5', 'الأرقام العشرية بتتعرض صح في التفصيل');
+
+  /* getFiltered — بفلتر الحالة الجديد «إظهار المتساوي» */
+  const prelude2 = [
+    "var $ = function(){ return { value: '' }; };",
+    "var inventoryData = [",
+    "  { code: 'A1', name: 'صنف متساوي', group: 'عام', status: 'متساوي', isJarded: true, counts: { 'أحمد': 5 } },",
+    "  { code: 'A2', name: 'صنف زيادة', group: 'عام', status: 'زيادة', isJarded: true, counts: { 'أحمد': 2 } },",
+    "  { code: 'A3', name: 'صنف عجز', group: 'عام', status: 'عجز', isJarded: true, counts: { 'منى': 1 } },",
+    "  { code: 'A4', name: 'صنف مجردش', group: 'عام', status: 'عجز', isJarded: false, counts: {} }",
+    "];",
+    "var currentCategory = 'all', currentStatus = 'all', userFilter = '';",
+    "var setStatus = function(s){ currentStatus = s; };"
+  ].join('\n');
+  const m2 = new Module();
+  m2._compile(prelude2 + '\n' + extractFn('getFiltered') + '\nmodule.exports = { getFiltered, setStatus };', 'gf-extracted.js');
+  const { getFiltered, setStatus } = m2.exports;
+  const codes = () => getFiltered().map(i => i.code).join(',');
+  eq(codes(), 'A1,A2,A3,A4', 'فلتر «الكل» بيرجع كل الأصناف');
+  setStatus('equal');
+  eq(codes(), 'A1', 'فلتر «إظهار المتساوي» الجديد بيرجع المتساوي بس');
+  setStatus('hide_equal');
+  eq(codes(), 'A2,A3,A4', '«إخفاء المتساوي» (الافتراضي الجديد) بيشيل المتساوي');
+  setStatus('not_jarded');
+  eq(codes(), 'A4', '«غير مُجرد» زي ما هو شغال');
+
+  /* reportUsers — ترتيب الأدمن ثم المشرف ثم الباقي أبجدي */
+  const prelude3 = [
+    "var inventoryData = [ { code: 'A1', counts: { 'منى': 2 } }, { code: 'A2', counts: { 'أحمد': 1 } } ];",
+    "var usersList = [ { name: 'admin', role: 'admin' }, { name: 'سعيد', role: 'supervisor' }, { name: 'منى' } ];"
+  ].join('\n');
+  const m3 = new Module();
+  m3._compile(prelude3 + '\n' + extractFn('getUserRole') + '\n' + extractFn('reportUsers') + '\nmodule.exports = { reportUsers };', 'ru-extracted.js');
+  const { reportUsers } = m3.exports;
+  eq(JSON.stringify(reportUsers()), JSON.stringify(['admin', 'سعيد', 'أحمد', 'منى']),
+    'أسماء التقارير: الأدمن الأول، المشرف بعده، والباقي أبجدي — حتى اللي جرد من غير حساب');
+
+  /* buildReport — تقرير التفاصيل + التقرير الكامل بمستخدم معيّن */
+  const prelude4 = [
+    "var $ = function(){ return { value: '' }; };",
+    "var inventoryData = [",
+    "  { serial: 1, code: 'A1', name: 'صنف 1', group: 'عام', systemQuantity: 5, actualQuantity: 9, difference: 4, status: 'زيادة', isJarded: true, counts: { 'admin': 2, 'أحمد': 4, 'منى': 3 }, countedBy: 'أحمد', note: '' },",
+    "  { serial: 2, code: 'A2', name: 'صنف 2', group: 'عام', systemQuantity: 5, actualQuantity: 5, difference: 0, status: 'متساوي', isJarded: true, counts: { 'منى': 5 }, countedBy: 'منى', note: '' },",
+    "  { serial: 3, code: 'A3', name: 'صنف 3', group: 'عام', systemQuantity: 5, actualQuantity: 0, difference: -5, status: 'عجز', isJarded: false, counts: {}, countedBy: '', note: '' }",
+    "];",
+    "var usersList = [ { name: 'admin', role: 'admin' }, { name: 'أحمد' } ];",
+    "var repUser = '';",
+    "var setRepUser = function(u){ repUser = u; };"
+  ].join('\n');
+  const m4 = new Module();
+  m4._compile(prelude4 + '\n' +
+    extractFn('fmtQ') + '\n' + extractFn('pad2') + '\n' + extractFn('reportWhen') + '\n' +
+    extractFn('getUserRole') + '\n' + extractFn('reportUsers') + '\n' + extractFn('buildReport') + '\n' +
+    'module.exports = { buildReport, setRepUser };', 'br-extracted.js');
+  const { buildReport, setRepUser } = m4.exports;
+
+  const d1 = buildReport('detail');
+  eq(JSON.stringify(d1.headers), JSON.stringify(['م','الكود','اسم الصنف','المجموعة','رصيد السيستم','admin','أحمد','منى','الإجمالي','الفرق','الحالة']),
+    'تقرير التفاصيل: عمود لكل مستخدم (الأدمن الأول)');
+  eq(d1.rows.length, 2, 'تقرير التفاصيل: الأصناف المجرودة بس (بدون اللي مجردش)');
+  eq(d1.rows[0][6], 4, 'تفاصيل: حصة أحمد في الصنف الأول = 4');
+  eq(d1.rows[0][7], 3, 'تفاصيل: حصة منى في الصنف الأول = 3');
+  eq(d1.foot[7], 8, 'تفاصيل: إجمالي حصص منى (3+5) = 8');
+
+  setRepUser('أحمد');
+  const d2 = buildReport('detail');
+  eq(d2.rows.length, 1, 'تفاصيل بمستخدم: الأصناف اللي هو جردها بس');
+  eq(d2.title.indexOf('— أحمد') !== -1, true, 'تفاصيل بمستخدم: العنوان فيه اسمه');
+  eq(JSON.stringify(d2.headers), JSON.stringify(['م','الكود','اسم الصنف','المجموعة','رصيد السيستم','أحمد','الإجمالي','الفرق','الحالة']),
+    'تفاصيل بمستخدم: عموده هو بس');
+
+  setRepUser('منى');
+  const f1 = buildReport('full');
+  eq(f1.headers[5], 'جرد منى', 'التقرير الكامل بمستخدم: عمود «جرد منى» مضاف');
+  eq(f1.rows.map(r => r[1]).join(','), 'A1,A2', 'الكامل بمستخدم: الأصناف اللي منى جردها');
+  eq(f1.rows[0][5], 3, 'الكامل بمستخدم: جرد منى للصنف الأول = 3');
+
+  setRepUser('');
+  const f0 = buildReport('full');
+  eq(JSON.stringify(f0.headers), JSON.stringify(['م','الكود','اسم الصنف','المجموعة','رصيد السيستم','الادمن','اليوزر','الفرق','الحالة']),
+    'التقرير الكامل: عمود للأدمن وعمود لليوزر والفرق');
+  eq(f0.rows.length, 3, 'الكامل: كل الأصناف (حتى اللي مجردش)');
+  eq(f0.rows[0][5] + ',' + f0.rows[0][6], '2,7', 'الكامل: الصنف الأول — الأدمن جرد 2 واليوزرين (4+3) = 7');
+  eq(f0.rows[0][7], 4, 'الكامل: الفرق = (2+7) − رصيد السيستم 5 = 4');
+  eq(f0.rows[1][5] + ',' + f0.rows[1][6] + ',' + f0.rows[1][7], '0,5,0', 'الكامل: الصنف المتساوي — يوزر 5 والفرق 0');
+  eq(f0.rows[2][5] + ',' + f0.rows[2][6] + ',' + f0.rows[2][7], '0,0,-5', 'الكامل: صنف مجردش — أدمن 0 ويوزر 0 والفرق −5');
+  eq(f0.foot[5] + ',' + f0.foot[6] + ',' + f0.foot[7], '2,12,-1', 'الكامل: إجماليات الأعمدة — أدمن 2، يوزر 12، فرق (14−15) = −1');
+  setRepUser('');
+}
+
+console.log('== هوية الأدمن الحقيقية على Firebase (القواعد المقفولة) ==');
+{
+  /* realAdminAuthOk و dropRealAdminAuth بيتشالوا من app.js زي ما هما
+     ويتشغلوا مع نسخة مزيّفة من firebase — عشان نثبت سلوك الهوية
+     من غير سيرفر حقيقي. المشكلة الأصلية اللي الاتيارات دي بتقفلها:
+     connectFirebase كان بيدخل مجهول بدري كفاية إنه يرمي جلسة الأدمن
+     المحفوظة، فالسيرفر كان بيرفض إضافة المستخدمين رغم إن الأدمن نفسه بيكتب */
+  const prelude = [
+    'var adminAuthEmail = function(){ return "admin@jard.local"; };',
+    'var firebase = null;',
+    'var setFirebase = function(f){ firebase = f; };'
+  ].join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(prelude + '\n' + extractFn('realAdminAuthOk') + '\n' + extractFn('dropRealAdminAuth') +
+    '\nmodule.exports = { realAdminAuthOk: realAdminAuthOk, dropRealAdminAuth: dropRealAdminAuth, setFirebase: setFirebase };',
+    'adminauth-extracted.js');
+  const { realAdminAuthOk, dropRealAdminAuth, setFirebase } = m.exports;
+
+  /* نسخة مزيّفة من firebase: مستخدم ثابت + عدّاد للعمليات */
+  const mk = user => {
+    const calls = { signOut: 0, anon: 0 };
+    const thens = [];
+    const fb = {
+      auth: () => ({
+        currentUser: user,
+        signOut: () => { calls.signOut++; return { then: fn => { thens.push(fn); return { catch: () => {} }; } }; },
+        signInAnonymously: () => { calls.anon++; return { then: () => ({ catch: () => {} }) }; }
+      })
+    };
+    return { fb, calls, thens };
+  };
+
+  setFirebase(null);
+  eq(realAdminAuthOk(), false, 'من غير Firebase (وضع محلي) → مش هوية أدمن');
+  setFirebase(mk(null).fb);
+  eq(realAdminAuthOk(), false, 'مفيش مستخدم داخل → مش هوية أدمن');
+  const anon = mk({ isAnonymous: true });
+  setFirebase(anon.fb);
+  eq(realAdminAuthOk(), false, 'هوية مجهولة → مش الأدمن الحقيقي (دي اللي كانت بتترفض كتاباتها الإدارية)');
+  setFirebase(mk({ isAnonymous: false, email: 'mona@example.com' }).fb);
+  eq(realAdminAuthOk(), false, 'حساب بريد تاني → مش الأدمن');
+  const adm = mk({ isAnonymous: false, email: 'admin@jard.local' });
+  setFirebase(adm.fb);
+  eq(realAdminAuthOk(), true, 'جلسة الأدمن الحقيقية المحفوظة (بريده الثابت) → أدمن');
+
+  /* تسليم الجهاز عند الخروج */
+  setFirebase(adm.fb);
+  dropRealAdminAuth();
+  eq(adm.calls.signOut, 1, 'الخروج بيسلّم هوية الأدمن الحقيقية (signOut)');
+  eq(adm.calls.anon, 0, 'لسه — الرجوع مجهول بيحصل بعد ما signOut يخلص');
+  adm.thens.forEach(fn => fn()); /* ننفّذ الـ then يدوياً زي ما Promise حقيقي هيعمل */
+  eq(adm.calls.anon, 1, 'وبعده الجهاز بيرجع مجهول — يفضل شغال للمستخدم الجاي من غير صلاحيات أدمن');
+  setFirebase(anon.fb);
+  dropRealAdminAuth();
+  eq(anon.calls.signOut, 0, 'جهاز مستخدم عادي (مجهول) → الخروج ما بيلمسش الهوية');
+  setFirebase(null);
+  dropRealAdminAuth();
+  eq(true, true, 'من غير Firebase الخروج العادي ما بيكسرش حاجة');
+
+  /* حارس رجوعي على سلوك الاتصال والدفع — من نص الدوال الحقيقية في app.js */
+  const cfSrc = extractFn('connectFirebase');
+  const iWait = cfSrc.indexOf('onAuthStateChanged');
+  const iAnon = cfSrc.indexOf('signInAnonymously');
+  eq(iWait !== -1 && iAnon !== -1 && iWait < iAnon, true,
+    'connectFirebase بيستنى استرجاع الجلسة المحفوظة قبل أي دخول مجهول (إصلاح رمي هوية الأدمن)');
+  const pmSrc = extractFn('pushMeta');
+  eq(pmSrc.indexOf('realAdminAuthOk()') !== -1, true, 'المفاتيح الحساسة بتتبعت بس من جهاز ماسك هوية الأدمن الحقيقية');
+  eq(pmSrc.indexOf('isElevated()') === -1, true, 'المشرف مش بيبعت المفاتيح الحساسة — السيرفر كان هيرفض الكتابة كلها');
+  eq((extractFn('tryLogin').match(/adminAuthedLive = true/g) || []).length, 1,
+    'دخول مستخدم من القايمة (حتى لو صلاحيته أدمن) مش بيدّعي صلاحية الأدمن الحقيقية — دي بكلمة المرور الرئيسية بس');
+  eq(extractFn('logoutUser').indexOf('dropRealAdminAuth') !== -1, true, 'الخروج اليدوي بيسلّم هوية الأدمن');
+  eq(extractFn('autoLogout').indexOf('dropRealAdminAuth') !== -1, true, 'والخروج التلقائي للخمول بيسلّمها كمان');
+}
+
 console.log('== تشفير كلمات المرور (salt) ==');
 {
   /* الدوال دي async، فمش هنقدر نستخدم extractFn العادية (بتقص كلمة async) —

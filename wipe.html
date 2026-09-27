@@ -13,7 +13,7 @@ input[type=password],input[type=text]{width:100%; box-sizing:border-box; padding
 pre{font-size:.7rem; text-align:left; direction:ltr; background:#f1f5f9; padding:.5rem; border-radius:.5rem; overflow:auto}
 .warn{font-size:.72rem;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;padding:.5rem;margin-top:.5rem;font-weight:700}
 </style>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://jard-86baf-default-rtdb.firebaseio.com https://identitytoolkit.googleapis.com; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://*.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; connect-src https://jard-86baf-default-rtdb.firebaseio.com https://identitytoolkit.googleapis.com; frame-src 'self';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://jard-86baf-default-rtdb.firebaseio.com https://identitytoolkit.googleapis.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src https://jard-86baf-default-rtdb.firebaseio.com https://identitytoolkit.googleapis.com; frame-src 'self';">
 </head>
 <body>
 <div class="card">
@@ -28,7 +28,7 @@ pre{font-size:.7rem; text-align:left; direction:ltr; background:#f1f5f9; padding
 <button class="ok" onclick="location.href='./'">↩️ رجوع للبرنامج</button>
 </div>
 <script>
-/* نسخة الملف: 4 — 2026-09-08 — دخول مجهول للقراءة/التحقق، ودخول حقيقي بحساب الأدمن (نفس اللي البرنامج بيعمله تلقائياً) قبل أي مسح فعلي */
+
 const DB_URL = 'https://jard-86baf-default-rtdb.firebaseio.com/jard';
 const API_KEY = 'AIzaSyA2edDs93CZ6_3_oQeLaklmPDNkMg_YfF8';
 const PROJECT_ID = 'jard-86baf';
@@ -39,8 +39,6 @@ const btn = document.getElementById('wipeBtn');
 const lockWarn = document.getElementById('lockWarn');
 function log(t){ logEl.textContent += '\n' + t; console.log(t); }
 
-/* تحذير لو الصفحة اتفتحت من غير جلسة أدمن سابقة في نفس التبويب —
-   طبقة إضافية بسيطة، مش بديل عن الباسورد */
 try {
   const su = sessionStorage.getItem('jard::sessionUser');
   let isAdminSession = false;
@@ -48,7 +46,6 @@ try {
   if (!isAdminSession) document.getElementById('noSessionWarn').style.display = 'block';
 } catch(e){}
 
-/* دخول مجهول عن طريق REST — كافي للقراءة والتحقق من الباسورد بس، مش للمسح نفسه */
 let anonToken = null;
 async function signInAnon(){
   const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(API_KEY), {
@@ -58,8 +55,7 @@ async function signInAnon(){
   const j = await r.json();
   anonToken = j.idToken;
 }
-/* دخول حقيقي بحساب الأدمن — نفس الحساب اللي البرنامج بيعمله تلقائياً أول مرة تكتب الباسورد فيه.
-   ده اللي القواعد الجديدة فعلياً بتوثق بيه إنك الأدمن الحقيقي، مش مجرد حد داخل مجهول */
+
 async function signInAsAdmin(password){
   const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -96,7 +92,6 @@ async function hashPass(p){
   return 'fb' + h.toString(16);
 }
 
-/* Rate limiting بسيط: بعد 5 محاولات غلط، قفل مؤقت متزايد (30 ثانية، بعدين دقيقة، إلخ) */
 let failCount = 0;
 let lockedUntil = 0;
 function isLocked(){
@@ -110,17 +105,16 @@ function isLocked(){
   return false;
 }
 
-/* منع سباق الطلبات: كل نداء ليه رقم، وبس آخر نداء هو اللي يقدر يحدّث الزرار */
 let checkToken = 0;
 let checkTimer = null;
-let lastVerifiedHash = null; /* آخر باسورد اتأكد إنه صح فعلياً */
+let lastVerifiedHash = null;
 function checkPass(){
   clearTimeout(checkTimer);
   btn.disabled = true;
   lastVerifiedHash = null;
   if (isLocked()) return;
   if (!anonToken) return;
-  checkTimer = setTimeout(doCheck, 350); /* debounce */
+  checkTimer = setTimeout(doCheck, 350);
 }
 async function doCheck(){
   const myToken = ++checkToken;
@@ -137,7 +131,7 @@ async function doCheck(){
   const h = await hashPass(p);
   const DEFAULT_HASH = await hashPass('123456');
   const ok = remoteHash ? (h === remoteHash) : (h === DEFAULT_HASH);
-  if (myToken !== checkToken) return; /* فيه نداء أحدث لسه شغال، اتجاهل النتيجة القديمة دي */
+  if (myToken !== checkToken) return;
   btn.disabled = !ok;
   lastVerifiedHash = ok ? h : null;
 }
@@ -146,7 +140,7 @@ pwEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !btn.disabled) 
 
 document.getElementById('wipeBtn').onclick = async ()=>{
   if (isLocked()) return;
-  // إعادة تحقق فعلية من الباسورد الحالي وقت الضغط — مش الاعتماد على disabled القديمة بس
+
   const currentHash = await hashPass(pwEl.value || '');
   if (!lastVerifiedHash || currentHash !== lastVerifiedHash) {
     failCount++;
@@ -158,14 +152,13 @@ document.getElementById('wipeBtn').onclick = async ()=>{
     }
     return;
   }
-  // تأكيد مكتوب بدل confirm() سهل التجاوز من الـ Console
+
   const typed = prompt('اكتب كلمة "مسح" بالظبط عشان تأكد إنك عايز تمسح كل البيانات نهائياً:');
   if (typed !== 'مسح') { log('اتلغى — الكلمة مش مطابقة'); return; }
   const whoDid = prompt('اكتب اسمك (للتسجيل في سجل التتبع):') || 'غير معروف';
 
   btn.disabled = true;
-  /* لازم نسجّل دخول بحساب الأدمن الحقيقي دلوقتي — القواعد الجديدة مش هتقبل مسح كامل
-     من دخول مجهول، حتى لو الباسورد المكتوب صح، لأنها بتتأكد من هوية Firebase نفسها */
+
   let adminToken;
   try {
     log('جاري تأكيد هويتك كأدمن حقيقي...');
@@ -181,7 +174,7 @@ document.getElementById('wipeBtn').onclick = async ()=>{
   }
   log('جاري عمل نسخة احتياطية قبل المسح...');
   try {
-    // نسخة احتياطية تلقائية قبل أي مسح — عشان البيانات ما تضيعش نهائي بلا رجعة
+
     const backupRes = await fetch(withAuth('/items.json', adminToken), { cache: 'no-store' });
     const backupData = await backupRes.json();
     if (backupData) {
@@ -212,7 +205,7 @@ document.getElementById('wipeBtn').onclick = async ()=>{
     log('ختم المسح (rev): ' + r.status);
     r = await fetch(withAuth('/meta/lastWipe.json', adminToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
     log('ختم المسح (ts): ' + r.status);
-    // تسجيل مين عمل المسح — سجل تدقيق بسيط
+
     r = await fetch(withAuth('/meta/lastWipeBy.json', adminToken), { method: 'PUT', body: JSON.stringify(whoDid + ' — ' + new Date(wipeTs).toLocaleString('ar-EG')) });
     log('تسجيل المسؤول: ' + r.status);
   } catch(e){ log('❌ خطأ في كتابة ختم المسح: ' + e.message); anyFail = true; }
@@ -227,7 +220,6 @@ document.getElementById('wipeBtn').onclick = async ()=>{
   }
 };
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33bb3818edf4329',t:'MTc4ODE3NTgwNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
-<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a37d25f33932e242',t:'MTc4ODg2MjA2Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+</body>
 </html>

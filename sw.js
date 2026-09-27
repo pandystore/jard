@@ -79,6 +79,15 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   /* على طول من النت — مفيش fallback على الكاش، فلو النت مقطوع البرنامج مش هيفتح */
+  /* ملفات البرنامج نفسها (app.js/index.html/...) بتيجي دايمًا بـ no-store —
+     عشان المتصفح/البروكسي مايخدمكش نسخة قديمة بعد أي رفع جديد */
+  try {
+    const u = new URL(req.url);
+    if (u.origin === self.location.origin) {
+      e.respondWith(fetch(req.url, { cache: 'no-store', credentials: 'same-origin' }));
+      return;
+    }
+  } catch (err) {}
   e.respondWith(fetch(req));
 });
 

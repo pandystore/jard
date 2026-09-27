@@ -150,7 +150,8 @@ function S(k){ return k; }
 
 let inventoryData = []; /* يبدأ فاضي - البيانات من Firebase فقط */
 let currentCategory = 'all';
-let currentStatus = 'all';
+/* المتساوي بيتخفى تلقائياً افتراضياً — تقدر تظهره من فلتر «الكل» أو «إظهار المتساوي» */
+let currentStatus = 'hide_equal';
 let workbookData = null, sheetNames = [], isCsvSource = false, csvRows = [];
 let selectedSerials = new Set();
 let logBook = JSON.parse(store.getItem(S('logBook')) || '[]');
@@ -166,7 +167,7 @@ let setupDone = false;
 let userFilter = '';
 let qrScanner = null, qrScanCount = 0, qrCamOn = false;
 /* ⏱️ المهلة بين المسحة والتانية — عشان الجهاز مايسجلش نفس الحاجة مرتين.
-   الكاميرا: 4 ثوانى كاملة بين كل مسحة والتانية (مش ورا بعض بسرعة).
+   الكاميرا: ثانيتين بين كل مسحة والتانية.
    الباركود العادى: ثانية وربع. */
 const CAM_DEDUPE_MS  = 2000;
 const SCAN_DEDUPE_MS = 1200;
@@ -637,7 +638,9 @@ async function ensureFirebaseAdminAuth(password){
   if (!syncOn || !db || typeof firebase === 'undefined' || !firebase.auth) return false;
   const email = adminAuthEmail();
   try {
-    await firebase.auth().signInWithEmailAndPassword(email, password);
+    const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+    /* ⚠️ نتأكد إن adminUid متسجل حتى لو الحساب موجود من زمان — بيصلّح نفسه */
+    try { await db.ref(fbPath() + '/meta/adminUid').transaction(cur => cur == null ? cred.user.uid : cur); } catch (e3) {}
     return true;
  } catch (e) {
     if (e && e.code === 'auth/user-not-found') {
@@ -653,8 +656,44 @@ async function ensureFirebaseAdminAuth(password){
         return false;
  }
  }
+    if (e && (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential')) {
+      toast('⚠️ هوية الأدمن على Firebase باسوردها مختلف عن باسورد البرنامج.\nمن الإعدادات اضغط «إصلاح هوية الأدمن» عشان تظبطها.', 'error', { life: 20000 });
+    }
     return false;
  }
+}
+/* 🔧 تشخيص وإصلاح هوية الأدمن على Firebase — لما إضافة المستخدمين بترفض
+   من السيرفر: بيوريك الهوية الحالية والـ uid المسجّل، ولو مش متطابقين
+   بيدخلك بباسورد admin ويسجّل هويتك الحقيقية */
+async function repairAdminIdentity(){
+  if (needAdmin()) return;
+  if (!syncOn || !db || typeof firebase === 'undefined' || !firebase.auth) { toast('لازم تكون متصل بالإنترنت', 'error'); return; }
+  const cu = firebase.auth().currentUser;
+  let storedUid = null;
+  try { storedUid = (await db.ref(fbPath() + '/meta/adminUid').get()).val(); } catch (e) {}
+  const lines = [
+    'هوية Firebase الحالية: <b>' + (cu ? (cu.isAnonymous ? 'مجهولة (مش أدمن)' : esc(cu.email || '')) : 'مفيش') + '</b>',
+    'الـ uid الحالي: <b>' + (cu ? cu.uid.slice(0,12) + '…' : '—') + '</b>',
+    'الـ uid المسجّل كأدمن: <b>' + (storedUid ? storedUid.slice(0,12) + '…' : 'لسه متسجلش') + '</b>',
+    (cu && !cu.isAnonymous && storedUid === cu.uid)
+      ? '<div style="color:#15803d;font-weight:800">✅ تمام — إنت الأدمن المسجّل، الكتابات الإدارية هتشتغل</div>'
+      : '<div style="color:#b91c1c;font-weight:800">⚠️ مش متطابقين — اضغط «صلّح» وادخل باسورد admin</div>'
+  ];
+  const fix = await new Promise(res => {
+    showModal('هوية الأدمن على Firebase', '<div style="font-size:.9rem;color:#475569;line-height:2.1">' + lines.join('<br>') + '</div>', [
+      { label: '🔧 صلّح', kind: 'primary', onClick: () => res(true) },
+      { label: 'إلغاء', kind: 'ghost', onClick: () => res(false) }
+    ], () => res(false));
+  });
+  if (!fix) return;
+  const pw = await inputDlg('باسورد admin', 'اكتب كلمة مرور admin الحالية', true);
+  if (pw === null) return;
+  const ok = await ensureFirebaseAdminAuth(pw);
+  const cu2 = firebase.auth().currentUser;
+  let uid2 = null;
+  try { uid2 = (await db.ref(fbPath() + '/meta/adminUid').get()).val(); } catch (e) {}
+  if (ok && cu2 && uid2 === cu2.uid) { toast('✅ اتصلحت — جرّب تضيف المستخدم تاني', 'success', { life: 12000 }); addLog('🔧 إصلاح هوية الأدمن'); pushMeta(true); }
+  else { toast('⛔ لسه مش مظبوطة.\nلو الرسالة «wrong-password» → Firebase Console ← Authentication ← Users ← امسح الحساب ' + adminAuthEmail() + ' وبعدين «صلّح» تاني.', 'error', { life: 30000 }); }
 }
 async function ensureAdmin(){
   if (!adminHash) {
@@ -1139,6 +1178,19 @@ function detachNotifListener(){
 
 
 /* ---------- تعديل مستخدم: الاسم أو كلمة المرور ---------- */
+/* 🛡️ فحص حقيقي على السيرفر: المستخدم اتضاف فعلًا ولا لسه؟
+   بنستخدمها بعد إضافة مستخدم عشان نقول للأدمن الحقيقة — مش "تمت الإضافة"
+   وهي محفوظة عند هو بس على جهازه */
+async function verifyUserOnServer(name){
+  if (!syncOn || !db) return false;
+  try {
+    const snap = await db.ref(fbPath() + '/meta/users').get();
+    const rv = snap.val();
+    if (!rv) return false;
+    const arr = Array.isArray(rv) ? rv : Object.values(rv);
+    return arr.some(u => u && u.name === name);
+  } catch (e) { return false; }
+}
 async function editUser(i){
   const u = usersList[i];
   if (!u) return;
@@ -1383,6 +1435,7 @@ function getFiltered(){
     if (currentStatus === 'زيادة') st = i.status === 'زيادة';
     else if (currentStatus === 'عجز') st = i.status === 'عجز';
     else if (currentStatus === 'hide_equal') st = i.status !== 'متساوي';
+    else if (currentStatus === 'equal') st = i.status === 'متساوي';
     else if (currentStatus === 'not_jarded') st = !i.isJarded;
     return ms && mc && st;
  });
@@ -1599,7 +1652,7 @@ function setStatusFilter(s){
   currentStatus = s;
   resetPage();
   document.querySelectorAll('.filter-toolbar .filter-btn').forEach(b => b.classList.remove('active'));
-  const map = { 'all': 'status-all', 'زيادة': 'status-plus', 'عجز': 'status-minus', 'hide_equal': 'status-ne', 'not_jarded': 'status-nj' };
+  const map = { 'all': 'status-all', 'زيادة': 'status-plus', 'عجز': 'status-minus', 'equal': 'status-eq', 'hide_equal': 'status-ne', 'not_jarded': 'status-nj' };
   const el = $(map[s]); if (el) el.classList.add('active');
   document.querySelectorAll('#categoryButtonsContainer .filter-btn').forEach(b => { if (b.dataset.cat === currentCategory) b.classList.add('active'); });
   updateTable();
@@ -1692,6 +1745,14 @@ function eanOk(code){
   return (10 - (s % 10)) % 10 === chk;
 }
 
+/* تفصيل الحصص: "أحمد: 3 + منى: 2" — يظهر آخر مسحة عشان تعرف مين جرد إيه
+   في الصنف ده من غير ما تفتح التقارير */
+function fmtCountsBreakdown(counts){
+  if (!counts || typeof counts !== 'object') return '';
+  const keys = Object.keys(counts).filter(k => Number(counts[k]) > 0);
+  if (!keys.length) return '';
+  return keys.map(k => k + ': ' + fmtQ(counts[k])).join(' + ');
+}
 let lastScanCode = '', lastScanTime = 0;
 function processCode(code){
   code = sanitizeCode(code);
@@ -1760,7 +1821,8 @@ function processCode(code){
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
-    ls.textContent = '✓ ' + done.name + ' — الكمية الآن: ' + fmtQ(qty) + (who ? ' — بواسطة: ' + who : '');
+    const bd = fmtCountsBreakdown(done.counts);
+    ls.textContent = '✓ ' + done.name + ' — الكمية الآن: ' + fmtQ(qty) + (bd ? ' — ' + bd : (who ? ' — بواسطة: ' + who : ''));
  }
 }
 
@@ -2397,7 +2459,14 @@ function pushMeta(withUsers){
         if (v) lastUsersRev = v;
  }).catch(() => {});
  }
- }).catch(e => { lastSyncErr = e.message || String(e); });
+ }).catch(e => {
+    lastSyncErr = (e && e.message) ? e.message : String(e);
+    if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
+      toast('⛔ السيرفر رفض حفظ ' + (withUsers ? 'المستخدمين' : 'الإعدادات') + ' — هوية الأدمن على Firebase مش متسجلة.\nالحل: حمّل الصفحة وسجّل دخول بـ admin تاني.', 'error', { life: 20000 });
+      addLog('⛔ رفض من السيرفر عند حفظ meta: ' + lastSyncErr);
+    }
+    return false;
+ }).then(ok => ok !== false);
 }
 /* الـ meta (مستخدمين/لوجو/إعدادات) بيتزامن على الجذر — كل الأجهزة بتشوف نفس النسخة */
 
@@ -2972,8 +3041,20 @@ function downloadBlob(blob, name){
 /* ================= التقارير (PDF + إكسيل) =================
    كل التقارير بتتبنى من دالة واحدة (buildReport) عشان PDF وإكسيل يطلعوا نفس الأرقام بالظبط.
    التقرير نفسه بيتحسب من البيانات الحالية — مفيش أي نسخ مخزّنة ممكن تختلف. */
+/* فلتر التقارير بمستخدم معيّن — فاضي = الكل */
+let repUser = '';
+/* كل الأسماء اللي ليها جرد (حصص على الأصناف) + مستخدمين القايمة —
+   مرتّبين: الأدمن الأول، بعدين المشرف، بعدين الباقي أبجدي */
+function reportUsers(){
+  const set = {};
+  inventoryData.forEach(i => { if (i.counts && typeof i.counts === 'object') Object.keys(i.counts).forEach(u => { set[u] = 1; }); });
+  usersList.forEach(u => { if (u && u.name) set[u.name] = set[u.name] || 1; });
+  const rank = n => getUserRole(n) === 'admin' ? 0 : getUserRole(n) === 'supervisor' ? 1 : 2;
+  return Object.keys(set).sort((a,b) => rank(a) - rank(b) || a.localeCompare(b,'ar'));
+}
 const REPORTS = [
   { id:'full',    name:'تقرير الجرد الكامل',        desc:'كل الأصناف: السيستم والفعلي والفرق والحالة' },
+  { id:'detail',  name:'تفاصيل الجرد بالمستخدمين',  desc:'على مستوى الصنف: كل مستخدم (أدمن/يوزر) جرد كام قطعة' },
   { id:'byUser',  name:'تقرير نهاية اليوم — بالمستخدمين', desc:'كل مستخدم جرد كام صنف وكام قطعة' },
   { id:'deficit', name:'تقرير العجز',               desc:'الأصناف اللي فعليها أقل من السيستم بس' },
   { id:'surplus', name:'تقرير الزيادة',             desc:'الأصناف اللي فعليها أكتر من السيستم بس' },
@@ -3011,7 +3092,8 @@ function buildReport(kind){
         per[u].items++; per[u].qty += Number(it.actualQuantity) || 0;
       }
     });
-    const names = Object.keys(per).sort((a,b) => per[b].qty - per[a].qty);
+    let names = Object.keys(per).sort((a,b) => per[b].qty - per[a].qty);
+    if (repUser) names = names.filter(u => u === repUser);
     const rows = names.map((u,i) => [i+1, u, getUserRole(u) === 'admin' ? 'مسؤول' : getUserRole(u) === 'supervisor' ? 'مشرف' : 'مستخدم', per[u].items, fmtQ(per[u].qty)]);
     const ti = names.reduce((a,u) => a + per[u].items, 0);
     const tq = names.reduce((a,u) => a + per[u].qty, 0);
@@ -3022,12 +3104,46 @@ function buildReport(kind){
     });
   }
 
+  /* تقرير التفاصيل: صف لكل صنف، وعمود لكل مستخدم — مين جرد كام قطعة بالظبط */
+  if (kind === 'detail') {
+    const allUsers = reportUsers();
+    const shownUsers = repUser ? allUsers.filter(u => u === repUser) : allUsers;
+    let items = inventoryData.filter(i => i.isJarded && i.counts && Object.keys(i.counts).length);
+    if (repUser) items = items.filter(i => Number(i.counts[repUser]) > 0);
+    const uQty = (i,u) => Number(i.counts && i.counts[u]) || 0;
+    const headers = ['م','الكود','اسم الصنف','المجموعة','رصيد السيستم'].concat(shownUsers).concat(['الإجمالي','الفرق','الحالة']);
+    const rows = items.map((i,idx) => {
+      const row = [idx+1, i.code, i.name, i.group, fmtQ(i.systemQuantity)];
+      shownUsers.forEach(u => row.push(fmtQ(uQty(i,u))));
+      row.push(fmtQ(i.actualQuantity), fmtQ(i.difference), i.status);
+      return row;
+    });
+    const sumSys = items.reduce((a,i)=>a+(Number(i.systemQuantity)||0),0);
+    const sumAct = items.reduce((a,i)=>a+(Number(i.actualQuantity)||0),0);
+    const foot = ['الإجمالي', items.length + ' صنف','','', fmtQ(sumSys)];
+    shownUsers.forEach(u => foot.push(fmtQ(items.reduce((a,i)=>a+uQty(i,u),0))));
+    foot.push(fmtQ(sumAct), fmtQ(sumAct-sumSys), '');
+    return Object.assign(base, { title:'تفاصيل الجرد بالمستخدمين' + (repUser ? ' — ' + repUser : ''), headers, rows, foot });
+  }
+
   /* التقارير اللي بتعرض أصناف */
   let items;
   if (kind === 'deficit')        items = inventoryData.filter(i => i.difference < 0);
   else if (kind === 'surplus')   items = inventoryData.filter(i => i.difference > 0);
   else if (kind === 'uncounted') items = inventoryData.filter(i => !i.isJarded || !(Number(i.actualQuantity) > 0));
   else                           items = inventoryData.slice();
+
+  /* فلتر بمستخدم؟ الأصناف اللي هو جردها بس (غير المجرّد مش ليه حصص أصلًا) */
+  if (repUser && kind !== 'uncounted') items = items.filter(i => Number(i.counts && i.counts[repUser]) > 0);
+  /* التقرير الكامل بمستخدم معيّن → عمود إضافي «جرد فلان» جنب الإجمالي */
+  if (kind === 'full' && repUser) {
+    const headers = ['م','الكود','اسم الصنف','المجموعة','السيستم','جرد '+repUser,'الإجمالي','الفرق','الحالة','بواسطة','ملاحظات'];
+    const rows = items.map(i => [ i.serial, i.code, i.name, i.group, fmtQ(i.systemQuantity), fmtQ(Number(i.counts&&i.counts[repUser])||0), fmtQ(i.actualQuantity), fmtQ(i.difference), i.status, i.countedBy||'—', i.note||'' ]);
+    const sum = f => items.reduce((a,i)=>a+(Number(i[f])||0),0);
+    const uq = items.reduce((a,i)=>a+(Number(i.counts&&i.counts[repUser])||0),0);
+    return Object.assign(base, { title:'تقرير الجرد الكامل — '+repUser, headers, rows,
+      foot:['الإجمالي', items.length+' صنف','','', fmtQ(sum('systemQuantity')), fmtQ(uq), fmtQ(sum('actualQuantity')), fmtQ(sum('actualQuantity')-sum('systemQuantity')),'','',''] });
+  }
 
   const titles = { full:'تقرير الجرد الكامل', deficit:'تقرير العجز', surplus:'تقرير الزيادة', uncounted:'تقرير الأصناف اللي مجردتش' };
   const rows = items.map(i => [
@@ -3141,10 +3257,21 @@ function openReports(){
       '</div>' +
     '</div>'
   ).join('');
-  const body = '<div class="hint" style="font-size:.8rem;margin-bottom:.6rem">كل التقارير بتتحسب من البيانات الحالية على طول. PDF بيفتح نافذة الطباعة — اختار منها «حفظ كـ PDF».</div>' + cards;
+  const opts = ['<option value=""' + (repUser ? '' : ' selected') + '>الكل (كل المستخدمين)</option>']
+    .concat(usersList.filter(u => u && u.name).map(u =>
+      '<option value="' + esc(u.name) + '"' + (repUser === u.name ? ' selected' : '') + '>' + esc(u.name) + (getUserRole(u.name) === 'admin' ? ' (أدمن)' : '') + '</option>'))
+    .join('');
+  const body =
+    '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap">' +
+      '<label style="font-weight:700;font-size:.85rem">👤 المسؤول عن الجرد:</label>' +
+      '<select id="repUserSel" class="inp" style="flex:1;min-width:140px">' + opts + '</select>' +
+    '</div>' +
+    '<div class="hint" style="font-size:.8rem;margin-bottom:.6rem">كل التقارير بتتحسب من البيانات الحالية على طول. اختار المستخدم عشان تشوف جرد إيه بالظبط قبل ما تصدّر.</div>' + cards;
   showModal('التقارير', body, [{ label:'إغلاق', kind:'ghost' }]);
   const ov = document.querySelector('.modal-overlay:last-of-type');
   if (!ov) return;
+  const sel = ov.querySelector('#repUserSel');
+  if (sel) sel.addEventListener('change', () => { repUser = sel.value; });
   ov.addEventListener('click', e => {
     const pdf = e.target.closest('[data-rep-pdf]');
     const xls = e.target.closest('[data-rep-xls]');
@@ -3534,7 +3661,8 @@ async function openSettings(){
     '<button class="mbtn ghost" id="chgLogoBtn" style="flex:0;padding:.45rem .7rem">تغيير</button>' +
     '<button class="mbtn ghost" id="rstLogoBtn" style="flex:0;padding:.45rem .7rem">↩️</button>' +
     '</div>' +
-    '<div class="modal-foot"><button class="mbtn ghost" id="chgPass">🔑 تغيير كلمة مرور admin</button></div>' +
+    '<div class="modal-foot" style="flex-wrap:wrap"><button class="mbtn ghost" id="chgPass">🔑 تغيير كلمة مرور admin</button>' +
+    '<button class="mbtn ghost" id="fixIdBtn" title="لو إضافة المستخدمين بترفض">🔧 إصلاح هوية الأدمن</button></div>' +
     '<div class="sec-title" style="margin-top:.9rem">🕘 السجل</div>' +
     '<div class="modal-foot" style="flex-wrap:wrap;margin-top:.2rem">' +
     '<button class="mbtn ghost" id="logBtn">🕘 عرض السجل</button></div>' +
@@ -3632,12 +3760,21 @@ async function openSettings(){
  }
     usersList.push({ name, hash: await hashPass(pass), role });
     store.setItem(S('usersList'), JSON.stringify(usersList));
-    pushMeta(true);
     m.body.querySelector('#newUserName').value = '';
     m.body.querySelector('#newUserPass').value = '';
-    addLog('إضافة مستخدم: ' + name);
-    toast('تمت إضافة ' + name + ' — يقدر يدخل بيها من أي جهاز', 'success');
     renderUsers();
+    /* 🛡️ مش "تمت الإضافة" وخلاص — بنتأكد فعلًا إن السيرفر قبلها،
+       لأن لو الهوية مش مسجلة السيرفر بيرفض وهيفضل عند الأدمن بس محليًا */
+    toast('⏳ بحفظ ' + name + ' على السيرفر...', 'info');
+    const okPush = await pushMeta(true);
+    const onServer = await verifyUserOnServer(name);
+    if (okPush && onServer) {
+      addLog('إضافة مستخدم: ' + name);
+      toast('✅ تمت إضافة ' + name + ' — موجود على السيرفر ويقدر يدخل من أي جهاز', 'success', { life: 12000 });
+    } else {
+      addLog('⛔ فشل حفظ المستخدم على السيرفر: ' + name);
+      toast('⛔ ' + name + ' ماتحفظش على السيرفر — هيظهر عندك إنت بس.\nالسبب غالباً: هوية الأدمن على Firebase مش متسجلة. حمّل الصفحة وسجّل دخول بـ admin تاني.', 'error', { life: 25000 });
+    }
  };
 
   /* ---------- اللوجو ---------- */
@@ -3724,6 +3861,8 @@ async function openSettings(){
     store.setItem('soundOn', soundOn ? '1' : '0');
     if (soundOn) beep('ok');
  };
+  const fixBtn = m.body.querySelector('#fixIdBtn');
+  if (fixBtn) fixBtn.onclick = async () => { m.close(); await repairAdminIdentity(); };
   m.body.querySelector('#chgPass').onclick = async () => {
     let old = '';
     if (adminHash) {
@@ -3865,7 +4004,7 @@ async function openCameraScanner(){
     const startScanner = (target, cfg) => qrScanner.start(target, cfg, onScanSuccess, () => {});
     async function onScanSuccess(txt){
         const now = Date.now();
-        /* ⏱️ 4 ثوانى كاملة بين كل مسحة والتانية — الكاميرا بتقرا أسرع بكتير من إيد الإنسان،
+        /* ⏱️ ثانيتين بين كل مسحة والتانية — الكاميرا بتقرا أسرع بكتير من إيد الإنسان،
            فبدون المهلة دي كانت بتسجل نفس القطعة كذا مرة */
         if (camBusy) return;
         if (now - lastCamTime < CAM_DEDUPE_MS) return;
@@ -3902,7 +4041,7 @@ async function openCameraScanner(){
           f.classList.add('show');
           setTimeout(() => { f.classList.remove('show'); }, 1000);
  }
-        /* الكاميرا تفضل مقفولة 4 ثوانى كاملة، مع عد تنازلى يوريك تستنى قد إيه */
+        /* الكاميرا تفضل مقفولة ثانيتين، مع عد تنازلى يوريك تستنى قد إيه */
         camCountdown(CAM_DEDUPE_MS);
  }
     /* عد تنازلى: يوريك كام ثانية فاضلة قبل ما تقدر تمسح تاني */
@@ -4031,6 +4170,57 @@ function registerSW(){
     .catch(() => {});
 }
 
+/* ---------- التحديث التلقائي ----------
+   البرنامج أونلاين فقط، فأي رفع جديد لـ app.js المفروض يوصل للمستخدمين
+   من غير ما حد يقفل ويفتح تاني. بنقارن Last-Modified لـ app.js كل 30 ثانية،
+   ولو اتغير: نستنى لحظة أمان (مفيش عدّة بتتحفظ ولا نافذة مفتوحة) وبعدها
+   نعمل reload. لو فيه شغل شغال — بنقول للمستخدم وهنحدث أول ما يخلص. */
+let autoUpdBase = null, autoUpdFired = false;
+function autoUpdateBusy(){
+  try {
+    if (Object.keys(pendingCountOps || {}).length) return 'فيه عدّة لسه بتتحفظ';
+    if (Object.keys(pendingItemWrites || {}).length) return 'فيه تعديل لسه بيتحفظ';
+    if (editingCount > 0) return 'فيه خلية لسه بتتكتب';
+    const overlays = Array.prototype.slice.call(document.querySelectorAll('.modal-overlay'));
+    const openOne = overlays.some(o => {
+      if (!o) return false;
+      if (o.style && o.style.display === 'none') return false;
+      try { if (getComputedStyle(o).display === 'none') return false; } catch (e) {}
+      return true;
+    });
+    if (openOne) return 'فيه نافذة مفتوحة';
+    if (typeof camBusy !== 'undefined' && camBusy) return 'الكاميرا شغالة';
+  } catch (e) {}
+  return null;
+}
+function autoUpdateCheck(first){
+  if (autoUpdFired) return;
+  if (document.hidden) return;
+  fetch('app.js', { method: 'HEAD', cache: 'no-store' })
+    .then(r => {
+      const lm = r.headers.get('Last-Modified') || r.headers.get('ETag') || '';
+      if (!lm) return;
+      if (first) { autoUpdBase = lm; return; }
+      if (autoUpdBase && lm !== autoUpdBase) {
+        const why = autoUpdateBusy();
+        if (why) {
+          if (!autoUpdFired) { toast('🔄 فيه تحديث جديد للبرنامج — ' + why + '، هيتم التحديث أول ما تخلص', 'info'); autoUpdFired = 'warned'; }
+          return;
+        }
+        autoUpdFired = true;
+        toast('🔄 فيه تحديث جديد — الصفحة هتتحدث خلال 3 ثواني', 'info');
+        setTimeout(() => { try { location.reload(); } catch (e) {} }, 3000);
+      }
+    })
+    .catch(() => {});
+}
+function startAutoUpdate(){
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
+  setTimeout(() => autoUpdateCheck(true), 4000);
+  setInterval(() => { if (autoUpdFired !== true) autoUpdateCheck(false); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && autoUpdFired !== true) autoUpdateCheck(false); });
+}
+
 /* ---------- عام ---------- */
 function saveDateTime(){
   store.setItem(S('selectedDateTime'), $('currentDateTime').value);
@@ -4117,6 +4307,7 @@ window.addEventListener('load', () => {
   $('userChip').addEventListener('click', () => setUserFilter(''));
   setupIdleWatch();
   registerSW();
+  startAutoUpdate();
   bootMsg('جاري الاتصال بقاعدة البيانات...');
   /* فك قفل الصوت على iOS/Chrome من أول لمسة */
   document.addEventListener('pointerdown', primeAudio, { once: true });

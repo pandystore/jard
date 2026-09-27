@@ -875,9 +875,45 @@ function tellSW(msg){
  } catch(e){}
 }
 let swPingTimer = null;
+function pushNotifConfigToSW(enabled){
+  const cfg = effectiveCfg() || {};
+  const payload = {
+    type: 'JARD_NOTIF',
+    enabled: !!enabled,
+    lastTs: lastNotifTs || 0,
+    dbUrl: (cfg && cfg.databaseURL) || '',
+    path: fbRoot(),
+    selfName: (sessionUser && sessionUser.name) || ''
+  };
+  tellSW(payload);
+  if (!enabled) return;
+  try {
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+      const cu = firebase.auth().currentUser;
+      if (cu && cu.getIdToken) {
+        cu.getIdToken().then(tok => {
+          payload.auth = tok || '';
+          tellSW(payload);
+        }).catch(() => {});
+      }
+    }
+  } catch (e) {}
+}
 function startSwPing(){
   if (swPingTimer) clearInterval(swPingTimer);
-  swPingTimer = setInterval(()=>{ tellSW({type:'JARD_PING'}); }, 15000);
+  const beat = () => {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+        firebase.auth().currentUser.getIdToken().then(tok => {
+          tellSW({ type: 'JARD_PING', auth: tok || '' });
+        }).catch(() => { tellSW({ type: 'JARD_PING' }); });
+      } else {
+        tellSW({ type: 'JARD_PING' });
+      }
+    } catch (e) { tellSW({ type: 'JARD_PING' }); }
+  };
+  beat();
+  swPingTimer = setInterval(beat, 15000);
 }
 function stopSwPing(){
   if (swPingTimer) { clearInterval(swPingTimer); swPingTimer=null; }
@@ -1027,7 +1063,7 @@ function attachNotifListener(){
     showJardNotification(ev, false);
  });
   notifOff = ()=>{ try{ ref.off('child_added', cb); }catch(e){} };
-  tellSW({type:'JARD_NOTIF', enabled:true, lastTs:lastNotifTs});
+  pushNotifConfigToSW(true);
   startSwPing();
 }
 function clearAllLocalCaches(){
@@ -1041,7 +1077,7 @@ function clearAllLocalCaches(){
 }
 function detachNotifListener(){
   if (notifOff) { try{ notifOff(); }catch(e){} notifOff=null; }
-  tellSW({type:'JARD_NOTIF', enabled:false});
+  pushNotifConfigToSW(false);
   stopSwPing();
 }
 
@@ -2187,7 +2223,7 @@ function pushMergeMeta(changes){
  });
 }
 function pushMeta(withUsers){
-  if (!syncOn || !db) { pendingMetaPush = true; return; }
+  if (!syncOn || !db) { pendingMetaPush = true; return Promise.resolve(false); }
   pendingMetaPush = false;
   const meta = {};
   meta.setupDone = true;
@@ -2212,7 +2248,7 @@ function pushMeta(withUsers){
   if (logo) meta.logo = logo;
   const dt = store.getItem('selectedDateTime');
   if (dt) meta.dt = dt;
-  db.ref(fbPath() + '/meta').update(meta).then(() => {
+  return db.ref(fbPath() + '/meta').update(meta).then(() => {
 
     if (withUsers) {
       db.ref(fbPath() + '/meta/usersRev').once('value').then(s => {
@@ -2220,14 +2256,15 @@ function pushMeta(withUsers){
         if (v) lastUsersRev = v;
  }).catch(() => {});
  }
+    return true;
  }).catch(e => {
     lastSyncErr = (e && e.message) ? e.message : String(e);
     if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
-      toast('⛔ السيرفر رفض حفظ ' + (withUsers ? 'المستخدمين' : 'الإعدادات') + ' — هوية الأدمن على Firebase مش متسجلة.\nالحل: حمّل الصفحة وسجّل دخول بـ admin تاني.', 'error', { life: 20000 });
+      toast('⛔ السيرفر رفض حفظ ' + (withUsers ? 'المستخدمين' : 'الإعدادات') + ' — هوية الأدمن على Firebase مش متسجلة.\nالحل: من الإعدادات اضغط «إصلاح هوية الأدمن»، أو حمّل الصفحة وسجّل دخول بـ admin تاني.', 'error', { life: 20000 });
       addLog('⛔ رفض من السيرفر عند حفظ meta: ' + lastSyncErr);
     }
     return false;
- }).then(ok => ok !== false);
+ });
 }
 
 function setupBarcodeInput(){

@@ -601,6 +601,34 @@ function adminAuthEmail(){
   const proj = (cfg && cfg.projectId) || 'jard';
   return 'admin@' + proj + '.local';
 }
+/* هل الهوية الحالية على Firebase هي هوية الأدمن الحقيقي؟
+   بتتحقق من غير أي طلب للسيرفر: حساب الأدمن بيتعمل بالبريد الثابت بتاعه،
+   والمستخدم المجهول مالوش بريد أصلاً — فوجود البريد ده معناه إن الجهاز
+   ماسك جلسة الأدمن الحقيقية (محفوظة من مرة سابقة أكّد فيها كلمة المرور).
+   دي أهم نقطة عشان القواعد المقفولة تشتغل: كتابات meta/users وأخواتها
+   السيرفر بيقبلها من الـ uid ده بالظبط — مش من أي هوية مجهولة */
+function realAdminAuthOk(){
+  try {
+    if (typeof firebase === 'undefined' || !firebase.auth) return false;
+    const cu = firebase.auth().currentUser;
+    return !!(cu && !cu.isAnonymous && cu.email && cu.email === adminAuthEmail());
+  } catch (e) { return false; }
+}
+/* تسليم الجهاز عند الخروج: لو الجهاز ماسك هوية الأدمن الحقيقية (جلسة محفوظة)
+   بنسيبها ونرجع مجهول — عشان المستخدم الجاي على نفس الجهاز مايورثش صلاحيات
+   الأدمن على السيرفر. بنعملها بصمت من غير ما نوقف البرنامج، ولو فشلت
+   (زي نت مقطوع) إعادة تحميل الصفحة بترتب كل حاجة تاني */
+function dropRealAdminAuth(){
+  try {
+    if (typeof firebase === 'undefined' || !firebase.auth) return;
+    const cu = firebase.auth().currentUser;
+    if (cu && !cu.isAnonymous) {
+      firebase.auth().signOut()
+        .then(() => firebase.auth().signInAnonymously())
+        .catch(() => {});
+    }
+  } catch (e) {}
+}
 /* تسجيل دخول حقيقي بحساب Firebase الخاص بالأدمن — أول مرة بيتعمل الحساب تلقائياً بنفس
    الباسورد اللي الأدمن كتبه في البرنامج، من غير أي خطوة زيادة. من بعد كده، قواعد الحماية
    على السيرفر تقدر تتأكد فعلاً إن اللي بيمسح/يغيّر المستخدمين هو الأدمن الحقيقي، مش أي حد
@@ -768,6 +796,7 @@ function logoutUser(){
   releaseSession();
   sessionUser = null;
   adminAuthedLive = false;
+  dropRealAdminAuth(); /* تسليم الجهاز: لو ماسكين هوية الأدمن الحقيقية نرجع مجهول */
   userFilter = '';
   store.removeItem('sessionUser');
   /* رجوع لشاشة الدخول مباشرة — من غير reload ومن غير شاشة "جاري الاتصال"، لأن البيانات لسه شغالة ومتزامنة */
@@ -790,6 +819,7 @@ function autoLogout(){
   releaseSession();
   sessionUser = null;
   adminAuthedLive = false;
+  dropRealAdminAuth(); /* تسليم الجهاز: لو ماسكين هوية الأدمن الحقيقية نرجع مجهول */
   userFilter = '';
   store.removeItem('sessionUser');
   try { stopCameraScanner(); } catch (e) {}
@@ -1252,7 +1282,12 @@ function showLock(){
         return;
  }
       loginFails = 0; say('');
-      if (u.role === 'admin') adminAuthedLive = true; /* نقطة 4: باسورد اتكتب صح دلوقتي في الجلسة دي */
+      /* ⚠️ الباسورد اللي اتكتب صح هنا هو باسورد حساب المستخدم نفسه — مش كلمة مرور
+         admin الرئيسية. فمش بنرفع adminAuthedLive هنا: الهوية على Firebase لسه
+         ممكن تكون مجهولة، ولو ادّعينا صلاحية الأدمن والسيرفر مش شايف الأدمن الحقيقي
+         → كل كتابة إدارية (إضافة/تعديل مستخدمين) هتترفض. الصلاحية الحقيقية بتتقوال
+         لما الأدمن يأكد كلمة المرور الرئيسية (أول ما يفتح الإعدادات — زي التصميم:
+         مرة واحدة في كل تحميل صفحة) أو لما الجلسة الحقيقية المحفوظة تترجع لوحدها. */
       sessionUser = u;
       store.setItem('sessionUser', JSON.stringify(u));
       ov.remove();
@@ -1856,8 +1891,19 @@ async function connectFirebase(silent, retryCount){
  }
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     /* دخول مجهول إجباري — القواعد الجديدة بتتطلب auth != null لأي قراءة/كتابة،
-       فلو ده فشل، مفيش أي وصول للبيانات أصلاً ولازم نوقف ونوضح السبب */
+       فلو ده فشل، مفيش أي وصول للبيانات أصلاً ولازم نوقف ونوضح السبب.
+       ⚠️ قبلها لازم نستنى استرجاع الجلسة المحفوظة على الجهاز: الاسترجاع بييجي
+       بشكل غير متزامن (أول إشارة حالة من Firebase)، ولو استعجلنا ودخلنا مجهول
+       كنا بنرمي هوية الأدمن الحقيقية (البريد/كلمة المرور) المحفوظة على الجهاز —
+       وساعتها السيرفر بيرفض كل الكتابات الإدارية (المستخدمين/كلمة المرور/المسح)
+       رغم إن الأدمن نفسه هو اللي بيكتب. أول إشارة حالة بتوصل دايماً وبتوصل بسرعة،
+       ولو فيها مستخدم بنسبّه زي ما هو — والدخول المجهول يبقى للي مالوش هوية خالص */
     try {
+      if (!firebase.auth().currentUser) {
+        await new Promise(resolve => {
+          const stop = firebase.auth().onAuthStateChanged(u => { stop(); resolve(u); });
+        });
+      }
       if (!firebase.auth().currentUser) await firebase.auth().signInAnonymously();
     } catch (e) {
       setSyncUI('off', 'فشل الدخول المجهول ⚠️');
@@ -2312,10 +2358,12 @@ function pushMeta(withUsers){
   /* 🔒 المفاتيح الحساسة دي قواعد السيرفر بتقبلها من الأدمن الحقيقي بس.
      فمابنبعتهاش أصلاً لو المستخدم الحالي مش أدمن — عشان الكتابة كلها ما ترفضش */
   /* مين يقدر يكتب المفاتيح الحساسة؟
-     - الأدمن/المشرف بعد الدخول
-     - أو أول تشغيل وقت إنشاء كلمة المرور (لسه مفيش جلسة دخول)
-     لو بعتناها من غير صلاحية، السيرفر هيرفض الكتابة كلها مش المفتاح ده بس */
-  const canWriteAdminMeta = !!(adminAuthedLive || isElevated());
+     - الأدمن بعد تأكيد كلمة المرور الرئيسية في الجلسة دي (adminAuthedLive)
+     - أو جهاز ماسك هوية الأدمن الحقيقية على Firebase (جلسة محفوظة)
+     المشرف/المستخدم العادي مش بيبعتهاش خالص: السيرفر مش هيقبلها منهم أصلًا،
+     ولو بعتناها من غير صلاحية، السيرفر هيرفض الكتابة كلها مش المفتاح ده بس
+     (يعني حتى اللوجو والإعدادات العادية هتفشل معاهم) */
+  const canWriteAdminMeta = !!(adminAuthedLive || realAdminAuthOk());
   if (adminHash && canWriteAdminMeta) meta.adminHash = adminHash;
   if (loginRequiredExplicit !== null && canWriteAdminMeta) meta.loginRequiredExplicit = loginRequiredExplicit;
   /* المستخدمين يتكتبوا بس لما التعديل فعلًا فيهم (withUsers) — تغيير اللوجو/الباسورد مش بيلمسهم */
@@ -3410,9 +3458,12 @@ async function openSettings(){
     if (!isAdmin()) {
       const ok = await ensureAdmin();
       if (!ok) { toast('الإعدادات للمسؤول فقط', 'error'); return; }
- } else if (!adminAuthedLive) {
+ } else if (!adminAuthedLive && !realAdminAuthOk()) {
       /* نقطة 4: الجلسة ممكن تكون مرمّمة — الأدمن يأكد الباسورد مرة واحدة في كل تحميل صفحة.
-         كده أي تلاعب بالتخزين/DevTools مش هيفتح الإعدادات من غير الباسورد الحقيقي. */
+         كده أي تلاعب بالتخزين/DevTools مش هيفتح الإعدادات من غير الباسورد الحقيقي.
+         الاستثناء الوحيد: الجهاز ماسك هوية الأدمن الحقيقية على Firebase نفسه (جلسة
+         محفوظة أكّد فيها الباسورد من قبل) — دي مستحيلة تتزوّر من DevTools، وفي نفس
+         الوقت هي بالظبط اللي بتخلي السيرفر يقبل الكتابات الإدارية من غير مزيد تأكيد */
       const ok = await ensureAdmin();
       if (!ok) { toast('لازم تأكيد كلمة مرور admin قبل فتح الإعدادات', 'error'); return; }
  }

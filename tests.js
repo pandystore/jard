@@ -440,6 +440,81 @@ console.log('== جرد متزامن فعلي: جهازين على نفس الص�
   eq(Object.keys(offDev.queue()).indexOf('10001'), -1, 'الطابور اتفضى بعد ما الكتابة نجحت');
 }
 
+console.log('== هوية الأدمن الحقيقية على Firebase (القواعد المقفولة) ==');
+{
+  /* realAdminAuthOk و dropRealAdminAuth بيتشالوا من app.js زي ما هما
+     ويتشغلوا مع نسخة مزيّفة من firebase — عشان نثبت سلوك الهوية
+     من غير سيرفر حقيقي. المشكلة الأصلية اللي الاتيارات دي بتقفلها:
+     connectFirebase كان بيدخل مجهول بدري كفاية إنه يرمي جلسة الأدمن
+     المحفوظة، فالسيرفر كان بيرفض إضافة المستخدمين رغم إن الأدمن نفسه بيكتب */
+  const prelude = [
+    'var adminAuthEmail = function(){ return "admin@jard.local"; };',
+    'var firebase = null;',
+    'var setFirebase = function(f){ firebase = f; };'
+  ].join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(prelude + '\n' + extractFn('realAdminAuthOk') + '\n' + extractFn('dropRealAdminAuth') +
+    '\nmodule.exports = { realAdminAuthOk: realAdminAuthOk, dropRealAdminAuth: dropRealAdminAuth, setFirebase: setFirebase };',
+    'adminauth-extracted.js');
+  const { realAdminAuthOk, dropRealAdminAuth, setFirebase } = m.exports;
+
+  /* نسخة مزيّفة من firebase: مستخدم ثابت + عدّاد للعمليات */
+  const mk = user => {
+    const calls = { signOut: 0, anon: 0 };
+    const thens = [];
+    const fb = {
+      auth: () => ({
+        currentUser: user,
+        signOut: () => { calls.signOut++; return { then: fn => { thens.push(fn); return { catch: () => {} }; } }; },
+        signInAnonymously: () => { calls.anon++; return { then: () => ({ catch: () => {} }) }; }
+      })
+    };
+    return { fb, calls, thens };
+  };
+
+  setFirebase(null);
+  eq(realAdminAuthOk(), false, 'من غير Firebase (وضع محلي) → مش هوية أدمن');
+  setFirebase(mk(null).fb);
+  eq(realAdminAuthOk(), false, 'مفيش مستخدم داخل → مش هوية أدمن');
+  const anon = mk({ isAnonymous: true });
+  setFirebase(anon.fb);
+  eq(realAdminAuthOk(), false, 'هوية مجهولة → مش الأدمن الحقيقي (دي اللي كانت بتترفض كتاباتها الإدارية)');
+  setFirebase(mk({ isAnonymous: false, email: 'mona@example.com' }).fb);
+  eq(realAdminAuthOk(), false, 'حساب بريد تاني → مش الأدمن');
+  const adm = mk({ isAnonymous: false, email: 'admin@jard.local' });
+  setFirebase(adm.fb);
+  eq(realAdminAuthOk(), true, 'جلسة الأدمن الحقيقية المحفوظة (بريده الثابت) → أدمن');
+
+  /* تسليم الجهاز عند الخروج */
+  setFirebase(adm.fb);
+  dropRealAdminAuth();
+  eq(adm.calls.signOut, 1, 'الخروج بيسلّم هوية الأدمن الحقيقية (signOut)');
+  eq(adm.calls.anon, 0, 'لسه — الرجوع مجهول بيحصل بعد ما signOut يخلص');
+  adm.thens.forEach(fn => fn()); /* ننفّذ الـ then يدوياً زي ما Promise حقيقي هيعمل */
+  eq(adm.calls.anon, 1, 'وبعده الجهاز بيرجع مجهول — يفضل شغال للمستخدم الجاي من غير صلاحيات أدمن');
+  setFirebase(anon.fb);
+  dropRealAdminAuth();
+  eq(anon.calls.signOut, 0, 'جهاز مستخدم عادي (مجهول) → الخروج ما بيلمسش الهوية');
+  setFirebase(null);
+  dropRealAdminAuth();
+  eq(true, true, 'من غير Firebase الخروج العادي ما بيكسرش حاجة');
+
+  /* حارس رجوعي على سلوك الاتصال والدفع — من نص الدوال الحقيقية في app.js */
+  const cfSrc = extractFn('connectFirebase');
+  const iWait = cfSrc.indexOf('onAuthStateChanged');
+  const iAnon = cfSrc.indexOf('signInAnonymously');
+  eq(iWait !== -1 && iAnon !== -1 && iWait < iAnon, true,
+    'connectFirebase بيستنى استرجاع الجلسة المحفوظة قبل أي دخول مجهول (إصلاح رمي هوية الأدمن)');
+  const pmSrc = extractFn('pushMeta');
+  eq(pmSrc.indexOf('realAdminAuthOk()') !== -1, true, 'المفاتيح الحساسة بتتبعت بس من جهاز ماسك هوية الأدمن الحقيقية');
+  eq(pmSrc.indexOf('isElevated()') === -1, true, 'المشرف مش بيبعت المفاتيح الحساسة — السيرفر كان هيرفض الكتابة كلها');
+  eq((extractFn('tryLogin').match(/adminAuthedLive = true/g) || []).length, 1,
+    'دخول مستخدم من القايمة (حتى لو صلاحيته أدمن) مش بيدّعي صلاحية الأدمن الحقيقية — دي بكلمة المرور الرئيسية بس');
+  eq(extractFn('logoutUser').indexOf('dropRealAdminAuth') !== -1, true, 'الخروج اليدوي بيسلّم هوية الأدمن');
+  eq(extractFn('autoLogout').indexOf('dropRealAdminAuth') !== -1, true, 'والخروج التلقائي للخمول بيسلّمها كمان');
+}
+
 console.log('== تشفير كلمات المرور (salt) ==');
 {
   /* الدوال دي async، فمش هنقدر نستخدم extractFn العادية (بتقص كلمة async) —

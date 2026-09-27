@@ -92,9 +92,6 @@
         "forceWipe": {
           ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
         },
-        "loginRequiredExplicit": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
 
         /* مفاتيح عادية — أي مستخدم داخل يقدر يكتبها */
         "setupDone": { ".write": "auth != null" },

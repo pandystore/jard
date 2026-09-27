@@ -3,7 +3,7 @@
 *{ box-sizing:border-box; }
 body{ font-family:'Cairo','Segoe UI',Tahoma,Arial,sans-serif; background:#f8fafc; overflow-x:hidden; margin:0; padding:0; color:#1e293b; }
 button{ font-family:inherit; }
-/* ===================== الشكل الأصلي: الشريط الجانبي ===================== */
+
 .sidebar{ width:280px; height:100vh; position:fixed; right:0; top:0; background:#fff; border-left:1px solid var(--border); z-index:50; display:flex; flex-direction:column; padding:1.5rem; overflow-y:auto; box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1); }
 .main-content{ margin-right:280px; padding:2rem; }
 .stat-card{ background:#fff; border:1px solid var(--border); padding:1rem; border-radius:1rem; text-align:center; }
@@ -18,7 +18,7 @@ thead th{ position:sticky; top:0; background:#1e293b !important; color:#fff !imp
 .analysis-box{ margin-top:15px; padding:10px; border-top:1px dashed var(--border); text-align:right; }
 .analysis-header{ font-size:.75rem; font-weight:800; margin-bottom:8px; display:block; border-bottom:1px solid #f1f5f9; padding-bottom:4px; }
 .analysis-row{ display:flex; justify-content:space-between; font-size:.7rem; color:#475569; margin-bottom:3px; }
-/* ===================== عناصر التصميم الأصلية ===================== */
+
 .logo-wrap{ display:flex; justify-content:center; margin-bottom:1rem; }
 .logo-wrap img{ width:100px; }
 .sb-title{ font-size:1.25rem; font-weight:700; color:#1f2937; text-align:center; margin:0; }
@@ -43,7 +43,7 @@ label.sbtn{ margin:0; }
 .expand-btn{ position:absolute; top:1rem; right:1rem; background:none; border:none; color:#9ca3af; cursor:pointer; transition:color .2s; padding:4px; }
 .expand-btn:hover{ color:#1f2937; }
 .ic{ width:1.1em; height:1.1em; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.2em; }
-/* ===================== المحتوى ===================== */
+
 .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.5rem; }
 .grid-4{ display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
 .card{ background:#fff; padding:1rem; border-radius:1rem; box-shadow:0 1px 2px rgba(0,0,0,.05); border:1px solid var(--border); }
@@ -64,7 +64,7 @@ label.sbtn{ margin:0; }
 .toolbar-lbl{ font-size:10px; font-weight:700; color:#9ca3af; text-transform:uppercase; white-space:nowrap; }
 .toolbar-sep{ height:1.5rem; width:1px; background:#e5e7eb; margin:0 1rem; }
 .pills{ display:flex; gap:.25rem; }
-/* الجدول */
+
 table{ width:100%; border-collapse:collapse; text-align:right; }
 tbody tr{ border-bottom:1px solid #f8fafc; }
 td{ padding:.65rem .75rem; }
@@ -81,14 +81,14 @@ td.p3{ padding:.75rem; }
 #printHeader{ display:none; }
 #printSign{ display:none; }
 tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !important; background:#f1f5f9 !important; color:#000 !important; text-align:center; font-size:10pt; }
-/* حالة المزامنة */
+
 .sync-line{ display:flex; align-items:center; justify-content:center; gap:.4rem; font-size:.7rem; color:#64748b; padding-top:.25rem; }
 .sync-dot{ width:9px; height:9px; border-radius:50%; display:inline-block; background:#94a3b8; }
 .sync-dot.on{ background:var(--green); }
 .sync-dot.mid{ background:#eab308; }
 @keyframes pulse{ 0%{ box-shadow:0 0 0 0 rgba(22,163,74,.5);} 70%{ box-shadow:0 0 0 8px rgba(22,163,74,0);} 100%{ box-shadow:0 0 0 0 rgba(22,163,74,0);} }
 .sync-dot.flash{ animation:pulse .8s ease-out; }
-/* ===================== المودالات والتنبيهات ===================== */
+
 .modal-overlay{ position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:100; display:flex; align-items:center; justify-content:center; padding:1rem; }
 .modal-box{ background:#fff; padding:1.5rem; border-radius:1rem; max-width:32rem; width:100%; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); max-height:90vh; overflow-y:auto; }
 .modal-box.wide{ max-width:52rem; padding:1.75rem 2rem; font-size:.85rem; }
@@ -107,7 +107,7 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .radio-row{ display:flex; gap:1rem; margin:.5rem 0; }
 .radio-row label{ display:flex; align-items:center; gap:.35rem; font-size:.85rem; cursor:pointer; }
 .hint{ font-size:.72rem; color:#94a3b8; margin-top:.35rem; line-height:1.6; }
-/* تبويبات الإعدادات */
+
 .set-tabs{ display:flex; gap:.25rem; overflow-x:auto; border-bottom:2px solid #f1f5f9; padding-bottom:.5rem; margin-bottom:.9rem; scrollbar-width:none; }
 .set-tabs::-webkit-scrollbar{ display:none; }
 .set-tab{ padding:.45rem .8rem; border-radius:.6rem .6rem 0 0; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; background:transparent; font-size:.78rem; font-weight:700; color:#64748b; cursor:pointer; white-space:nowrap; transition:all .2s; }
@@ -116,7 +116,7 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .set-pane{ display:none; }
 .set-pane.active{ display:block; animation:tabIn .2s ease; }
 @keyframes tabIn{ from{ opacity:0; transform:translateY(4px); } to{ opacity:1; transform:none; } }
-/* أقسام الإعدادات — كروت منظمة */
+
 .set-card{ border:1px solid var(--border); border-radius:1rem; padding:.9rem 1rem; margin-bottom:.8rem; background:#fff; }
 .set-card-head{ display:flex; align-items:center; gap:.6rem; margin-bottom:.7rem; }
 .set-icon{ width:2rem; height:2rem; border-radius:.6rem; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; }
@@ -127,13 +127,13 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .set-card .fld:last-child{ margin-bottom:0; }
 .sec-title{ font-size:.8rem; font-weight:800; color:#0f172a; border-bottom:1px solid #f1f5f9; padding-bottom:.35rem; margin:1rem 0 .75rem; }
 .check-row{ display:flex; align-items:center; gap:.5rem; font-size:.85rem; margin-bottom:.5rem; cursor:pointer; }
-/* التوست */
+
 #toasts{ position:fixed; top:1rem; right:1rem; z-index:500; display:flex; flex-direction:column; gap:.5rem; max-width:320px; }
 .toast{ background:#fff; border-radius:.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,.15); padding:.7rem .9rem; font-size:.83rem; font-weight:600; display:flex; align-items:center; gap:.6rem; border-right:4px solid var(--blue); animation:slideIn .25s ease; }
 .toast.success{ border-color:var(--green); } .toast.error{ border-color:var(--red); } .toast.warning{ border-color:var(--orange); }
 .toast .act{ background:var(--blue); color:#fff; border:none; border-radius:.4rem; padding:.25rem .7rem; font-size:.75rem; font-weight:700; cursor:pointer; margin-right:auto; }
 @keyframes slideIn{ from{ transform:translateX(30px); opacity:0; } to{ transform:none; opacity:1; } }
-/* شاشة القفل وتسجيل الدخول */
+
 .lock-overlay{ position:fixed; inset:0; background:#f8fafc; z-index:400; display:flex; align-items:center; justify-content:center; padding:1rem; }
 .lock-card{ background:#fff; border:1px solid var(--border); border-radius:1.75rem; padding:2.2rem 2rem; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.06); }
 .lock-card img{ width:112px; margin-bottom:1rem; }
@@ -147,11 +147,11 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .lock-card .mbtn.primary:hover{ background:#ea580c; }
 .shake{ animation:shk .4s; }
 @keyframes shk{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(6px)} 75%{transform:translateX(-6px)} }
-/* الكاميرا */
+
 .cam-stage{ position:relative; }
 #qrReader{ width:100%; min-height:250px; background:#000; border-radius:.75rem; overflow:hidden; }
 #qrReader video{ width:100% !important; border-radius:.75rem; }
-/* فلاش "تم الجرد" بيغطي الكاميرا */
+
 .scan-flash{ position:absolute; inset:0; background:rgba(22,163,74,.93); border-radius:.75rem; display:none; flex-direction:column; align-items:center; justify-content:center; z-index:5; animation:flashIn .15s ease; }
 .scan-flash.show{ display:flex; }
 .scan-flash .big{ font-size:1.9rem; font-weight:800; color:#fff; }
@@ -165,29 +165,29 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .scan-count b{ color:#dc2626; font-size:1.35rem; margin:0 .15rem; }
 .cam-actions{ display:flex; gap:.7rem; margin-top:.8rem; justify-content:center; }
 .cam-actions .mbtn{ flex:1; }
-/* تنبيه الإضاءة الضعيفة — شريط صغير أعلى الكاميرا بيظهر بس لما الفلاش يشتغل تلقائيًا */
+
 .low-light-hint{ position:absolute; top:.5rem; left:50%; transform:translateX(-50%); background:rgba(217,119,6,.95); color:#fff; font-size:.78rem; font-weight:800; padding:.35rem .8rem; border-radius:2rem; z-index:6; white-space:nowrap; }
-/* سلايدر التكبير الرقمي أثناء المسح */
+
 .cam-zoom-wrap{ align-items:center; gap:.5rem; margin-top:.6rem; font-size:.9rem; font-weight:700; color:#475569; }
 .cam-zoom-wrap input[type=range]{ accent-color:var(--blue,#2563eb); }
-/* زر الكاميرا والإضافة بجوار حقل الباركود */
+
 .code-row{ display:flex; gap:.5rem; }
 .code-row .inp-wrap{ flex:1; }
 .mini-btn{ background:var(--blue); color:#fff; border:none; border-radius:.75rem; padding:0 .9rem; cursor:pointer; display:flex; align-items:center; gap:.35rem; font-weight:700; font-size:.8rem; transition:background .2s; white-space:nowrap; }
 .mini-btn:hover{ background:#1d4ed8; }
 .mini-btn.cam{ background:#0f172a; } .mini-btn.cam:hover{ background:#1e293b; }
 .mini-btn .ic{ width:1.05rem; height:1.05rem; }
-/* فلتر المستخدم */
+
 .user-chip{ display:none; align-items:center; gap:.35rem; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; border-radius:.75rem; padding:.35rem .7rem; font-size:.75rem; font-weight:700; cursor:pointer; }
 .user-chip.show{ display:inline-flex; }
-/* تقرير المستخدمين */
+
 .urep-row{ display:flex; align-items:center; justify-content:space-between; padding:.55rem 0; border-bottom:1px dashed #f1f5f9; font-size:.85rem; }
 .urep-row .who{ font-weight:700; }
 .urep-row .meta{ font-size:.7rem; color:#94a3b8; }
 .urep-row .cnt{ background:#eff6ff; color:#1d4ed8; font-weight:800; border-radius:.6rem; padding:.15rem .6rem; font-size:.75rem; }
 .urep-row .view{ background:#e2e8f0; border:none; border-radius:.5rem; padding:.3rem .7rem; font-size:.72rem; font-weight:700; cursor:pointer; }
 .urep-row .view:hover{ background:#cbd5e1; }
-/* قسم المستخدمين — كارت الإضافة وجدول العرض (شكل مطابق للتصميم المرجعي) */
+
 .add-user-card{ background:#f8fafc; border:1px solid var(--border); border-radius:1.1rem; padding:1rem; margin-bottom:1rem; }
 .add-user-title{ font-size:.85rem; font-weight:800; color:#1e293b; margin-bottom:.7rem; }
 .add-user-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:.7rem; }
@@ -202,7 +202,7 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .users-table tbody tr.row-off{ opacity:.55; }
 .users-empty{ text-align:center; padding:1.2rem; color:#94a3b8; font-size:.8rem; }
 .users-actions{ display:flex; gap:.35rem; align-items:center; justify-content:center; flex-wrap:wrap; }
-/* أزرار إجراءات موحّدة الشكل في جدول المستخدمين — نفس الحجم والحواف لكل الأزرار، يختلفوا في اللون بس */
+
 .icon-btn{ border:none; border-radius:.5rem; padding:.3rem .55rem; font-size:.72rem; font-weight:700; cursor:pointer; line-height:1.4; transition:filter .15s; }
 .icon-btn:hover{ filter:brightness(.92); }
 .icon-btn.del{ background:#fee2e2; color:#b91c1c; }
@@ -214,22 +214,19 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .sess-dot.on{ background:#16a34a; box-shadow:0 0 0 3px #dcfce7; }
 .kick{ background:#fef3c7; color:#b45309; }
 .kick:hover{ background:#fde68a; }
-/* كارت المستخدم بجوار الفرع — اضغط = خروج */
-/* زر الخروج الأيقوني بجوار شارة الفرع */
+
 .user-chip-out{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; margin-right:auto; margin-left:.2rem; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:50%; cursor:pointer; transition:all .2s; flex-shrink:0; }
 .user-chip-out:hover{ background:#fee2e2; transform:scale(1.08); }
 .user-chip-out svg{ width:.95rem; height:.95rem; }
 .role-tag{ font-size:.65rem; background:#f1f5f9; color:#475569; border-radius:.4rem; padding:.1rem .4rem; margin-right:.3rem; }
 .logout-link{ color:#94a3b8; font-size:.68rem; cursor:pointer; text-decoration:underline; }
 .logout-link:hover{ color:#ef4444; }
-/* شارة الفرع */
 
-/* شريط الموبايل */
 #mobileBar{ display:none; }
 #sidebarOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:45; }
 .log-item{ display:flex; justify-content:space-between; font-size:.75rem; padding:.45rem 0; border-bottom:1px dashed #f1f5f9; color:#475569; }
 .log-item .lt{ color:#94a3b8; font-size:.68rem; direction:ltr; }
-/* ===================== الموبايل ===================== */
+
 @media (max-width:900px){
   .sidebar{ transform:translateX(105%); transition:transform .3s ease; box-shadow:none; }
   .sidebar.open{ transform:translateX(0); box-shadow:0 0 45px rgba(0,0,0,.25); }
@@ -244,7 +241,7 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
   .toolbar-sep{ display:none; }
   .modal-2col{ grid-template-columns:1fr; }
 }
-/* ===================== الطباعة ===================== */
+
 @media print{
   @page{ size:A4; margin:12mm; }
   body{ background:#fff !important; color:#000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
@@ -256,8 +253,7 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
   table{ width:100% !important; table-layout:fixed !important; border-collapse:collapse !important; }
   thead{ display:table-header-group !important; }
   thead th{ position:static !important; background:#1e293b !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; border:1px solid #000 !important; font-size:9pt !important; padding:5px 3px !important; }
-  /* أعمدة منظمة ومتناسبة — كل عمود بعرض ثابت عشان الجدول يبقى متساوي ومرتب.
-     العمود الأول (خانة التحديد) مخفي أصلاً بـ no-print، فالنسب هنا للأعمدة الـ9 الظاهرة فعلياً */
+
   th:nth-child(2), td:nth-child(2){ width:5%; }
   th:nth-child(3), td:nth-child(3){ width:12%; }
   th:nth-child(4), td:nth-child(4){ width:20%; }
@@ -277,8 +273,6 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
   #printSign{ display:flex; justify-content:space-around; margin-top:35px; font-weight:bold; font-size:11pt; }
 }
 
-
-/* شاشة القفل الأولية اللي بتظهر من أول render قبل ما JS يحمل — عشان مايحصلش فلاش */
 #initialLock{ position:fixed; inset:0; background:#f8fafc; z-index:9999; display:flex; align-items:center; justify-content:center; padding:1rem; font-family:Cairo,Tahoma,sans-serif; }
 #initialLock .il-card{ background:#fff; border:1px solid #e2e8f0; border-radius:1.75rem; padding:2.2rem 2rem; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 25px -5px rgba(0,0,0,.1); }
 #initialLock img{ width:112px; margin-bottom:1rem; }
@@ -287,7 +281,6 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 #initialLock .il-spinner{ font-size:2rem; padding:.5rem 0; animation: il-spin 1s linear infinite; display:inline-block; }
 @keyframes il-spin{ from{transform:rotate(0)} to{transform:rotate(360deg)} }
 
-/* ---------- كروت التقارير ---------- */
 .rep-card{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; padding:.65rem .7rem; border:1px solid var(--border); border-radius:.6rem; margin-bottom:.5rem; background:#fff; }
 .rep-info{ min-width:0; }
 .rep-name{ font-weight:800; font-size:.9rem; }
@@ -296,7 +289,6 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .rep-acts .mbtn{ white-space:nowrap; }
 @media (max-width:520px){ .rep-card{ flex-direction:column; align-items:stretch; } .rep-acts{ justify-content:stretch; } .rep-acts .mbtn{ flex:1; } }
 
-/* ---------- ترقيم صفحات الجدول ---------- */
 .pager{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; padding:.5rem .6rem; margin-top:.5rem; background:#fff; border:1px solid var(--border); border-radius:.6rem; }
 .pager-info{ font-size:.75rem; font-weight:700; color:#475569; }
 .pager-ctrl{ display:flex; align-items:center; gap:.3rem; }
@@ -306,7 +298,6 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .pager-pos{ font-size:.78rem; font-weight:800; color:#0f172a; min-width:3.5rem; text-align:center; }
 @media (max-width:520px){ .pager{ justify-content:center; } .pager-info{ width:100%; text-align:center; } }
 
-/* ---------- تلميحات اختصارات الكيبورد ---------- */
 .kbd-hint{ display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.45rem; }
 .kbd-hint span{ font-size:.62rem; font-weight:700; color:#64748b; background:#f1f5f9; border:1px solid var(--border); border-radius:.3rem; padding:.1rem .35rem; }
 .kbd-hint b{ color:#0f172a; font-family:monospace; }

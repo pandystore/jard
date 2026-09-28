@@ -542,81 +542,38 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
   setRepUser('');
 }
 
-console.log('== هوية الأدمن الحقيقية على Firebase (القواعد المقفولة) ==');
+console.log('== موضع الإشعارات وإخفاؤها عن المستخدم العادي ==');
 {
-  /* realAdminAuthOk و dropRealAdminAuth بيتشالوا من app.js زي ما هما
-     ويتشغلوا مع نسخة مزيّفة من firebase — عشان نثبت سلوك الهوية
-     من غير سيرفر حقيقي. المشكلة الأصلية اللي الاتيارات دي بتقفلها:
-     connectFirebase كان بيدخل مجهول بدري كفاية إنه يرمي جلسة الأدمن
-     المحفوظة، فالسيرفر كان بيرفض إضافة المستخدمين رغم إن الأدمن نفسه بيكتب */
-  const prelude = [
-    'var adminAuthEmail = function(){ return "admin@jard.local"; };',
-    'var firebase = null;',
-    'var setFirebase = function(f){ firebase = f; };'
-  ].join('\n');
+  const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf-8');
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf-8');
+  eq(/#toasts\s*\{[^}]*left:\s*1rem[^}]*right:\s*auto/s.test(css), true, 'التنبيهات تظهر أعلى يسار الشاشة');
+  eq(extractFn('toast').includes('!isElevated()'), true, 'المستخدم العادي لا تظهر له رسائل Toast');
+  eq(app.includes('fixIdBtn'), false, 'لا توجد أداة إصلاح Firebase مرتبطة بهذه الرسالة');
+}
+
+console.log('== عرض الكمية الإجمالية المشتركة لكل المستخدمين ==');
+{
   const Module = require('module');
   const m = new Module();
-  m._compile(prelude + '\n' + extractFn('realAdminAuthOk') + '\n' + extractFn('dropRealAdminAuth') +
-    '\nmodule.exports = { realAdminAuthOk: realAdminAuthOk, dropRealAdminAuth: dropRealAdminAuth, setFirebase: setFirebase };',
-    'adminauth-extracted.js');
-  const { realAdminAuthOk, dropRealAdminAuth, setFirebase } = m.exports;
+  m._compile('let userFilter = "محمد"; function fmtQ(n){ return n; }\n' + extractFn('displayQty') + '\nmodule.exports = { displayQty };', 'display-qty.js');
+  const displayQty = m.exports.displayQty;
+  const item = { actualQuantity: 8, systemQuantity: 3, difference: 5, status: 'زيادة', counts: { admin: 5, محمد: 3 } };
+  eq(displayQty(item).act, 8, 'فلتر المستخدم لا يخفي بقية العدّات من كمية الصنف');
+  eq(displayQty(item).diff, 5, 'الفرق يعتمد على الإجمالي المشترك');
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf-8');
+  eq(app.includes('الكمية الإجمالية الآن'), true, 'تأكيد المسح يعرض الإجمالي بدل تفصيل حصص الأشخاص');
+  eq(extractFn('prepareAndPrint').includes('const q = i => i.actualQuantity'), true, 'الطباعة تعرض إجمالي الصنف حتى مع فلتر المستخدم');
+}
 
-  /* نسخة مزيّفة من firebase: مستخدم ثابت + عدّاد للعمليات */
-  const mk = user => {
-    const calls = { signOut: 0, anon: 0 };
-    const thens = [];
-    const fb = {
-      auth: () => ({
-        currentUser: user,
-        signOut: () => { calls.signOut++; return { then: fn => { thens.push(fn); return { catch: () => {} }; } }; },
-        signInAnonymously: () => { calls.anon++; return { then: () => ({ catch: () => {} }) }; }
-      })
-    };
-    return { fb, calls, thens };
-  };
-
-  setFirebase(null);
-  eq(realAdminAuthOk(), false, 'من غير Firebase (وضع محلي) → مش هوية أدمن');
-  setFirebase(mk(null).fb);
-  eq(realAdminAuthOk(), false, 'مفيش مستخدم داخل → مش هوية أدمن');
-  const anon = mk({ isAnonymous: true });
-  setFirebase(anon.fb);
-  eq(realAdminAuthOk(), false, 'هوية مجهولة → مش الأدمن الحقيقي (دي اللي كانت بتترفض كتاباتها الإدارية)');
-  setFirebase(mk({ isAnonymous: false, email: 'mona@example.com' }).fb);
-  eq(realAdminAuthOk(), false, 'حساب بريد تاني → مش الأدمن');
-  const adm = mk({ isAnonymous: false, email: 'admin@jard.local' });
-  setFirebase(adm.fb);
-  eq(realAdminAuthOk(), true, 'جلسة الأدمن الحقيقية المحفوظة (بريده الثابت) → أدمن');
-
-  /* تسليم الجهاز عند الخروج */
-  setFirebase(adm.fb);
-  dropRealAdminAuth();
-  eq(adm.calls.signOut, 1, 'الخروج بيسلّم هوية الأدمن الحقيقية (signOut)');
-  eq(adm.calls.anon, 0, 'لسه — الرجوع مجهول بيحصل بعد ما signOut يخلص');
-  adm.thens.forEach(fn => fn()); /* ننفّذ الـ then يدوياً زي ما Promise حقيقي هيعمل */
-  eq(adm.calls.anon, 1, 'وبعده الجهاز بيرجع مجهول — يفضل شغال للمستخدم الجاي من غير صلاحيات أدمن');
-  setFirebase(anon.fb);
-  dropRealAdminAuth();
-  eq(anon.calls.signOut, 0, 'جهاز مستخدم عادي (مجهول) → الخروج ما بيلمسش الهوية');
-  setFirebase(null);
-  dropRealAdminAuth();
-  eq(true, true, 'من غير Firebase الخروج العادي ما بيكسرش حاجة');
-
-  /* حارس رجوعي على سلوك الاتصال والدفع — من نص الدوال الحقيقية في app.js */
-  const cfSrc = extractFn('connectFirebase');
-  const iWait = cfSrc.indexOf('onAuthStateChanged');
-  const iAnon = cfSrc.indexOf('signInAnonymously');
-  eq(iWait !== -1 && iAnon !== -1 && iWait < iAnon, true,
-    'connectFirebase بيستنى استرجاع الجلسة المحفوظة قبل أي دخول مجهول (إصلاح رمي هوية الأدمن)');
-  const pmSrc = extractFn('pushMeta');
-  eq(pmSrc.indexOf('realAdminAuthOk()') !== -1, true, 'المفاتيح الحساسة بتتبعت بس من جهاز ماسك هوية الأدمن الحقيقية');
-  eq(pmSrc.indexOf('isElevated()') === -1, true, 'المشرف مش بيبعت المفاتيح الحساسة — السيرفر كان هيرفض الكتابة كلها');
-  eq((extractFn('tryLogin').match(/adminAuthedLive = true/g) || []).length, 1,
-    'دخول مستخدم من القايمة (حتى لو صلاحيته أدمن) مش بيدّعي صلاحية الأدمن الحقيقية — دي بكلمة المرور الرئيسية بس');
-  eq(extractFn('logoutUser').indexOf('dropRealAdminAuth') !== -1, true, 'الخروج اليدوي بيسلّم هوية الأدمن');
-  eq(extractFn('autoLogout').indexOf('dropRealAdminAuth') !== -1, true, 'والخروج التلقائي للخمول بيسلّمها كمان');
-  eq(/return\s+db\.ref/.test(pmSrc), true, 'pushMeta بيرجع الـ Promise — إضافة المستخدم بتستنى نتيجة السيرفر فعلًا');
-  eq(pmSrc.indexOf('إصلاح هوية الأدمن') !== -1, true, 'رفض الكتابة الإدارية بيوجّه لزر إصلاح الهوية');
+console.log('== صلاحيات Firebase المستقلة عن تسجيل الدخول داخل التطبيق ==');
+{
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf-8');
+  const rules = fs.readFileSync(path.join(__dirname, 'firebase-rules.json'), 'utf-8');
+  eq(app.includes('signInWithPassword'), false, 'التطبيق لا ينشئ جلسة Firebase بكلمة مرور منفصلة');
+  eq(app.includes('fixIdBtn'), false, 'لا يظهر زر إصلاح جلسة Firebase');
+  eq(rules.includes('auth.uid'), false, 'قواعد Firebase لا تربط الصلاحيات بمعرّف مستخدم محدد');
+  eq(rules.includes('".write": "auth != null"'), true, 'جلسة Firebase المسجلة تملك الكتابة');
+  eq(/return\s+db\.ref/.test(extractFn('pushMeta')), true, 'pushMeta بيرجع الـ Promise');
 }
 
 console.log('== إشعارات الأدمن (المشروع الصحيح + توكن القواعد المقفولة) ==');

@@ -5,15 +5,8 @@
      ⚠️ الملف ده مايشتغلش لوحده: لازم ترفعه على Firebase
         Realtime Database ← Rules ← الصق المحتوى ← Publish
 
-     الفكرة الأساسية:
-       "الأدمن الحقيقي" = الهوية الحقيقية على Firebase Authentication
-       (اللي بتتعمل أول ما الأدمن يؤكد كلمة مروره)، و uid بتاعه متسجل في
-       jard/meta/adminUid. أي كتابة حساسة لازم تجي من الـ uid ده بالظبط.
-
-     ملاحظة مهمة عن قواعد Realtime Database:
-       الصلاحية بتنزل لتحت — لو أبو العقدة (.write) مفتوح، كل الأولاد مفتوحين
-       وماممكنش نقفلهم من تحت. عشان كده مفيش .write عام على meta أو على
-       الأصناف: كل مفتاح ليه قاعدته الخاصة.
+     ملاحظة أمان: كل من سجّل الدخول إلى Firebase (بما في ذلك Anonymous)
+     يستطيع قراءة وكتابة البيانات. كلمة مرور البرنامج محلية وليست حماية قاعدة بيانات.
      ============================================================================ */
   "rules": {
     ".read": false,
@@ -21,14 +14,15 @@
 
     "jard": {
       ".read": "auth != null",
+      ".write": "auth != null",
 
       /* ---------- الأصناف ----------
          أي مستخدم دخل يقدر يعدّ (يضيف أو يعدّل صنف)،
-         لكن مسح صنف موجود قرار إداري — للأدمن الحقيقي بس */
+         الكتابة متاحة لأي جلسة Firebase */
       "items": {
-        ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid",
+        ".write": "auth != null",
         "$code": {
-          ".write": "auth != null && (newData.exists() || root.child('jard/meta/adminUid').val() === auth.uid)",
+          ".write": "auth != null",
           ".validate": "newData.val() == null || (newData.hasChildren(['code']) && newData.child('code').isString())"
         }
       },
@@ -37,7 +31,7 @@
          المستخدم يضيف إشعار بعدّته؛ الأدمن الحقيقي يقدر يمسح العقدة كلها
          (مسح المصنع / تنظيف القديم). القراءة من jard.read = أي مستخدم داخل. */
       "notifs": {
-        ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid",
+        ".write": "auth != null",
         "$id": {
           ".write": "auth != null",
           ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber())"
@@ -59,7 +53,7 @@
          اللي هنا يمنع الكتابة الغلط ويثبت شكل البيانات بس.
          الحماية الكاملة محتاجة حساب Firebase حقيقي لكل مستخدم. */
       "sessions": {
-        ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid",
+        ".write": "auth != null",
         "$user": {
           ".write": "auth != null",
           ".validate": "newData.val() == null || (newData.hasChildren(['ts']) && newData.child('ts').isNumber() && newData.child('name').isString())"
@@ -84,34 +78,14 @@
       "meta": {
         ".read": "auth != null",
 
-        /* أول أدمن يعمل الحساب هو اللي بيسجّل uid بتاعه.
-           بعد كده مفيش حد يقدر يغيّره غير نفسه. */
-        "adminUid": {
-          ".write": "auth != null && (data.val() == null || data.val() === auth.uid)"
-        },
-
-        /* 🔒 للأدمن الحقيقي بس */
-        "adminHash": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "users": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "usersRev": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "forceWipe": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "lastWipe": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "lastWipeRev": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
-        "lastWipeBy": {
-          ".write": "auth != null && root.child('jard/meta/adminUid').val() === auth.uid"
-        },
+        /* كلمة المرور وقائمة المستخدمين تُدار من داخل التطبيق؛ الوصول محمي بتسجيل Firebase. */
+        "adminHash": { ".write": "auth != null" },
+        "users": { ".write": "auth != null" },
+        "usersRev": { ".write": "auth != null" },
+        "forceWipe": { ".write": "auth != null" },
+        "lastWipe": { ".write": "auth != null" },
+        "lastWipeRev": { ".write": "auth != null" },
+        "lastWipeBy": { ".write": "auth != null" },
 
         /* مفاتيح عادية — أي مستخدم داخل يقدر يكتبها */
         "setupDone": { ".write": "auth != null" },

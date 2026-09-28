@@ -71,9 +71,8 @@ td{ padding:.65rem .75rem; }
 td.p3{ padding:.75rem; }
 .tc{ text-align:center; } .fwb{ font-weight:700; } .fw6{ font-weight:600; }
 .tsm{ font-size:.875rem; } .txs{ font-size:.75rem; } .tblue{ color:var(--blue); }
-/* الرصيد الفعلى: مقفول للمستخدم العادي، ومميّز لما يكون اتحدد يدويًا من المسؤول/المشرف */
+/* الرصيد الفعلى: مقفول للمستخدم العادي — وبيفضل بلونه الطبيعي حتى لو اتحدد يدويًا */
 td.qty-locked{ color:#64748b; background:#f8fafc; cursor:not-allowed; }
-td.qty-manual{ background:#fffbeb; box-shadow:inset 3px 0 0 #f59e0b; }
 td[contenteditable="false"][data-qty]{ cursor:not-allowed; }
 .rowselect{ background:transparent; border:none; outline:none; cursor:pointer; width:100%; font-family:inherit; color:inherit; font-size:.75rem; }
 

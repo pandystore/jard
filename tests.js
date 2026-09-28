@@ -679,8 +679,8 @@ console.log('== الرصيد الفعلى: التعديل اليدوي للمس�
   eq(open.editable, true, 'عند المسؤول الخانة قابلة للتعديل');
   eq(open.cls.indexOf('qty-locked') === -1, true, 'ومفيش عليها شكل القفل');
   const manual = actCellAttrs({ actualQuantity: 12, counts: { admin: 12 }, manualQty: true, manualBy: 'admin', manualAt: 0, manualPrev: 'محمد: 5 + admin: 3' });
-  eq(manual.cls.indexOf('qty-manual') !== -1, true, 'الصنف اللي اتحدد يدويًا بيتميّز في الجدول (qty-manual)');
-  eq(manual.title.indexOf('محمد: 5 + admin: 3') !== -1, true, 'والتلميح بيورّي العدّات القديمة اللي اتحذفت');
+  eq(manual.cls.indexOf('qty-manual') === -1, true, 'الصنف اللي اتحدد يدويًا مابقاش ليه تمييز لوني (فات الأصفر)');
+  eq(manual.title.indexOf('محمد: 5 + admin: 3') !== -1, true, 'والتلميح لسه بيورّي مين حدده والعدّات القديمة (البيانات محفوظة في البيانات)');
   setFilter('محمد');
   eq(actCellAttrs({ actualQuantity: 8, counts: {} }).editable, false, 'فلتر المستخدم بيقفل الخانة حتى للمسؤول (زي كمية السيستم)');
   setFilter('');
@@ -694,10 +694,14 @@ console.log('== الرصيد الفعلى: التعديل اليدوي للمس�
   eq(upd.includes('restoreQtyCell'), true, 'لو حد مش من حقه عدّل، الرقم القديم بيرجع في الخانة');
   eq(upd.includes("t: 'manual'"), true, 'التعديل اليدوي بيتبعت كنيّة manual (تمسح القديم)');
   eq(upd.includes("t: 'set'"), false, 'مابقاش يستخدم set (اللي بيضيف حصة فوق القديم)');
+  eq(upd.includes('confirmManualQty'), false, 'مابقاش في شاشة تأكيد/تحذير قبل التحديد اليدوي');
+  eq(upd.includes('showModal'), false, 'updateQty مش بتفتح أي شاشة خالص');
+  eq(upd.includes('if (item[field] === v) return;'), true, 'لو الرقم = الرصيد الحالي (أي صيغة) → مفيش رسالة ولا سجل ولا رفع');
+  eq(src.includes('function confirmManualQty'), false, 'دالة confirmManualQty اتشالت من app.js خالص');
   eq(extractFn('patchSingleRow').includes('actCellAttrs'), true, 'تحديث صف واحد بيحافظ على حالة القفل والعلامة اليدوية');
   eq(extractFn('applyUserUI').includes('thActual'), true, 'رأس عمود «الفعلي» بيتقفل بصريًا لغير المسؤول');
   eq(extractFn('processCode').includes("t: 'delta'"), true, 'المستخدم العادي لسه يقدر يعدّ بالباركود (delta)');
-  eq(css.includes('td.qty-locked') && css.includes('td.qty-manual'), true, 'فيه تنسيق للخانة المقفولة والخانة المحددة يدويًا');
+  eq(css.includes('td.qty-locked') && !css.includes('qty-manual'), true, 'في تنسيق للخانة المقفولة بس — الخلفية الصفرا للمحدد يدويًا اتشالت');
   eq(html.includes('id="thActual"'), true, 'رأس عمود «الفعلي» له معرّف يتحدّث حسب الصلاحية');
 }
 
@@ -875,13 +879,13 @@ console.log('== شكل الجدول: خانة «الفعلي» بتتقفل لغ
   t.updateTable();
   eq(actTd().indexOf('contenteditable="true"') !== -1, true, 'مشرف: يقدر يعدّل الرصيد الفعلى يدويًا');
 
-  /* صنف محدد يدويًا بيتميّز في الجدول */
+  /* صنف محدد يدويًا — التلميح لسه موجود بس من غير أي تمييز لوني */
   t.setItems([{ serial: 2, code: '10002', name: 'سكر', group: 'عام', systemQuantity: 5, actualQuantity: 30,
     isJarded: true, difference: 25, status: 'زيادة', note: '', countedBy: 'admin', counts: { admin: 30 },
     manualQty: true, manualBy: 'admin', manualAt: 1700000000000, manualPrev: 'محمد: 5 + admin: 3' }]);
   t.updateTable();
-  eq(actTd().indexOf('qty-manual') !== -1, true, 'الصنف المحدد يدويًا عليه علامة مميزة في الجدول');
-  eq(actTd().indexOf('محدد يدويًا بواسطة admin') !== -1, true, 'والتلميح بيقول مين حدده يدويًا');
+  eq(actTd().indexOf('qty-manual') === -1, true, 'مفيش تمييز لوني على الخانة المحددة يدويًا (فات الأصفر)');
+  eq(actTd().indexOf('محدد يدويًا بواسطة admin') !== -1, true, 'والتلميح لسه بيقول مين حدده يدويًا');
   eq(actTd().indexOf('محمد: 5 + admin: 3') !== -1, true, 'وكمان العدّات القديمة اللي اتحذفت');
 
   /* فلتر المستخدم بيقفل الخانة حتى للأدمن (زي كمية السيستم) */
@@ -893,7 +897,7 @@ console.log('== شكل الجدول: خانة «الفعلي» بتتقفل لغ
   t.setFilter('');
 }
 
-console.log('== التعديل اليدوي من الجدول (updateQty) — تكامل بالصلاحيات والتأكيد ==');
+console.log('== التعديل اليدوي من الجدول (updateQty) — تكامل بالصلاحيات من غير أي شاشة تأكيد ==');
 {
   const Module = require('module');
   const startAsync = src.indexOf('async function updateQty(');
@@ -907,13 +911,13 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
     }
     const fnSrc = src.slice(startAsync, end);
     const deps = ['esc', 'fmtQ', 'parseQty', 'round2', 'sumCounts', 'countsSummary', 'normItem', 'calculateRow',
-      'applyCountOps', 'loginRequired', 'isElevated', 'canEditActual', 'needAdmin', 'confirmManualQty',
+      'applyCountOps', 'loginRequired', 'isElevated', 'canEditActual', 'needAdmin',
       'restoreQtyCell'].map(extractFn).join('\n');
     const prelude = [
       'var sessionUser = null;',
       'var userFilter = "";',
       'var inventoryData = [];',
-      'var out = { ops: [], pushed: [], logs: [], toasts: [], modals: [], cells: [], notifs: 0, confirm: true };',
+      'var out = { ops: [], pushed: [], logs: [], toasts: [], modals: [], cells: [], notifs: 0 };',
       'var enqueueCountOp = function(code, op){ out.ops.push({ code: code, op: op }); };',
       'var scheduleCountPush = function(code){ out.pushed.push(code); };',
       'var schedulePushItem = function(){ out.pushed.push("meta"); };',
@@ -924,11 +928,8 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       'var refreshRow = function(){};',
       'var patchSingleRow = function(item){ out.cells.push(item.actualQuantity); };',
       'var pushCountNotif = function(){ out.notifs++; };',
-      /* showModal وهمي: يضغط «تأكيد» أو «إلغاء» حسب out.confirm */
-      'var showModal = function(title, body, btns){ out.modals.push(title);',
-      '  if (out.confirm && btns && btns[0] && btns[0].onClick) btns[0].onClick();',
-      '  else if (btns && btns[1] && btns[1].onClick) btns[1].onClick();',
-      '  return { body: null, close: function(){} }; };'
+      /* showModal وهمي: بس يسجّل أي شاشة اتفتحت — لو updateQty فتحت أي شاشة هيفشل الاختبار */
+      'var showModal = function(title){ out.modals.push(title); return { body: null, close: function(){} }; };'
     ].join('\n');
     const m = new Module();
     m._compile(prelude + '\n' + deps + '\n' + fnSrc + '\nmodule.exports = {' +
@@ -936,7 +937,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       ' setSession: function(u){ sessionUser = u; },' +
       ' setItems: function(a){ inventoryData = a; },' +
       ' getItems: function(){ return inventoryData; },' +
-      ' resetOut: function(){ out.ops = []; out.pushed = []; out.logs = []; out.toasts = []; out.modals = []; out.cells = []; out.notifs = 0; out.confirm = true; } };',
+      ' resetOut: function(){ out.ops = []; out.pushed = []; out.logs = []; out.toasts = []; out.modals = []; out.cells = []; out.notifs = 0; } };',
       'update-qty-integration.js');
     const t = m.exports;
     const mkItem = () => ({ serial: 1, code: '10001', name: 'أرز', group: 'عام', systemQuantity: 20,
@@ -957,7 +958,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       t.resetOut(); t.setItems([mkItem()]); t.setSession({ name: 'admin', role: 'admin' });
       await t.updateQty(1, 'actualQuantity', '30', null);
       const i2 = t.getItems()[0];
-      eq(t.out.modals.length, 1, 'أدمن: ظهر تأكيد قبل مسح عدّة اليوزر');
+      eq(t.out.modals.length, 0, 'أدمن: مفيش أي شاشة تأكيد/تحذير — التعديل اتنفذ على طول');
       eqMap(i2.counts, { admin: 30 }, 'أدمن: العدّات القديمة اتمسحت والرقم الجديد باسمه');
       eq(i2.actualQuantity, 30, 'أدمن: الرصيد الفعلى = الرقم المكتوب بإيده');
       eq(i2.difference, 10, 'أدمن: الفرق اتحسب من جديد (30 − 20)');
@@ -983,29 +984,31 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       eq(i3.manualBy, 'ahmed', 'مشرف: منسوب ليه');
       eq(t.out.notifs, 1, 'مشرف: التعديل بتاعه بيبعت إشعار للأدمن');
 
-      /* 4) إلغاء التأكيد → مفيش أي تغيير */
+      /* 4) كتب نفس الرقم بصيغة تانية (8.00) → مفيش أي حاجة خالص */
       t.resetOut(); t.setItems([mkItem()]); t.setSession({ name: 'admin', role: 'admin' });
-      t.out.confirm = false;
-      await t.updateQty(1, 'actualQuantity', '50', null);
+      await t.updateQty(1, 'actualQuantity', '8.00', null);
       const i4 = t.getItems()[0];
-      eq(t.out.modals.length, 1, 'إلغاء: التأكيد ظهر');
-      eqMap(i4.counts, { 'محمد': 5, admin: 3 }, 'إلغاء: العدّات ماتبلاعتش');
-      eq(i4.actualQuantity, 8, 'إلغاء: الرصيد الفعلى زي ما هو');
-      eq(t.out.ops.length, 0, 'إلغاء: مفيش حاجة اترفعت');
-      eq(t.out.cells[t.out.cells.length - 1], 8, 'إلغاء: الخانة رجعت تعرض الرقم المحفوظ');
+      eqMap(i4.counts, { 'محمد': 5, admin: 3 }, 'نفس الرقم (8.00): الحصص ماتبلاعتش');
+      eq(i4.actualQuantity, 8, 'نفس الرقم (8.00): الرصيد الفعلى زي ما هو');
+      eq(!!i4.manualQty, false, 'نفس الرقم (8.00): مفيش علامة تحديد يدوي جديدة');
+      eq(t.out.modals.length, 0, 'نفس الرقم (8.00): مفيش أي شاشة');
+      eq(t.out.ops.length, 0, 'نفس الرقم (8.00): مفيش نيّة اتبعتت للسيرفر');
+      eq(t.out.pushed.length, 0, 'نفس الرقم (8.00): مفيش رفع خالص');
+      eq(t.out.logs.length, 0, 'نفس الرقم (8.00): مفيش سجل عمليات');
+      eq(t.out.toasts.length, 0, 'نفس الرقم (8.00): مفيش رسالة');
 
-      /* 5) تعديل رقمه هو من غير عدّة ناس تانيين → من غير تأكيد */
+      /* 5) تعديل رقمه هو من غير عدّة ناس تانيين → من غير أي شاشة */
       t.resetOut();
       t.setItems([{ serial: 2, code: '10002', name: 'سكر', group: 'عام', systemQuantity: 5, actualQuantity: 5,
         isJarded: true, countedBy: 'admin', counts: { admin: 5 }, editedAt: 100 }]);
       t.setSession({ name: 'admin', role: 'admin' });
       await t.updateQty(2, 'actualQuantity', '9', null);
       const i5 = t.getItems()[0];
-      eq(t.out.modals.length, 0, 'أدمن بيعدّل رقمه هو: مفيش تأكيد (مفيش حد تاني هيتمسح)');
+      eq(t.out.modals.length, 0, 'أدمن بيعدّل رقمه هو: مفيش أي شاشة خالص');
       eqMap(i5.counts, { admin: 9 }, 'ورقمه اتحدث');
       eq(i5.manualQty, true, 'واتعلّم كتحديد يدوي');
 
-      /* 6) كتب نفس الإجمالي بس فيه حصص تانية → يوحّدها باسمه */
+      /* 6) كتب نفس الإجمالي بس فيه حصص تانية → مفيش أي حاجة (الرقم مش مختلف فعلاً) */
       t.resetOut();
       t.setItems([{ serial: 3, code: '10003', name: 'مكرونة', group: 'عام', systemQuantity: 10, actualQuantity: 14,
         isJarded: true, countedBy: 'محمد', counts: { admin: 12, 'محمد': 2 }, editedAt: 500,
@@ -1013,8 +1016,12 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       t.setSession({ name: 'admin', role: 'admin' });
       await t.updateQty(3, 'actualQuantity', '14', null);
       const i6 = t.getItems()[0];
-      eqMap(i6.counts, { admin: 14 }, 'نفس الرقم: الحصص التانية اتوحّدت تحت اسم الأدمن');
+      eqMap(i6.counts, { admin: 12, 'محمد': 2 }, 'نفس الإجمالي: الحصص زي ما هي (ماعملش merge)');
       eq(i6.actualQuantity, 14, 'والإجمالي فضل 14');
+      eq(t.out.ops.length, 0, 'ومفيش نيّة اتبعتت للسيرفر');
+      eq(t.out.pushed.length, 0, 'ومفيش رفع خالص');
+      eq(t.out.logs.length, 0, 'ومفيش سجل');
+      eq(t.out.toasts.length, 0, 'ومفيش رسالة');
 
       /* 7) بيانات قديمة (كمية من غير حصص) منسوبة ليوزر */
       t.resetOut();
@@ -1023,7 +1030,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       t.setSession({ name: 'admin', role: 'admin' });
       await t.updateQty(4, 'actualQuantity', '4', null);
       const i7 = t.getItems()[0];
-      eq(t.out.modals.length, 1, 'بيانات قديمة: ظهر تأكيد لأن فيه كمية باسم يوزر هتتمسح');
+      eq(t.out.modals.length, 0, 'بيانات قديمة: مفيش أي شاشة — اتنفذ على طول حتى لو فيه كمية باسم يوزر هتتمسح');
       eqMap(i7.counts, { admin: 4 }, 'الكمية القديمة اتمسحت واتحطت مكانها رقم الأدمن');
       eq(i7.manualPrev, 'محمد: 9', 'والكمية القديمة اتسجلت باسم صاحبها');
       eq(i7.status, 'عجز', 'والحالة اتحسبت (4 − 6)');

@@ -1354,7 +1354,7 @@ function resetPage(){ currentPage = 0; }
 /* حالة خانة «الفعلي» في الجدول: مين يقدر يعدّلها وإيه اللي حصل فيها */
 function actCellAttrs(item){
   const editable = canEditActual() && !userFilter;
-  const cls = 'tc fwb tblue' + (editable ? '' : ' qty-locked') + (item && item.manualQty ? ' qty-manual' : '');
+  const cls = 'tc fwb tblue' + (editable ? '' : ' qty-locked');
   let title;
   if (!editable) title = '🔒 الرصيد الفعلى يعدّله المسؤول أو المشرف فقط — انت تعدّ بالباركود/الكاميرا بس';
   else {
@@ -1568,26 +1568,6 @@ function restoreQtyCell(tr, field, item){
   else if (field === 'actualQuantity') { try { patchSingleRow(item); } catch(e){} }
 }
 
-/* تأكيد قبل ما التحديد اليدوي يمسح عدّة ناس تانيين — العملية ملهاش تراجع */
-function confirmManualQty(item, v, othersBreakdown){
-  return new Promise(res => {
-    showModal('✍️ تحديد يدوي للرصيد الفعلى',
-      '<div style="font-size:.9rem;color:#475569;line-height:1.8">' +
-        'الصنف: <b>' + esc(item.name) + '</b> (' + esc(item.code) + ')<br>' +
-        'الرصيد الفعلى الجديد: <b style="color:#1d4ed8">' + fmtQ(v) + '</b>' +
-        '<div style="margin-top:.55rem;padding:.6rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#991b1b">' +
-          '⚠️ عدّة ناس تانيين هتتمسح: <b>' + esc(othersBreakdown) + '</b><br>' +
-          'الإجمالي هيكون الرقم اللي كتبته بإيدك بس، وأي حد يعدّ بعد كده هيتضاف فوقه.<br>' +
-          '<b>العملية دي ملهاش تراجع.</b>' +
-        '</div>' +
-      '</div>',
-      [
-        { label: 'تحديد ومسح العدّات القديمة', kind: 'danger', onClick: () => res(true) },
-        { label: 'إلغاء', kind: 'ghost', onClick: () => res(false) }
-      ], () => res(false));
-  });
-}
-
 async function updateQty(serial, field, value, tr){
   const item = inventoryData.find(x => x.serial === serial);
   if (!item) return;
@@ -1602,11 +1582,10 @@ async function updateQty(serial, field, value, tr){
     return;
  }
 
-  const cs = (item.counts && typeof item.counts === 'object') ? item.counts : {};
-  /* لو كتب نفس الرقم الموجود بس لسه فيه حصص قديمة → برضه ننفّذ عشان نوحّدها باسمه */
-  const alreadyManual = field === 'actualQuantity' && !!item.manualQty &&
-    Object.keys(cs).length === 1 && Number(cs[bag]) === v;
-  if (item[field] === v && (field !== 'actualQuantity' || alreadyManual)) return;
+  /* لو الرقم المكتوب = الرصيد الحالي (حتى لو بصيغة تانية زي "8.00"، أو دخول
+     الخانة والخروج منها من غير تغيير) → مفيش أي حاجة: مفيش رسالة ولا سجل
+     ولا رفع للسيرفر */
+  if (item[field] === v) return;
 
   if (field === 'actualQuantity' && onlineGuard('التعديل ده')) return;
   const prevQty = item.actualQuantity;
@@ -1621,19 +1600,7 @@ async function updateQty(serial, field, value, tr){
         ? (item.countedBy ? item.countedBy + ': ' + fmtQ(item.actualQuantity) : fmtQ(item.actualQuantity))
         : '');
 
-    /* لو فيه عدّة باسم حد تاني هتتمسح، نأكد الأول */
-    const others = {};
-    Object.keys(cs).forEach(u => { if (u !== bag && Number(cs[u])) others[u] = cs[u]; });
-    let othersBreakdown = countsSummary(others);
-    if (!othersBreakdown && !Object.keys(cs).length && Number(item.actualQuantity) > 0 && item.countedBy && item.countedBy !== bag) {
-      othersBreakdown = item.countedBy + ': ' + fmtQ(item.actualQuantity);
- }
-    if (othersBreakdown) {
-      const ok = await confirmManualQty(item, v, othersBreakdown);
-      /* إلغاء: نرجّع الخانة للرقم المحفوظ (الصف ممكن يكون اترسم من جديد وإحنا مستنيين) */
-      if (!ok) { try { patchSingleRow(item); } catch(e){ restoreQtyCell(tr, field, item); } return; }
- }
-
+    /* يتنفذ على طول من غير أي شاشة تأكيد — العدّات القديمة بتتسجل في prev والسجل */
     const op = { t: 'manual', who: bag, v: v, ts: nowTs, prev: prevBreakdown };
 
     const opt = applyCountOps(item, [op], who, item.code, item);

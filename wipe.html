@@ -31,8 +31,6 @@ pre{font-size:.7rem; text-align:left; direction:ltr; background:#f1f5f9; padding
 
 const DB_URL = 'https://jard-22f1c-default-rtdb.firebaseio.com/jard';
 const API_KEY = 'AIzaSyB5myjQKjfJ6XMn5ml5D6ohK12zx2m01VI';
-const PROJECT_ID = 'jard-22f1c';
-const ADMIN_EMAIL = 'admin@' + PROJECT_ID + '.local';
 const logEl = document.getElementById('log');
 const pwEl = document.getElementById('pw');
 const btn = document.getElementById('wipeBtn');
@@ -56,18 +54,6 @@ async function signInAnon(){
   anonToken = j.idToken;
 }
 
-async function signInAsAdmin(password){
-  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + encodeURIComponent(API_KEY), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: ADMIN_EMAIL, password: password, returnSecureToken: true })
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(()=>({}));
-    throw new Error((j.error && j.error.message) || ('HTTP ' + r.status));
-  }
-  const j = await r.json();
-  return j.idToken;
-}
 function withAuth(path, token){ return DB_URL + path + '?auth=' + encodeURIComponent(token); }
 (async () => {
   try {
@@ -159,23 +145,15 @@ document.getElementById('wipeBtn').onclick = async ()=>{
 
   btn.disabled = true;
 
-  let adminToken;
-  try {
-    log('جاري تأكيد هويتك كأدمن حقيقي...');
-    adminToken = await signInAsAdmin(pwEl.value);
-    log('✅ هويتك اتأكدت');
-  } catch(e){
-    log('❌ فشل تأكيد الهوية: ' + e.message);
-    if (String(e.message).indexOf('EMAIL_NOT_FOUND') !== -1 || String(e.message).indexOf('INVALID_PASSWORD') !== -1) {
-      log('\u2192 افتح البرنامج نفسه وادخل الإعدادات بالباسورد ده مرة واحدة الأول، عشان يتسجّل حسابك كأدمن حقيقي في Firebase');
-    }
+  if (!anonToken) {
+    log('❌ مفيش اتصال Firebase صالح. أعد تحميل الصفحة وحاول تاني.');
     btn.disabled = false;
     return;
   }
   log('جاري عمل نسخة احتياطية قبل المسح...');
   try {
 
-    const backupRes = await fetch(withAuth('/items.json', adminToken), { cache: 'no-store' });
+    const backupRes = await fetch(withAuth('/items.json', anonToken), { cache: 'no-store' });
     const backupData = await backupRes.json();
     if (backupData) {
       const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
@@ -194,21 +172,21 @@ document.getElementById('wipeBtn').onclick = async ()=>{
   const paths = ['/items.json', '/notifs.json', '/sessions.json'];
   for (const p of paths) {
     try {
-      const r = await fetch(withAuth(p, adminToken), { method: 'DELETE' });
+      const r = await fetch(withAuth(p, anonToken), { method: 'DELETE' });
       log('مسح ' + p + ': ' + r.status + (r.ok ? ' ✅' : ' ❌'));
       if (!r.ok) anyFail = true;
     } catch(e){ log('❌ خطأ في مسح ' + p + ': ' + e.message); anyFail = true; }
   }
   try {
     const wipeTs = Date.now();
-    let r = await fetch(withAuth('/meta/lastWipeRev.json', adminToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
+    let r = await fetch(withAuth('/meta/lastWipeRev.json', anonToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
     log('ختم المسح (rev): ' + r.status);
-    r = await fetch(withAuth('/meta/lastWipe.json', adminToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
+    r = await fetch(withAuth('/meta/lastWipe.json', anonToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
     log('ختم المسح (ts): ' + r.status);
 
-    r = await fetch(withAuth('/meta/lastWipeBy.json', adminToken), { method: 'PUT', body: JSON.stringify(whoDid + ' — ' + new Date(wipeTs).toLocaleString('ar-EG')) });
+    r = await fetch(withAuth('/meta/lastWipeBy.json', anonToken), { method: 'PUT', body: JSON.stringify(whoDid + ' — ' + new Date(wipeTs).toLocaleString('ar-EG')) });
     log('تسجيل المسؤول: ' + r.status);
-    r = await fetch(withAuth('/meta/forceWipe.json', adminToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
+    r = await fetch(withAuth('/meta/forceWipe.json', anonToken), { method: 'PUT', body: JSON.stringify(wipeTs) });
     log('إشارة المسح للأجهزة التانية (forceWipe): ' + r.status);
   } catch(e){ log('❌ خطأ في كتابة ختم المسح: ' + e.message); anyFail = true; }
   try { if ('caches' in window) { const ks = await caches.keys(); for (const k of ks) if (k.startsWith('jard-')) await caches.delete(k); } } catch(e){}

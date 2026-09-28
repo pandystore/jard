@@ -104,6 +104,7 @@ function tabGuard(proceed){
 
 window.addEventListener('error', function (e) {
   try {
+    if (typeof sessionUser !== 'undefined' && sessionUser && typeof isElevated === 'function' && !isElevated()) return;
     var box = document.getElementById('toasts');
     if (!box || !e || !e.message) return;
     var t = document.createElement('div');
@@ -154,7 +155,7 @@ let failCount = 0, lockUntil = 0;
 
 let loginFails = 0, loginLockUntil = 0;
 
-let adminAuthedLive = false;
+let localAdminVerified = false;
 let pendingMetaPush = false;
 
 let lastUsersRev = 0;
@@ -420,6 +421,8 @@ function primeAudio(){
 }
 
 function toast(msg, type, opts){
+  /* المستخدم العادي لا تظهر له أي رسائل Toast؛ تظل رسائل المسؤول والمشرف ظاهرة. */
+  if (sessionUser && typeof isElevated === 'function' && !isElevated()) return;
   opts = opts || {};
   const t = document.createElement('div');
   t.className = 'toast ' + (type || 'info');
@@ -493,91 +496,6 @@ function inputDlg(title, ph, isPass){
  });
 }
 
-function adminAuthEmail(){
-  const cfg = effectiveCfg();
-  const proj = (cfg && cfg.projectId) || 'jard';
-  return 'admin@' + proj + '.local';
-}
-
-function realAdminAuthOk(){
-  try {
-    if (typeof firebase === 'undefined' || !firebase.auth) return false;
-    const cu = firebase.auth().currentUser;
-    return !!(cu && !cu.isAnonymous && cu.email && cu.email === adminAuthEmail());
-  } catch (e) { return false; }
-}
-
-function dropRealAdminAuth(){
-  try {
-    if (typeof firebase === 'undefined' || !firebase.auth) return;
-    const cu = firebase.auth().currentUser;
-    if (cu && !cu.isAnonymous) {
-      firebase.auth().signOut()
-        .then(() => firebase.auth().signInAnonymously())
-        .catch(() => {});
-    }
-  } catch (e) {}
-}
-
-async function ensureFirebaseAdminAuth(password){
-  if (!syncOn || !db || typeof firebase === 'undefined' || !firebase.auth) return false;
-  const email = adminAuthEmail();
-  try {
-    const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
-
-    try { await db.ref(fbPath() + '/meta/adminUid').transaction(cur => cur == null ? cred.user.uid : cur); } catch (e3) {}
-    return true;
- } catch (e) {
-    if (e && e.code === 'auth/user-not-found') {
-      try {
-        const cred = await firebase.auth().createUserWithEmailAndPassword(email, password);
-
-        try { await db.ref(fbPath() + '/meta/adminUid').transaction(cur => cur == null ? cred.user.uid : cur); } catch(e2){}
-        return true;
- } catch (e2) {
-        if (e2 && e2.code === 'auth/operation-not-allowed') {
-          toast('⚠️ لازم تفعّل "Email/Password" في Firebase Console ← Authentication ← Sign-in method عشان الحماية المتقدمة تشتغل', 'error');
- }
-        return false;
- }
- }
-    if (e && (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential')) {
-      toast('⚠️ هوية الأدمن على Firebase باسوردها مختلف عن باسورد البرنامج.\nمن الإعدادات اضغط «إصلاح هوية الأدمن» عشان تظبطها.', 'error', { life: 20000 });
-    }
-    return false;
- }
-}
-
-async function repairAdminIdentity(){
-  if (needAdmin()) return;
-  if (!syncOn || !db || typeof firebase === 'undefined' || !firebase.auth) { toast('لازم تكون متصل بالإنترنت', 'error'); return; }
-  const cu = firebase.auth().currentUser;
-  let storedUid = null;
-  try { storedUid = (await db.ref(fbPath() + '/meta/adminUid').get()).val(); } catch (e) {}
-  const lines = [
-    'هوية Firebase الحالية: <b>' + (cu ? (cu.isAnonymous ? 'مجهولة (مش أدمن)' : esc(cu.email || '')) : 'مفيش') + '</b>',
-    'الـ uid الحالي: <b>' + (cu ? cu.uid.slice(0,12) + '…' : '—') + '</b>',
-    'الـ uid المسجّل كأدمن: <b>' + (storedUid ? storedUid.slice(0,12) + '…' : 'لسه متسجلش') + '</b>',
-    (cu && !cu.isAnonymous && storedUid === cu.uid)
-      ? '<div style="color:#15803d;font-weight:800">✅ تمام — إنت الأدمن المسجّل، الكتابات الإدارية هتشتغل</div>'
-      : '<div style="color:#b91c1c;font-weight:800">⚠️ مش متطابقين — اضغط «صلّح» وادخل باسورد admin</div>'
-  ];
-  const fix = await new Promise(res => {
-    showModal('هوية الأدمن على Firebase', '<div style="font-size:.9rem;color:#475569;line-height:2.1">' + lines.join('<br>') + '</div>', [
-      { label: '🔧 صلّح', kind: 'primary', onClick: () => res(true) },
-      { label: 'إلغاء', kind: 'ghost', onClick: () => res(false) }
-    ], () => res(false));
-  });
-  if (!fix) return;
-  const pw = await inputDlg('باسورد admin', 'اكتب كلمة مرور admin الحالية', true);
-  if (pw === null) return;
-  const ok = await ensureFirebaseAdminAuth(pw);
-  const cu2 = firebase.auth().currentUser;
-  let uid2 = null;
-  try { uid2 = (await db.ref(fbPath() + '/meta/adminUid').get()).val(); } catch (e) {}
-  if (ok && cu2 && uid2 === cu2.uid) { toast('✅ اتصلحت — جرّب تضيف المستخدم تاني', 'success', { life: 12000 }); addLog('🔧 إصلاح هوية الأدمن'); pushMeta(true); }
-  else { toast('⛔ لسه مش مظبوطة.\nلو الرسالة «wrong-password» → Firebase Console ← Authentication ← Users ← امسح الحساب ' + adminAuthEmail() + ' وبعدين «صلّح» تاني.', 'error', { life: 30000 }); }
-}
 async function ensureAdmin(){
   if (!adminHash) {
     const p1 = await inputDlg('إنشاء كلمة مرور admin', 'أول مرة — اختر كلمة مرور', true);
@@ -588,8 +506,7 @@ async function ensureAdmin(){
     adminHash = await hashPass(p1);
     store.setItem('adminHash', adminHash);
 
-    await ensureFirebaseAdminAuth(p1);
-    adminAuthedLive = true;
+    localAdminVerified = true;
     pushMeta(false);
     addLog('تم إنشاء كلمة مرور admin');
     toast('تم إنشاء كلمة المرور بنجاح', 'success');
@@ -604,8 +521,7 @@ async function ensureAdmin(){
   if (p === null) return false;
   const upg = await verifyPass(p, adminHash);
   if (upg) {
-    failCount = 0; adminAuthedLive = true;
-    await ensureFirebaseAdminAuth(p);
+    failCount = 0; localAdminVerified = true;
 
     if (upg !== adminHash) { adminHash = upg; store.setItem('adminHash', adminHash); scheduleMetaPush(); }
     return true;
@@ -706,8 +622,7 @@ function logoutUser(){
   if (sessionUser) addLog('خروج المستخدم: ' + sessionUser.name);
   releaseSession();
   sessionUser = null;
-  adminAuthedLive = false;
-  dropRealAdminAuth();
+  localAdminVerified = false;
   userFilter = '';
 
   try { stopCameraScanner(); } catch (e) {}
@@ -728,8 +643,7 @@ function autoLogout(){
   addLog('خروج تلقائي للخمول: ' + sessionUser.name);
   releaseSession();
   sessionUser = null;
-  adminAuthedLive = false;
-  dropRealAdminAuth();
+  localAdminVerified = false;
   userFilter = '';
   try { stopCameraScanner(); } catch (e) {}
   document.querySelectorAll('.modal-overlay, .big-block-ov, .lock-overlay').forEach(x => x.remove());
@@ -1148,9 +1062,8 @@ async function tryLogin(user, pass){
   if (user === '__admin__' || user === '') {
     const up = await verifyPass(pass, adminHash);
     if (up) {
-      adminAuthedLive = true;
+      localAdminVerified = true;
 
-      try { await ensureFirebaseAdminAuth(pass); } catch (e) {}
       if (up !== adminHash) { adminHash = up; store.setItem('adminHash', adminHash); scheduleMetaPush(); }
       return { name: 'admin', role: 'admin' };
     }
@@ -1432,12 +1345,9 @@ function refreshRow(tr, item){
 }
 
 function displayQty(item){
-  const hasUCounts = userFilter && item.counts && Object.keys(item.counts).length > 0;
-  const uQty = hasUCounts ? (Number(item.counts[userFilter]) || 0)
-    : (userFilter && item.countedBy === userFilter ? item.actualQuantity : null);
-  if (uQty === null) return { act: item.actualQuantity, diff: item.difference, status: item.status };
-  const diff = uQty - item.systemQuantity;
-  return { act: uQty, diff: diff, status: diff > 0 ? 'زيادة' : diff < 0 ? 'عجز' : 'متساوي' };
+  /* فلتر المستخدم يختار الأصناف التي شارك فيها، لكن الجرد يعرض الإجمالي
+     المشترك للصنف ولا يستبدله بحصة مستخدم واحد. */
+  return { act: item.actualQuantity, diff: item.difference, status: item.status };
 }
 function rowClass(status, serial){
   return (status === 'زيادة' ? 'row-surplus' : status === 'عجز' ? 'row-deficit' : '') +
@@ -1640,9 +1550,8 @@ function processCode(code){
   if (item) {
     const prevBy = item.countedBy;
     if (item.isJarded && who && prevBy && prevBy !== who) {
-      toast('⚠️ "' + item.name + '" اتجرد بواسطة ' + prevBy + ' قبل كده — كميته كانت ' + fmtQ(item.actualQuantity), 'warning');
-      beep('bad');
-      addLog('تنبيه تعدد جرد: ' + item.code + ' بواسطة ' + prevBy + ' ثم ' + who);
+      toast('ℹ️ "' + item.name + '" اتجرد قبل كده بواسطة ' + prevBy + ' — العدّة الجديدة هتتضاف للإجمالي المشترك.', 'info');
+      addLog('إضافة جرد مشترك: ' + item.code + ' بواسطة ' + prevBy + ' ثم ' + who);
  }
 
     const seed = legacySeedOp(item, bag, nowTs);
@@ -1682,10 +1591,7 @@ function processCode(code){
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
-    const cnt = (done.counts && typeof done.counts === 'object') ? done.counts : {};
-    const nCounters = Object.keys(cnt).filter(k => Number(cnt[k]) > 0).length;
-    const bd = nCounters > 1 ? fmtCountsBreakdown(cnt) : '';
-    ls.textContent = '✓ ' + done.name + ' — الكمية الآن: ' + fmtQ(qty) + (bd ? ' — ' + bd : (who ? ' — بواسطة: ' + who : ''));
+    ls.textContent = '✓ ' + done.name + ' — الكمية الإجمالية الآن: ' + fmtQ(qty);
  }
 }
 
@@ -2228,7 +2134,7 @@ function pushMeta(withUsers){
   const meta = {};
   meta.setupDone = true;
 
-  const canWriteAdminMeta = !!(adminAuthedLive || realAdminAuthOk());
+  const canWriteAdminMeta = !!localAdminVerified;
   if (adminHash && canWriteAdminMeta) meta.adminHash = adminHash;
 
   if (withUsers && canWriteAdminMeta) {
@@ -2260,7 +2166,7 @@ function pushMeta(withUsers){
  }).catch(e => {
     lastSyncErr = (e && e.message) ? e.message : String(e);
     if (String(lastSyncErr).indexOf('PERMISSION_DENIED') !== -1) {
-      toast('⛔ السيرفر رفض حفظ ' + (withUsers ? 'المستخدمين' : 'الإعدادات') + ' — هوية الأدمن على Firebase مش متسجلة.\nالحل: من الإعدادات اضغط «إصلاح هوية الأدمن»، أو حمّل الصفحة وسجّل دخول بـ admin تاني.', 'error', { life: 20000 });
+      toast('⛔ السيرفر رفض الحفظ — راجع صلاحيات Firebase Realtime Database Rules.', 'error', { life: 12000 });
       addLog('⛔ رفض من السيرفر عند حفظ meta: ' + lastSyncErr);
     }
     return false;
@@ -3070,7 +2976,7 @@ function prepareAndPrint(){
   $('printDate').textContent = 'تاريخ الجرد: ' + (($('currentDateTime').value || '').replace('T', ' ')) + (userFilter ? ' — المستخدم: ' + userFilter : '');
   const rows = anySel ? inventoryData.filter(i => selectedSerials.has(i.serial)) : getFiltered();
 
-  const q = i => (userFilter && i.counts ? (Number(i.counts[userFilter]) || 0) : i.actualQuantity);
+  const q = i => i.actualQuantity;
   $('footSys').textContent = fmtQ(rows.reduce((a, i) => a + i.systemQuantity, 0));
   $('footAct').textContent = fmtQ(rows.reduce((a, i) => a + q(i), 0));
   $('footDiff').textContent = fmtQ(rows.reduce((a, i) => a + (q(i) - i.systemQuantity), 0));
@@ -3350,7 +3256,7 @@ async function openSettings(){
     if (!isAdmin()) {
       const ok = await ensureAdmin();
       if (!ok) { toast('الإعدادات للمسؤول فقط', 'error'); return; }
- } else if (!adminAuthedLive && !realAdminAuthOk()) {
+ } else if (!localAdminVerified) {
 
       const ok = await ensureAdmin();
       if (!ok) { toast('لازم تأكيد كلمة مرور admin قبل فتح الإعدادات', 'error'); return; }
@@ -3416,7 +3322,6 @@ async function openSettings(){
     '<button class="mbtn ghost" id="rstLogoBtn" style="flex:0;padding:.45rem .7rem">↩️</button>' +
     '</div>' +
     '<div class="modal-foot" style="flex-wrap:wrap"><button class="mbtn ghost" id="chgPass">🔑 تغيير كلمة مرور admin</button>' +
-    '<button class="mbtn ghost" id="fixIdBtn" title="لو إضافة المستخدمين بترفض">🔧 إصلاح هوية الأدمن</button></div>' +
     '<div class="sec-title" style="margin-top:.9rem">🕘 السجل</div>' +
     '<div class="modal-foot" style="flex-wrap:wrap;margin-top:.2rem">' +
     '<button class="mbtn ghost" id="logBtn">🕘 عرض السجل</button></div>' +
@@ -3524,7 +3429,7 @@ async function openSettings(){
       toast('✅ تمت إضافة ' + name + ' — موجود على السيرفر ويقدر يدخل من أي جهاز', 'success', { life: 12000 });
     } else {
       addLog('⛔ فشل حفظ المستخدم على السيرفر: ' + name);
-      toast('⛔ ' + name + ' ماتحفظش على السيرفر — هيظهر عندك إنت بس.\nالسبب غالباً: هوية الأدمن على Firebase مش متسجلة. حمّل الصفحة وسجّل دخول بـ admin تاني.', 'error', { life: 25000 });
+      toast('⛔ ' + name + ' ماتحفظش على السيرفر — راجع صلاحيات Firebase Rules.', 'error', { life: 12000 });
     }
  };
 
@@ -3591,8 +3496,6 @@ async function openSettings(){
     store.setItem('soundOn', soundOn ? '1' : '0');
     if (soundOn) beep('ok');
  };
-  const fixBtn = m.body.querySelector('#fixIdBtn');
-  if (fixBtn) fixBtn.onclick = async () => { m.close(); await repairAdminIdentity(); };
   m.body.querySelector('#chgPass').onclick = async () => {
     let old = '';
     if (adminHash) {
@@ -3609,15 +3512,9 @@ async function openSettings(){
     if (p1 !== p2) { toast('غير متطابقتين', 'error'); return; }
     adminHash = await hashPass(p1);
     store.setItem('adminHash', adminHash);
-    adminAuthedLive = true;
+    localAdminVerified = true;
     pushMeta(false);
 
-    try {
-      if (old) await ensureFirebaseAdminAuth(old);
-      const cu = firebase.auth && firebase.auth().currentUser;
-      if (cu && cu.email === adminAuthEmail()) await cu.updatePassword(p1);
-      else await ensureFirebaseAdminAuth(p1);
- } catch (e) {}
     addLog('تغيير كلمة المرور');
     toast('تم تغيير كلمة المرور', 'success');
  };

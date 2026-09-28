@@ -208,21 +208,56 @@ function normItem(i, fallbackCode){
     countedBy: String(i.countedBy || ''),
     counts: (i.counts && typeof i.counts === 'object') ? i.counts : {},
     conflict: !!i.conflict,
-    editedAt: Number(i.editedAt) || 0
+    editedAt: Number(i.editedAt) || 0,
+    /* تحديد يدوي للرصيد الفعلى — بيحصل من المسؤول/المشرف فقط من الجدول */
+    manualQty: !!i.manualQty,
+    manualBy: String(i.manualBy || ''),
+    manualAt: Number(i.manualAt) || 0,
+    manualPrev: String(i.manualPrev || '')
  };
+}
+
+/* الرصيد الفعلى (العمود الأزرق في الجدول) يتعدّل يدويًا من المسؤول أو المشرف فقط.
+   المستخدم العادي يعدّ بالباركود/الكاميرا بس — العدّة بتتسجّل كحصة باسمه. */
+function canEditActual(){
+  if (!loginRequired()) return true;
+  return isElevated();
+}
+
+function fmtTs(ts){
+  const n = Number(ts) || 0;
+  if (!n) return '';
+  const d = new Date(n);
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());
 }
 
 function mergeOneItem(l, r, me){
   const rRole = getUserRole(r.countedBy);
   const rTs = Number(r.editedAt) || 0;
   const lTs = Number(l.editedAt) || 0;
+  const lManualAt = Number(l.manualAt) || 0;
+  const rManualAt = Number(r.manualAt) || 0;
 
-  const counts = Object.assign({}, r.counts || {});
-  Object.keys(l.counts || {}).forEach(u => {
-    if (u === me || counts[u] === undefined) counts[u] = l.counts[u];
+  /* تحديد يدوي من المسؤول/المشرف: بيمسح كل الحصص اللي كانت موجودة وقت التحديد
+     ويحط الرقم الجديد باسمه. النسخة اللي فيها تحديد يدوي أحدث من توقيت النسخة
+     التانية هي اللي بتكسب — وأي عدّة اتعملت بعد التحديد بتتضاف فوقه وما بتتمسحش. */
+  const lManualWins = lManualAt > 0 && lManualAt >= rTs;
+  const rManualWins = !lManualWins && rManualAt > 0 && rManualAt >= lTs;
+
+  const counts = Object.assign({}, lManualWins ? (l.counts || {}) : (r.counts || {}));
+  if (!lManualWins && !rManualWins) {
+    Object.keys(l.counts || {}).forEach(u => {
+      if (u === me || counts[u] === undefined) counts[u] = l.counts[u];
  });
+ }
   const m = Object.assign({}, r);
   m.counts = counts;
+  if (lManualAt && lManualAt >= rManualAt) {
+    m.manualQty = !!l.manualQty;
+    m.manualBy = String(l.manualBy || '');
+    m.manualAt = lManualAt;
+    m.manualPrev = String(l.manualPrev || '');
+ }
   if (Object.keys(counts).length) {
     const tot = Object.keys(counts).reduce((a, u) => a + (Number(counts[u]) || 0), 0);
 
@@ -256,6 +291,14 @@ function sumCounts(counts){
   return round2(Object.keys(c).reduce((a, u) => a + (Number(c[u]) || 0), 0));
 }
 
+/* وصف مقروء للحصص: "محمد: 5 + admin: 2" — بيستخدم في التلميحات وسجل العمليات */
+function countsSummary(counts){
+  const c = (counts && typeof counts === 'object') ? counts : {};
+  const keys = Object.keys(c).filter(k => Number(c[k]) > 0);
+  if (!keys.length) return '';
+  return keys.map(k => k + ': ' + fmtQ(c[k])).join(' + ');
+}
+
 function applyCountOps(cur, ops, me, code, localBase){
   const list = Array.isArray(ops) ? ops : [];
   const src = (cur && typeof cur === 'object') ? cur : (localBase || null);
@@ -263,7 +306,7 @@ function applyCountOps(cur, ops, me, code, localBase){
   if (code) item.code = code;
 
   let counts = (cur && cur.counts && typeof cur.counts === 'object') ? Object.assign({}, cur.counts) : {};
-  let lastWho = '', lastTs = Number(item.editedAt) || 0;
+  let lastWho = '', lastTs = Number(item.editedAt) || 0, manual = null;
   for (let i = 0; i < list.length; i++){
     const op = list[i];
     if (!op) continue;
@@ -273,6 +316,14 @@ function applyCountOps(cur, ops, me, code, localBase){
       if (!Object.keys(counts).length && who) counts[who] = Math.max(0, round2(op.v));
  } else if (op.t === 'delta'){
       if (who) counts[who] = round2((Number(counts[who]) || 0) + (Number(op.d) || 0));
+ } else if (op.t === 'manual'){
+      /* تحديد يدوي من المسؤول/المشرف: يمسح كل العدّات السابقة (من الأدمن أو أي يوزر)
+         ويحط الرقم اللي اتكتب بإيده كحصة واحدة باسمه — الإجمالي يبقى هو الرقم ده بالظبط */
+      if (who) {
+        manual = { by: who, at: Number(op.ts) || 0, prev: countsSummary(counts) || String(op.prev || '') };
+        counts = {};
+        counts[who] = Math.max(0, round2(op.v));
+ }
  } else if (op.t === 'set'){
 
       if (who) counts[who] = Math.max(0, round2(op.v));
@@ -285,6 +336,12 @@ function applyCountOps(cur, ops, me, code, localBase){
   item.isJarded = true;
   item.countedBy = lastWho || me || item.countedBy || '';
   item.editedAt = lastTs;
+  if (manual) {
+    item.manualQty = true;
+    item.manualBy = manual.by;
+    item.manualAt = manual.at;
+    item.manualPrev = manual.prev;
+ }
   calculateRow(item);
   return item;
 }
@@ -605,6 +662,16 @@ function applyUserUI(){
   ['btnExport', 'btnExportCsv', 'btnPrint', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnReports'].forEach(id => {
     const b = $(id); if (b) b.style.display = elev ? '' : 'none';
  });
+
+  /* رأس عمود «الفعلي»: يقفل بصريًا لغير المسؤول/المشرف */
+  const thAct = $('thActual');
+  if (thAct) {
+    const canAct = canEditActual();
+    thAct.textContent = 'الفعلي' + (canAct ? '' : ' 🔒');
+    thAct.title = canAct
+      ? 'تعديل يدوي من المسؤول/المشرف: يمسح العدّات السابقة من أي حد ويخلي الإجمالي هو الرقم ده'
+      : 'الرصيد الفعلى يعدّله المسؤول أو المشرف فقط — انت تعدّ بالباركود/الكاميرا بس';
+ }
 
   try { updateTable(); } catch (e) {}
   try {
@@ -1284,6 +1351,22 @@ function setPageSize(v){
 
 function resetPage(){ currentPage = 0; }
 
+/* حالة خانة «الفعلي» في الجدول: مين يقدر يعدّلها وإيه اللي حصل فيها */
+function actCellAttrs(item){
+  const editable = canEditActual() && !userFilter;
+  const cls = 'tc fwb tblue' + (editable ? '' : ' qty-locked') + (item && item.manualQty ? ' qty-manual' : '');
+  let title;
+  if (!editable) title = '🔒 الرصيد الفعلى يعدّله المسؤول أو المشرف فقط — انت تعدّ بالباركود/الكاميرا بس';
+  else {
+    title = '✍️ تعديل يدوي (للمسؤول/المشرف): يمسح العدّات السابقة من أي حد ويخلي الإجمالي هو الرقم ده';
+    if (item && item.manualQty) {
+      title += '\n— محدد يدويًا بواسطة ' + (item.manualBy || 'المسؤول') + (item.manualAt ? ' في ' + fmtTs(item.manualAt) : '');
+      if (item.manualPrev) title += '\n— كان قبلها: ' + item.manualPrev;
+ }
+ }
+  return { cls: cls, title: title, editable: editable };
+}
+
 function updateTable(){
   const filtered = getFiltered();
 
@@ -1300,11 +1383,12 @@ function updateTable(){
   const rows = new Array(view.length);
   const ceName = canEdit ? 'true' : 'false';
   const ceSys = (userFilter || !canEdit) ? 'false' : 'true';
-  const ceAct = userFilter ? 'false' : 'true';
   for (let i = 0; i < view.length; i++) {
     const item = view[i];
     const d = displayQty(item);
     const sel = selectedSerials.has(item.serial);
+    const act = actCellAttrs(item);
+    const actCe = act.editable ? 'true' : 'false';
 
     const groupCell = canEdit
       ? '<td class="p3 txs"><select data-gsel class="rowselect"><option value="' + esc(item.group) + '" selected>' + esc(item.group) + '</option></select></td>'
@@ -1316,7 +1400,7 @@ function updateTable(){
       '<td class="p3 tsm" contenteditable="' + ceName + '" data-edit="name">' + esc(item.name) + '</td>' +
       groupCell +
       '<td class="tc fwb" contenteditable="' + ceSys + '" data-qty="systemQuantity" data-cell="sys">' + fmtQ(item.systemQuantity) + '</td>' +
-      '<td class="tc fwb tblue" contenteditable="' + ceAct + '" data-qty="actualQuantity" data-cell="act">' + fmtQ(d.act) + '</td>' +
+      '<td class="' + act.cls + '" contenteditable="' + actCe + '" title="' + esc(act.title) + '" data-qty="actualQuantity" data-cell="act">' + fmtQ(d.act) + '</td>' +
       '<td class="tc fwb" data-cell="diff">' + fmtQ(d.diff) + '</td>' +
       '<td class="tc txs fwb" data-cell="status">' + esc(d.status) + '</td>' +
       '<td class="p3 txs" contenteditable="' + ceName + '" data-edit="note">' + esc(item.note) + '</td>' +
@@ -1381,7 +1465,14 @@ function patchSingleRow(item){
   const gsel = tr.querySelector('select[data-gsel]'); if (gsel && document.activeElement !== gsel) setGroupSelect(gsel, item.group);
   const sysEl = tr.querySelector('[data-cell="sys"]'); if (sysEl && document.activeElement !== sysEl) sysEl.textContent = fmtQ(item.systemQuantity);
   const d = displayQty(item);
-  const actEl = tr.querySelector('[data-cell="act"]'); if (actEl && document.activeElement !== actEl) actEl.textContent = fmtQ(d.act);
+  const actEl = tr.querySelector('[data-cell="act"]');
+  if (actEl) {
+    const act = actCellAttrs(item);
+    actEl.className = act.cls;
+    actEl.setAttribute('title', act.title);
+    actEl.setAttribute('contenteditable', act.editable ? 'true' : 'false');
+    if (document.activeElement !== actEl) actEl.textContent = fmtQ(d.act);
+ }
   const diffEl = tr.querySelector('[data-cell="diff"]'); if (diffEl) diffEl.textContent = fmtQ(d.diff);
   const stEl = tr.querySelector('[data-cell="status"]'); if (stEl) stEl.textContent = d.status;
   const noteEl = tr.querySelector('[data-edit="note"]'); if (noteEl && document.activeElement !== noteEl) noteEl.textContent = item.note;
@@ -1469,46 +1560,104 @@ function updateField(serial, field, value){
   saveAndRefresh(false, item);
   if (field === 'group') { renderCategoryButtons(); updateStats(); }
 }
-function updateQty(serial, field, value, tr){
+function restoreQtyCell(tr, field, item){
+  if (!item) return;
+  const cell = field === 'actualQuantity' ? 'act' : 'sys';
+  const td = (tr && tr.querySelector) ? tr.querySelector('[data-cell="' + cell + '"]') : null;
+  if (td) td.textContent = fmtQ(item[field]);
+  else if (field === 'actualQuantity') { try { patchSingleRow(item); } catch(e){} }
+}
+
+/* تأكيد قبل ما التحديد اليدوي يمسح عدّة ناس تانيين — العملية ملهاش تراجع */
+function confirmManualQty(item, v, othersBreakdown){
+  return new Promise(res => {
+    showModal('✍️ تحديد يدوي للرصيد الفعلى',
+      '<div style="font-size:.9rem;color:#475569;line-height:1.8">' +
+        'الصنف: <b>' + esc(item.name) + '</b> (' + esc(item.code) + ')<br>' +
+        'الرصيد الفعلى الجديد: <b style="color:#1d4ed8">' + fmtQ(v) + '</b>' +
+        '<div style="margin-top:.55rem;padding:.6rem;background:#fef2f2;border:1px solid #fecaca;border-radius:.5rem;color:#991b1b">' +
+          '⚠️ عدّة ناس تانيين هتتمسح: <b>' + esc(othersBreakdown) + '</b><br>' +
+          'الإجمالي هيكون الرقم اللي كتبته بإيدك بس، وأي حد يعدّ بعد كده هيتضاف فوقه.<br>' +
+          '<b>العملية دي ملهاش تراجع.</b>' +
+        '</div>' +
+      '</div>',
+      [
+        { label: 'تحديد ومسح العدّات القديمة', kind: 'danger', onClick: () => res(true) },
+        { label: 'إلغاء', kind: 'ghost', onClick: () => res(false) }
+      ], () => res(false));
+  });
+}
+
+async function updateQty(serial, field, value, tr){
   const item = inventoryData.find(x => x.serial === serial);
   if (!item) return;
   const v = parseQty(value);
-  if (item[field] === v) return;
+  const who = sessionUser ? sessionUser.name : '';
+  const whoRole = sessionUser ? (sessionUser.role||'user') : 'user';
+  const bag = who || 'بدون مستخدم';
 
-  if (field === 'systemQuantity' && needAdmin()) return;
+  /* الرصيد الفعلى وكمية السيستم: تعديل يدوي للمسؤول أو المشرف فقط */
+  if (needAdmin()) {
+    restoreQtyCell(tr, field, item);
+    return;
+ }
+
+  const cs = (item.counts && typeof item.counts === 'object') ? item.counts : {};
+  /* لو كتب نفس الرقم الموجود بس لسه فيه حصص قديمة → برضه ننفّذ عشان نوحّدها باسمه */
+  const alreadyManual = field === 'actualQuantity' && !!item.manualQty &&
+    Object.keys(cs).length === 1 && Number(cs[bag]) === v;
+  if (item[field] === v && (field !== 'actualQuantity' || alreadyManual)) return;
 
   if (field === 'actualQuantity' && onlineGuard('التعديل ده')) return;
   const prevQty = item.actualQuantity;
-  const who = sessionUser ? sessionUser.name : '';
-  const whoRole = sessionUser ? (sessionUser.role||'user') : 'user';
   let viaOps = false;
   if (field === 'systemQuantity') {
     item[field] = v;
  } else if (field === 'actualQuantity') {
 
-    const bag = who || 'بدون مستخدم';
     const nowTs = Date.now();
-    const ops = [];
-    const seed = legacySeedOp(item, bag, nowTs);
-    if (seed) ops.push(seed);
-    ops.push({ t: 'set', who: bag, v: v, ts: nowTs });
+    const prevBreakdown = countsSummary(item.counts) ||
+      (Number(item.actualQuantity) > 0
+        ? (item.countedBy ? item.countedBy + ': ' + fmtQ(item.actualQuantity) : fmtQ(item.actualQuantity))
+        : '');
 
-    const opt = applyCountOps(item, ops, who, item.code, item);
+    /* لو فيه عدّة باسم حد تاني هتتمسح، نأكد الأول */
+    const others = {};
+    Object.keys(cs).forEach(u => { if (u !== bag && Number(cs[u])) others[u] = cs[u]; });
+    let othersBreakdown = countsSummary(others);
+    if (!othersBreakdown && !Object.keys(cs).length && Number(item.actualQuantity) > 0 && item.countedBy && item.countedBy !== bag) {
+      othersBreakdown = item.countedBy + ': ' + fmtQ(item.actualQuantity);
+ }
+    if (othersBreakdown) {
+      const ok = await confirmManualQty(item, v, othersBreakdown);
+      /* إلغاء: نرجّع الخانة للرقم المحفوظ (الصف ممكن يكون اترسم من جديد وإحنا مستنيين) */
+      if (!ok) { try { patchSingleRow(item); } catch(e){ restoreQtyCell(tr, field, item); } return; }
+ }
+
+    const op = { t: 'manual', who: bag, v: v, ts: nowTs, prev: prevBreakdown };
+
+    const opt = applyCountOps(item, [op], who, item.code, item);
     opt.serial = item.serial;
     Object.assign(item, opt);
-    ops.forEach(op => enqueueCountOp(item.code, op));
+    enqueueCountOp(item.code, op);
     viaOps = true;
+
+    addLog('تحديد يدوي للرصيد الفعلى: ' + item.code + ' «' + item.name + '» → ' + fmtQ(v) +
+      ' بواسطة ' + bag + (prevBreakdown ? ' (اتمسح: ' + prevBreakdown + ')' : ''));
+    toast('✍️ الرصيد الفعلى بقى ' + fmtQ(v) +
+      (prevBreakdown ? ' — العدّات السابقة (' + prevBreakdown + ') اتحذفت' : ''), 'success');
  } else {
     item[field] = v;
  }
   item.editedAt = Date.now();
   calculateRow(item);
   if (tr) refreshRow(tr, item);
+  if (field === 'actualQuantity') patchSingleRow(item);
   updateStats();
   if (viaOps) scheduleCountPush(item.code); else schedulePushItem(item);
 
   try {
-    if (field === 'actualQuantity' && who && v !== prevQty && (!whoRole || whoRole === 'user')) {
+    if (field === 'actualQuantity' && who && v !== prevQty && whoRole !== 'admin') {
       pushCountNotif(item, (v - prevQty), 'edit');
  }
  } catch(e){}
@@ -1524,10 +1673,7 @@ function eanOk(code){
 }
 
 function fmtCountsBreakdown(counts){
-  if (!counts || typeof counts !== 'object') return '';
-  const keys = Object.keys(counts).filter(k => Number(counts[k]) > 0);
-  if (!keys.length) return '';
-  return keys.map(k => k + ': ' + fmtQ(counts[k])).join(' + ');
+  return countsSummary(counts);
 }
 let lastScanCode = '', lastScanTime = 0;
 function processCode(code){
@@ -1591,7 +1737,10 @@ function processCode(code){
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
-    ls.textContent = '✓ ' + done.name + ' — الكمية الإجمالية الآن: ' + fmtQ(qty);
+    ls.textContent = '✓ ' + done.name + ' — الكمية الإجمالية الآن: ' + fmtQ(qty) +
+      (done.manualQty
+        ? ' (منها ' + fmtQ(Number(done.counts && done.counts[done.manualBy]) || 0) + ' تحديد يدوي من ' + (done.manualBy || 'المسؤول') + ' — عدّتك بتتضاف فوقها)'
+        : '');
  }
 }
 
@@ -2105,7 +2254,7 @@ function pushMergeMeta(changes){
       const base = (cur && typeof cur === 'object') ? cur : {};
       const sys = Number(ch.sys) || 0;
       const out = Object.assign({}, base, { code: ch.code, name: ch.name, group: ch.group, systemQuantity: sys, editedAt: Date.now() });
-      if (ch.reset) { out.actualQuantity = 0; out.isJarded = false; out.counts = {}; out.countedBy = ''; }
+      if (ch.reset) { out.actualQuantity = 0; out.isJarded = false; out.counts = {}; out.countedBy = ''; out.manualQty = false; out.manualBy = ''; out.manualAt = 0; out.manualPrev = ''; }
       out.actualQuantity = Number(out.actualQuantity) || 0;
       out.difference = out.actualQuantity - sys;
       out.status = out.difference > 0 ? 'زيادة' : out.difference < 0 ? 'عجز' : 'متساوي';
@@ -2642,7 +2791,7 @@ async function confirmImport(){
       if (ex) {
         ex.name = r.name; ex.group = r.group; ex.systemQuantity = r.sys;
 
-        if (resetActual) { ex.actualQuantity = 0; ex.isJarded = false; ex.counts = {}; ex.countedBy = ''; }
+        if (resetActual) { ex.actualQuantity = 0; ex.isJarded = false; ex.counts = {}; ex.countedBy = ''; ex.manualQty = false; ex.manualBy = ''; ex.manualAt = 0; ex.manualPrev = ''; }
         ex.editedAt = now;
         calculateRow(ex); updated++;
         changed.push({ code: r.code, name: r.name, group: r.group, sys: r.sys, reset: !!resetActual });

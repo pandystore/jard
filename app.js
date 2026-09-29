@@ -167,7 +167,15 @@ let connectRetryTimer = null;
 
 let notifOff = null;
 let lastNotifTs = parseInt(store.getItem('lastNotifTs') || '0') || 0;
-const deviceId = 'dev-' + Math.random().toString(36).slice(2, 9);
+const deviceId = (() => {
+  try {
+    const saved = localStorage.getItem('jardDevId');
+    if (saved) return saved;
+    const id = 'dev-' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem('jardDevId', id);
+    return id;
+  } catch (e) { return 'dev-' + Math.random().toString(36).slice(2, 9); }
+})();
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -685,7 +693,31 @@ function applyUserUI(){
  } catch(e){}
 }
 
+function saveAuth(name){
+  try { if (name) localStorage.setItem('jardAuthUser', name); } catch (e) {}
+}
+function clearAuth(){
+  try { localStorage.removeItem('jardAuthUser'); } catch (e) {}
+}
+function restoreSession(){
+  return (async () => {
+    let name = '';
+    try { name = localStorage.getItem('jardAuthUser') || ''; } catch (e) { return false; }
+    if (!name) return false;
+    const user = usersList.find(u => u && u.name === name);
+    if (!user || user.active === false) { clearAuth(); return false; }
+    const restoredUser = { name: user.name, role: user.role || 'user' };
+    let claim;
+    try { claim = await claimSession(restoredUser); }
+    catch (e) { return false; }
+    if (claim && claim.offline) return false;
+    if (!claim || !claim.ok) { clearAuth(); return false; }
+    sessionUser = restoredUser;
+    return true;
+  })();
+}
 function logoutUser(){
+  clearAuth();
   if (sessionUser) addLog('خروج المستخدم: ' + sessionUser.name);
   releaseSession();
   sessionUser = null;
@@ -707,6 +739,7 @@ function resetIdleTimer(){
 }
 function autoLogout(){
   if (!sessionUser) return;
+  clearAuth();
   addLog('خروج تلقائي للخمول: ' + sessionUser.name);
   releaseSession();
   sessionUser = null;
@@ -759,6 +792,7 @@ async function claimSession(u){
     if (window.__sessBeat) clearInterval(window.__sessBeat);
     const forceOut = () => {
       if (!sessionUser || !loginRequired()) return;
+      clearAuth();
       addLog('تم طرد الجلسة بواسطة admin: ' + sessionUser.name);
       sessionUser = null;
       bigBlock('⛔', 'تم إنهاء جلستك',
@@ -806,7 +840,7 @@ async function claimSession(u){
     });
     mySessionRef = ref;
     return { ok: true };
- } catch (e) { return { ok: true }; }
+ } catch (e) { return { ok: false, offline: true }; }
 }
 function releaseSession(){
   if (window.__sessBeat) { clearInterval(window.__sessBeat); window.__sessBeat = null; }
@@ -1215,6 +1249,7 @@ function showLock(){
       loginFails = 0; say('');
 
       sessionUser = u;
+      saveAuth(u.name);
       ov.remove();
       applyUserUI();
       resetIdleTimer();
@@ -1308,7 +1343,7 @@ function getFiltered(){
     else if (currentStatus === 'عجز') st = i.status === 'عجز';
     else if (currentStatus === 'hide_equal') st = i.status !== 'متساوي';
     else if (currentStatus === 'equal') st = i.status === 'متساوي';
-    else if (currentStatus === 'not_jarded') st = !i.isJarded;
+    else if (currentStatus === 'not_jarded') st = !(Number(i.actualQuantity) > 0);
     return ms && mc && st;
  });
 }
@@ -1486,7 +1521,7 @@ function updateStats(){
   const gs = {};
   for (let i = 0; i < total; i++){
     const it = inventoryData[i];
-    if (it.isJarded) jarded++;
+    if (Number(it.actualQuantity) > 0) jarded++;
     if (it.status === 'عجز') deficit++;
     else if (it.status === 'زيادة') surplus++;
     sumSys += Number(it.systemQuantity) || 0;
@@ -2371,7 +2406,10 @@ function setupTableEvents(){
   document.addEventListener('focusout', e => {
     if (e.target.closest && e.target.closest('td[contenteditable]')) {
       editingCount = Math.max(0, editingCount - 1);
-      if (editingCount === 0 && pendingRemote) { pendingRemote = false; updateTable(); }
+      if (editingCount === 0 && pendingRemote) {
+        pendingRemote = false;
+        updateTable(); updateStats(); renderCategoryButtons();
+      }
  }
  });
   tb.addEventListener('focusout', e => {
@@ -2916,7 +2954,7 @@ function buildReport(kind){
   let items;
   if (kind === 'deficit')        items = inventoryData.filter(i => i.difference < 0);
   else if (kind === 'surplus')   items = inventoryData.filter(i => i.difference > 0);
-  else if (kind === 'uncounted') items = inventoryData.filter(i => !i.isJarded || !(Number(i.actualQuantity) > 0));
+  else if (kind === 'uncounted') items = inventoryData.filter(i => !(Number(i.actualQuantity) > 0));
   else                           items = inventoryData.slice();
 
   if (repUser && kind !== 'uncounted') items = items.filter(i => Number(i.counts && i.counts[repUser]) > 0);
@@ -3163,7 +3201,7 @@ function showUserReport(){
 function updateStatsForUser(name){
 
   setTimeout(() => {
-    const items = inventoryData.filter(i => i.countedBy === name && i.isJarded);
+    const items = inventoryData.filter(i => i.countedBy === name && Number(i.actualQuantity) > 0);
     toast(name + ' جرد ' + items.length + ' صنف من أصل ' + inventoryData.length, 'info');
  }, 50);
 }
@@ -3978,7 +4016,12 @@ function maybeFinishBoot(){
 }
 function finalize(){
   updateTable(); updateStats(); renderCategoryButtons(); applyLogo();
-  if (loginRequired()) showLock(); else applyUserUI();
+  if (loginRequired()) {
+    restoreSession().then(restored => {
+      if (restored) { applyUserUI(); resetIdleTimer(); }
+      else showLock();
+    }).catch(() => showLock());
+  } else applyUserUI();
   try { if (isAdmin() && syncOn) attachNotifListener(); } catch(e){}
   try {
 

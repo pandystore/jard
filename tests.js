@@ -460,10 +460,11 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
   const prelude2 = [
     "var $ = function(){ return { value: '' }; };",
     "var inventoryData = [",
-    "  { code: 'A1', name: 'صنف متساوي', group: 'عام', status: 'متساوي', isJarded: true, counts: { 'أحمد': 5 } },",
-    "  { code: 'A2', name: 'صنف زيادة', group: 'عام', status: 'زيادة', isJarded: true, counts: { 'أحمد': 2 } },",
-    "  { code: 'A3', name: 'صنف عجز', group: 'عام', status: 'عجز', isJarded: true, counts: { 'منى': 1 } },",
-    "  { code: 'A4', name: 'صنف مجردش', group: 'عام', status: 'عجز', isJarded: false, counts: {} }",
+    "  { code: 'A1', name: 'صنف متساوي', group: 'عام', status: 'متساوي', isJarded: true, actualQuantity: 0, counts: { 'أحمد': 5 } },",
+    "  { code: 'A2', name: 'صنف زيادة', group: 'عام', status: 'زيادة', isJarded: true, actualQuantity: 5, counts: { 'أحمد': 2 } },",
+    "  { code: 'A3', name: 'صنف عجز', group: 'عام', status: 'عجز', isJarded: true, actualQuantity: 1, counts: { 'منى': 1 } },",
+    "  { code: 'A4', name: 'صنف مجردش', group: 'عام', status: 'عجز', isJarded: false, actualQuantity: 0, counts: {} },",
+    "  { code: 'A5', name: 'رصيده موجب وعلامته قديمة', group: 'عام', status: 'زيادة', isJarded: false, actualQuantity: 2, counts: {} }",
     "];",
     "var currentCategory = 'all', currentStatus = 'all', userFilter = '';",
     "var setStatus = function(s){ currentStatus = s; };"
@@ -472,13 +473,15 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
   m2._compile(prelude2 + '\n' + extractFn('getFiltered') + '\nmodule.exports = { getFiltered, setStatus };', 'gf-extracted.js');
   const { getFiltered, setStatus } = m2.exports;
   const codes = () => getFiltered().map(i => i.code).join(',');
-  eq(codes(), 'A1,A2,A3,A4', 'فلتر «الكل» بيرجع كل الأصناف');
+  eq(codes(), 'A1,A2,A3,A4,A5', 'فلتر «الكل» بيرجع كل الأصناف');
   setStatus('equal');
   eq(codes(), 'A1', 'فلتر «إظهار المتساوي» الجديد بيرجع المتساوي بس');
   setStatus('hide_equal');
-  eq(codes(), 'A2,A3,A4', '«إخفاء المتساوي» (الافتراضي الجديد) بيشيل المتساوي');
+  eq(codes(), 'A2,A3,A4,A5', '«إخفاء المتساوي» (الافتراضي الجديد) بيشيل المتساوي');
   setStatus('not_jarded');
-  eq(codes(), 'A4', '«غير مُجرد» زي ما هو شغال');
+  eq(codes(), 'A1,A4', '«غير مُجرد» يتحدد من الرصيد الفعلي مش من العلامة القديمة');
+  setStatus('all');
+  eq(getFiltered().find(i => i.code === 'A5').actualQuantity, 2, 'صنف رصيده موجب يفضل مجرود حتى لو علامة isJarded قديمة false');
 
   /* reportUsers — ترتيب الأدمن ثم المشرف ثم الباقي أبجدي */
   const prelude3 = [
@@ -497,7 +500,7 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
     "var inventoryData = [",
     "  { serial: 1, code: 'A1', name: 'صنف 1', group: 'عام', systemQuantity: 5, actualQuantity: 9, difference: 4, status: 'زيادة', isJarded: true, counts: { 'admin': 2, 'أحمد': 4, 'منى': 3 }, countedBy: 'أحمد', note: '' },",
     "  { serial: 2, code: 'A2', name: 'صنف 2', group: 'عام', systemQuantity: 5, actualQuantity: 5, difference: 0, status: 'متساوي', isJarded: true, counts: { 'منى': 5 }, countedBy: 'منى', note: '' },",
-    "  { serial: 3, code: 'A3', name: 'صنف 3', group: 'عام', systemQuantity: 5, actualQuantity: 0, difference: -5, status: 'عجز', isJarded: false, counts: {}, countedBy: '', note: '' }",
+    "  { serial: 3, code: 'A3', name: 'صنف 3', group: 'عام', systemQuantity: 5, actualQuantity: 0, difference: -5, status: 'عجز', isJarded: true, counts: {}, countedBy: '', note: '' }",
     "];",
     "var usersList = [ { name: 'admin', role: 'admin' }, { name: 'أحمد' } ];",
     "var repUser = '';",
@@ -536,12 +539,92 @@ console.log('== فلاتر الحالة وتفصيل الحصص والتقاري
   eq(JSON.stringify(f0.headers), JSON.stringify(['م','الكود','اسم الصنف','المجموعة','رصيد السيستم','الادمن','اليوزر','الفرق','الحالة']),
     'التقرير الكامل: عمود للأدمن وعمود لليوزر والفرق');
   eq(f0.rows.length, 3, 'الكامل: كل الأصناف (حتى اللي مجردش)');
+  eq(buildReport('uncounted').rows.map(r => r[1]).join(','), 'A3', 'تقرير غير المجرد يعتمد على الرصيد الفعلي حتى لو isJarded=true');
   eq(f0.rows[0][5] + ',' + f0.rows[0][6], '2,7', 'الكامل: الصنف الأول — الأدمن جرد 2 واليوزرين (4+3) = 7');
   eq(f0.rows[0][7], 4, 'الكامل: الفرق = (2+7) − رصيد السيستم 5 = 4');
   eq(f0.rows[1][5] + ',' + f0.rows[1][6] + ',' + f0.rows[1][7], '0,5,0', 'الكامل: الصنف المتساوي — يوزر 5 والفرق 0');
   eq(f0.rows[2][5] + ',' + f0.rows[2][6] + ',' + f0.rows[2][7], '0,0,-5', 'الكامل: صنف مجردش — أدمن 0 ويوزر 0 والفرق −5');
   eq(f0.foot[5] + ',' + f0.foot[6] + ',' + f0.foot[7], '2,12,-1', 'الكامل: إجماليات الأعمدة — أدمن 2، يوزر 12، فرق (14−15) = −1');
   setRepUser('');
+}
+
+console.log('== استرجاع الجلسة المحفوظة بعد تحديث الصفحة ==');
+{
+  function makeRestoreHarness(saved, users, result, throws){
+    const prelude = [
+      'const auth = new Map();',
+      `if (${JSON.stringify(saved)} !== null) auth.set('jardAuthUser', ${JSON.stringify(saved)});`,
+      "var localStorage = { getItem:k=>auth.has(k)?auth.get(k):null, setItem:(k,v)=>auth.set(k,String(v)), removeItem:k=>auth.delete(k) };",
+      `var usersList = ${JSON.stringify(users)};`,
+      'var sessionUser = null;',
+      'var claimCalls = [];',
+      `var claimSession = async u => { claimCalls.push(u); ${throws ? "throw new Error('offline');" : `return ${JSON.stringify(result)};`} };`
+    ].join('\n');
+    const code = prelude + '\n' + ['saveAuth','clearAuth','restoreSession'].map(extractFn).join('\n') +
+      '\nmodule.exports = { saveAuth, clearAuth, restoreSession, auth, claimCalls, getSession:()=>sessionUser };';
+    const Module = require('module'); const m = new Module(); m._compile(code, 'restore-session-test.js'); return m.exports;
+  }
+  pendingAsync.push((async () => {
+    const user = { name:'سارة', role:'supervisor', active:true };
+    let t = makeRestoreHarness(null, [user], {ok:true});
+    eq(await t.restoreSession(), false, 'مفيش اسم محفوظ: مفيش استرجاع');
+    eq(t.claimCalls.length, 0, 'من غير اسم محفوظ ما بنحاولش حجز جلسة');
+
+    t = makeRestoreHarness('سارة', [user], {ok:true});
+    eq(await t.restoreSession(), true, 'الحساب الموجود والشغال يسترجع الجلسة بعد claimSession ناجح');
+    eq(JSON.stringify(t.getSession()), JSON.stringify({name:'سارة',role:'supervisor'}), 'sessionUser بيرجع بالاسم والصلاحية من القائمة');
+    eq(t.claimCalls.length, 1, 'استرجاع الجلسة يحجزها على الجهاز الحالي');
+
+    t = makeRestoreHarness('سارة', [{...user, active:false}], {ok:true});
+    eq(await t.restoreSession(), false, 'المستخدم الموقوف لا يسترجع جلسة');
+    eq(t.auth.has('jardAuthUser'), false, 'اسم المستخدم الموقوف يتمسح من المحفوظات');
+    eq(t.claimCalls.length, 0, 'المستخدم الموقوف لا يحاول حجز جلسة');
+
+    t = makeRestoreHarness('مش موجود', [user], {ok:true});
+    eq(await t.restoreSession(), false, 'اسم مش موجود في usersList لا يسترجع جلسة');
+    eq(t.auth.has('jardAuthUser'), false, 'الاسم اللي مش في القائمة يتمسح');
+
+    t = makeRestoreHarness('سارة', [user], {ok:false, since:123});
+    eq(await t.restoreSession(), false, 'الحساب المفتوح على جهاز تاني لا يسترجع');
+    eq(t.auth.has('jardAuthUser'), false, 'عند تعارض الجهاز نمسح اسم الدخول المحفوظ');
+
+    t = makeRestoreHarness('سارة', [user], {ok:false,offline:true});
+    eq(await t.restoreSession(), false, 'لو الإنترنت مقطوع ما نعتبرش الجلسة مسترجعة');
+    eq(t.auth.get('jardAuthUser'), 'سارة', 'وقت انقطاع الإنترنت نحتفظ بالاسم لمحاولة تانية');
+
+    t = makeRestoreHarness('سارة', [user], null, true);
+    eq(await t.restoreSession(), false, 'خطأ الشبكة مايفتحش جلسة محلية');
+    eq(t.auth.get('jardAuthUser'), 'سارة', 'خطأ الشبكة يحتفظ بالاسم المحفوظ');
+    t.saveAuth('محمود');
+    eq(t.auth.get('jardAuthUser'), 'محمود', 'saveAuth تحفظ الاسم في localStorage');
+    t.clearAuth();
+    eq(t.auth.has('jardAuthUser'), false, 'clearAuth تمسح الاسم المحفوظ');
+  })());
+}
+
+console.log('== إحصاءات الجرد حسب الرصيد الفعلي لا العلامة القديمة ==');
+{
+  const prelude = [
+    'var inventoryData = [',
+    " {group:'أ',status:'عجز',systemQuantity:5,actualQuantity:0,difference:-5,isJarded:true,countedBy:'سارة'},",
+    " {group:'أ',status:'زيادة',systemQuantity:2,actualQuantity:3,difference:1,isJarded:false,countedBy:'سارة'},",
+    " {group:'ب',status:'متساوي',systemQuantity:4,actualQuantity:4,difference:0,isJarded:true,countedBy:'محمود'},",
+    " {group:'ب',status:'عجز',systemQuantity:1,actualQuantity:0,difference:-1,isJarded:false,countedBy:'سارة'}",
+    '];',
+    'var els = {}; var $ = id => els[id] || (els[id] = {textContent:"",innerHTML:""});',
+    'var fmtQ = x => x; var esc = x => String(x);',
+    'var setTimeout = f => f(); var toastMsg = ""; var toast = x => {toastMsg=x;};'
+  ].join('\n');
+  const funcs = ['updateStats','updateStatsForUser'].map(extractFn).join('\n');
+  const Module = require('module'); const m = new Module();
+  m._compile(prelude + '\n' + funcs + '\nmodule.exports={updateStats,updateStatsForUser,els,getToast:()=>toastMsg};', 'actual-quantity-stats.js');
+  const t = m.exports;
+  t.updateStats();
+  eq(t.els.cardJarded.textContent, 2, 'صنفين فقط رصيدهم الفعلي أكبر من صفر (بغض النظر عن isJarded)');
+  eq(t.els.cardNotJarded.textContent, 2, 'غير المجرد = عدد الأصناف ناقص اللي رصيدهم موجب');
+  eq(t.els.completionPercent.textContent, '50.0%', 'نسبة الإنجاز محسوبة من الرصيد الفعلي');
+  t.updateStatsForUser('سارة');
+  eq(t.getToast(), 'سارة جرد 1 صنف من أصل 4', 'إحصاء المستخدم يحتسب countedBy فقط مع رصيد فعلي موجب');
 }
 
 console.log('== موضع الإشعارات وإخفاؤها عن المستخدم العادي ==');

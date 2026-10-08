@@ -90,7 +90,10 @@
         /* مفاتيح عادية — أي مستخدم داخل يقدر يكتبها */
         "setupDone": { ".write": "auth != null" },
         "logo":      { ".write": "auth != null" },
-        "dt":        { ".write": "auth != null" }
+        "dt":        { ".write": "auth != null" },
+        "uploadedAt": { ".write": "auth != null" },
+        "lastEditAt": { ".write": "auth != null" },
+        "lastEditBy": { ".write": "auth != null" }
       }
     }
   }

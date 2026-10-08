@@ -1011,6 +1011,9 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       'var refreshRow = function(){};',
       'var patchSingleRow = function(item){ out.cells.push(item.actualQuantity); };',
       'var pushCountNotif = function(){ out.notifs++; };',
+      /* markAdminEdit وهمي: يسجّل عدد مرات استدعائه — عشان نتأكد
+         إن تاريخ التعديل بيتحدّث في كل مرة */
+      'var markAdminEdit = function(){ out.edits = (out.edits || 0) + 1; };',
       /* showModal وهمي: بس يسجّل أي شاشة اتفتحت — لو updateQty فتحت أي شاشة هيفشل الاختبار */
       'var showModal = function(title){ out.modals.push(title); return { body: null, close: function(){} }; };'
     ].join('\n');
@@ -1020,7 +1023,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       ' setSession: function(u){ sessionUser = u; },' +
       ' setItems: function(a){ inventoryData = a; },' +
       ' getItems: function(){ return inventoryData; },' +
-      ' resetOut: function(){ out.ops = []; out.pushed = []; out.logs = []; out.toasts = []; out.modals = []; out.cells = []; out.notifs = 0; } };',
+      ' resetOut: function(){ out.ops = []; out.pushed = []; out.logs = []; out.toasts = []; out.modals = []; out.cells = []; out.notifs = 0; out.edits = 0; } };',
       'update-qty-integration.js');
     const t = m.exports;
     const mkItem = () => ({ serial: 1, code: '10001', name: 'أرز', group: 'عام', systemQuantity: 20,
@@ -1036,6 +1039,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       eq(!!i1.manualQty, false, 'يوزر عادي: مفيش علامة تحديد يدوي');
       eq(t.out.ops.length, 0, 'يوزر عادي: مفيش نيّة تعديل اتبعتت للسيرفر');
       eq(t.out.pushed.length, 0, 'يوزر عادي: مفيش حاجة اترفعت');
+      eq(t.out.edits, 0, 'يوزر عادي: مفيش تسجيل لتاريخ التعديل (مش أدمن)');
 
       /* 2) مسؤول النظام بيحدد الرصيد يدويًا فوق عدّة يوزر */
       t.resetOut(); t.setItems([mkItem()]); t.setSession({ name: 'admin', role: 'admin' });
@@ -1057,6 +1061,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       eq(t.out.logs[0].indexOf('اتمسح: محمد: 5 + admin: 3') !== -1, true, 'أدمن: سجل العمليات وثّق اللي اتحذف');
       eq(t.out.toasts[0].indexOf('30') !== -1, true, 'أدمن: رسالة تأكيد بالرقم الجديد');
       eq(t.out.notifs, 0, 'أدمن: مفيش إشعار لنفسه');
+      eq(t.out.edits, 1, 'أدمن: بيتسجّل تاريخ التعديل مرة واحدة بس');
 
       /* 3) المشرف بيعمل نفس الدور — وبياخد إشعار للأدمن */
       t.resetOut(); t.setItems([mkItem()]); t.setSession({ name: 'ahmed', role: 'supervisor' });
@@ -1079,6 +1084,7 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
       eq(t.out.pushed.length, 0, 'نفس الرقم (8.00): مفيش رفع خالص');
       eq(t.out.logs.length, 0, 'نفس الرقم (8.00): مفيش سجل عمليات');
       eq(t.out.toasts.length, 0, 'نفس الرقم (8.00): مفيش رسالة');
+      eq(t.out.edits, 0, 'نفس الرقم (8.00): مفيش تسجيل لتاريخ التعديل');
 
       /* 5) تعديل رقمه هو من غير عدّة ناس تانيين → من غير أي شاشة */
       t.resetOut();
@@ -1128,6 +1134,60 @@ console.log('== التعديل اليدوي من الجدول (updateQty) — ت
     })());
   }
 }
+
+console.log('== تاريخ رفع الجرد وتاريخ التعديل (أسفل الصفحة) ==');
+{
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf-8');
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
+  const rules = fs.readFileSync(path.join(__dirname, 'firebase-rules.json'), 'utf-8');
+  const wipe = fs.readFileSync(path.join(__dirname, 'wipe.html'), 'utf-8');
+
+  eq(html.includes('id="uploadDateLabel"'), true, 'شريط الملخص فيه خانة «تاريخ رفع الجرد»');
+  eq(html.includes('id="lastEditLabel"'), true, 'شريط الملخص فيه خانة «تاريخ التعديل» بجانب خانة الرفع');
+  eq(html.includes('>تاريخ رفع الجرد</span>'), true, 'عنوان خانة «تاريخ رفع الجرد» مكتوب');
+  eq(html.includes('>تاريخ التعديل</span>'), true, 'عنوان خانة «تاريخ التعديل» مكتوب');
+  eq(/id="currentDateTime"[^>]*display:none/.test(html), true, 'خانة « تاريخ الجرد » مخفي — للتقارير بس');
+  eq(html.includes('saveDateTime'), false, 'حقل التاريخ في index.html من غير onchange');
+  eq(app.includes('saveDateTime'), false, 'الدالة saveDateTime اتشالت من app.js');
+  eq(app.includes('dt.value = uploadDateTime || nowLocalDT()'), true, 'تاريخ الجرد عند التحميل = تاريخ الرفع');
+
+  eq(extractFn('pushMeta').includes('meta.uploadedAt'), true, 'pushMeta بيرفع uploadedAt لـ Firebase');
+  eq(extractFn('pushMeta').includes('meta.lastEditAt'), true, 'pushMeta بيرفع lastEditAt و lastEditBy لـ Firebase');
+  eq((extractFn('confirmImport').match(/markInventoryUploaded\(\)/g) || []).length, 2, 'confirmImport بيسجّل تاريخ الرفع في الفرعين (دمج + استبدال)');
+  eq(app.includes('meta.uploadedAt') && app.includes('meta.lastEditAt'), true, 'meta listener بيزامن uploadedAt و lastEditAt من Firebase');
+  eq(extractFn('doWipeAll').includes('clearInventoryUpload()'), true, 'المسح النهائي بيرجّع تاريخ الرفع فاضي');
+  eq(extractFn('doWipeAll').includes('markAdminEdit()'), true, 'المسح النهائي بيسجّل تاريخ التعديل');
+  eq(extractFn('deleteSelected').includes('markAdminEdit()'), true, 'حذف المحدد بيسجّل تاريخ التعديل');
+  eq(extractFn('updateField').includes('markAdminEdit()'), true, 'تعديل الاسم/الملاحظة/المجموعة بيسجّل تاريخ التعديل');
+  eq(extractFn('updateQty').includes('markAdminEdit()'), true, 'التعديل اليدوي للكمية بيسجّل تاريخ التعديل');
+  eq(rules.includes('"uploadedAt"') && rules.includes('"lastEditAt"') && rules.includes('"lastEditBy"'), true, 'قواعد Firebase فيها كتابة مفاتيح التاريخين');
+  eq(wipe.includes('/meta/uploadedAt.json') && wipe.includes('/meta/lastEditAt.json'), true, 'صفحة wipe.html بتمسح تواريخ الملف بعد المسح النهائي');
+
+  /* renderFileDates — عرض اللوحات في أسفل الصفحة */
+  const prelude = [
+    "var els = {}; var $ = function(id){ return els[id] || (els[id] = { textContent: '', title: '', value: '' }); };",
+    "var uploadDateTime = '2026-10-08T14:30';",
+    "var lastEditAt = 1760000000000; var lastEditBy = 'admin';",
+    "function pad2(n){ return String(n).padStart(2, '0'); }"
+  ].join('\n');
+  const Module = require('module');
+  const m = new Module();
+  m._compile(prelude + '\n' + extractFn('fmtTs') + '\n' + extractFn('renderFileDates') +
+    '\nmodule.exports = { renderFileDates: renderFileDates, fmtTs: fmtTs, els: els,' +
+    ' setState: function(u, l, b){ uploadDateTime = u; lastEditAt = l; lastEditBy = b; } };',
+    'file-dates.js');
+  const t = m.exports;
+  t.renderFileDates();
+  eq(t.els.uploadDateLabel.textContent, '2026-10-08 14:30', 'تاريخ رفع الجرد بيتعرض بتنسيق «YYYY-MM-DD HH:mm»');
+  eq(t.els.lastEditLabel.textContent, t.fmtTs(1760000000000), 'تاريخ التعديل بيتعرض بنفس تنسيق الوقت');
+  eq(t.els.lastEditLabel.title.indexOf('admin') !== -1, true, 'اسم آخر تعديل مكتوب في العنوان');
+  eq(t.els.currentDateTime.value, '2026-10-08T14:30', 'حقل «تاريخ الجرد» المخفي = تاريخ الرفع (للتقارير والطباعة)');
+  t.setState('', 0, '');
+  t.renderFileDates();
+  eq(t.els.uploadDateLabel.textContent, '—', 'تاريخ الرفع فاضي قبل رفع الملف');
+  eq(t.els.lastEditLabel.textContent, '—', 'تاريخ التعديل فاضي قبل أي تعديل');
+}
+
 
 console.log('== تشفير كلمات المرور (salt) ==');
 {

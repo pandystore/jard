@@ -232,12 +232,14 @@
     <span>توقيع المراجع: ..............................</span>
   </div>
 
-  <div class="grid-4 summary-row no-print">
+  <div class="grid-5 summary-row no-print">
     <div class="card"><span class="t">إجمالي السيستم</span><span id="summarySystemQuantity" class="v c-blue">0</span></div>
     <div class="card"><span class="t">إجمالي الفعلي</span><span id="summaryActualQuantity" class="v c-green">0</span></div>
     <div class="card"><span class="t">الفرق النهائي</span><span id="summaryDifference" class="v c-red">0</span></div>
-    <div class="card"><input type="datetime-local" id="currentDateTime" onchange="saveDateTime()" class="datetime-inp"></div>
+    <div class="card"><span class="t">تاريخ رفع الجرد</span><span class="v datev" id="uploadDateLabel">—</span></div>
+    <div class="card"><span class="t">تاريخ التعديل</span><span class="v datev" id="lastEditLabel">—</span></div>
   </div>
+  <input type="datetime-local" id="currentDateTime" style="display:none" aria-hidden="true" tabindex="-1">
 </main>
 
 <div id="columnSelectors" class="modal-overlay" style="display:none">

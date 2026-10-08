@@ -177,6 +177,15 @@ document.getElementById('wipeBtn').onclick = async ()=>{
       if (!r.ok) anyFail = true;
     } catch(e){ log('❌ خطأ في مسح ' + p + ': ' + e.message); anyFail = true; }
   }
+  /* تاريخ رفع الجرد وتاريخ التعديل — بيتمسحوا بعد المسح النهائي */
+  const metaPaths = ['/meta/uploadedAt.json', '/meta/lastEditAt.json', '/meta/lastEditBy.json'];
+  for (const p of metaPaths) {
+    try {
+      const r = await fetch(withAuth(p, anonToken), { method: 'DELETE' });
+      log('مسح ' + p + ': ' + r.status + (r.ok ? ' ✅' : ' ❌'));
+      if (!r.ok) anyFail = true;
+    } catch(e){ log('❌ خطأ في مسح ' + p + ': ' + e.message); anyFail = true; }
+  }
   try {
     const wipeTs = Date.now();
     let r = await fetch(withAuth('/meta/lastWipeRev.json', anonToken), { method: 'PUT', body: JSON.stringify(wipeTs) });

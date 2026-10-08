@@ -10,7 +10,7 @@ const store = (() => {
 })();
 
 (function purgeLegacyStorage(){
-  const KILL = /^(jard::.*)|(inventoryData|localRev|logBook|selectedDateTime|customLogo|adminHash|usersList|sessionUser|firebaseCfg|soundOn|lockOnOpen|syncPath|deviceId|branchesList|branch|lastForceWipe|lastNotifTs|notifEnabled)(::.*)?$/;
+  const KILL = /^(jard::.*)|(inventoryData|localRev|logBook|selectedDateTime|customLogo|adminHash|usersList|sessionUser|firebaseCfg|soundOn|lockOnOpen|syncPath|deviceId|branchesList|branch|lastForceWipe|lastNotifTs|notifEnabled|uploadDateTime|lastEditAt|lastEditBy)(::.*)?$/;
   ['localStorage', 'sessionStorage'].forEach(kind => {
     try {
       const box = window[kind];
@@ -132,6 +132,12 @@ let adminHash = store.getItem('adminHash') || '';
 let usersList = JSON.parse(store.getItem('usersList') || '[]');
 let sessionUser = null;
 
+/* تاريخ رفع الجرد = آخر مرة اترفع فيها ملف الإكسيل على السيستم (دمج أو استبدال).
+   تاريخ التعديل = آخر مرة عدّل فيها الأدمن/المشرف في بيانات الجرد. */
+let uploadDateTime = store.getItem('uploadDateTime') || '';
+let lastEditAt = Number(store.getItem('lastEditAt')) || 0;
+let lastEditBy = store.getItem('lastEditBy') || '';
+
 let setupDone = false;
 let userFilter = '';
 let qrScanner = null, qrScanCount = 0, qrCamOn = false;
@@ -237,6 +243,54 @@ function fmtTs(ts){
   if (!n) return '';
   const d = new Date(n);
   return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());
+}
+
+/* -------------------------------------------------------
+   تاريخ رفع الجرد / تاريخ التعديل (أسفل الصفحة من الشمال)
+   - تاريخ رفع الجرد: بيتسجّل تلقائيًا أول ما الأدمن يرفع ملف إكسيل
+     جديد على السيستم (دمج أو استبدال) — مش بيتغيّر لوحده.
+   - تاريخ التعديل: بيتحدّث تلقائيًا عند أي تعديل من الأدمن/المشرف
+     في بيانات الجرد (رفع ملف، تعديل يدوي، حذف، مسح الكل).
+   الاتنين بيتزامنوا من meta على Firebase عشان كل الأجهزة
+   تشوف نفس التاريخ.
+   ------------------------------------------------------- */
+function renderFileDates(){
+  const up = $('uploadDateLabel');
+  if (up) {
+    up.textContent = uploadDateTime ? uploadDateTime.replace('T', ' ') : '—';
+    up.title = uploadDateTime ? 'تاريخ رفع ملف جرد الإكسيل على السيستم' : 'لسه مفيش ملف جرد مرفوع';
+ }
+  const le = $('lastEditLabel');
+  if (le) {
+    le.textContent = lastEditAt ? fmtTs(lastEditAt) : '—';
+    le.title = lastEditBy ? ('آخر تعديل بواسطة: ' + lastEditBy) : (lastEditAt ? 'آخر تعديل في بيانات الجرد' : 'لسه مفيش تعديل');
+ }
+  /* حقل "تاريخ الجرد" المخفي — التقارير والطباعة بيقروا منه */
+  const dtEl = $('currentDateTime');
+  if (dtEl && uploadDateTime) dtEl.value = uploadDateTime;
+}
+function markAdminEdit(){
+  lastEditAt = Date.now();
+  lastEditBy = (sessionUser && sessionUser.name) || 'النظام';
+  store.setItem('lastEditAt', String(lastEditAt));
+  store.setItem('lastEditBy', lastEditBy);
+  renderFileDates();
+  scheduleMetaPush();
+}
+function markInventoryUploaded(){
+  uploadDateTime = nowLocalDT();
+  store.setItem('uploadDateTime', uploadDateTime);
+  store.setItem('selectedDateTime', uploadDateTime);
+  const dtEl = $('currentDateTime'); if (dtEl) dtEl.value = uploadDateTime;
+  renderFileDates();
+  markAdminEdit();
+}
+function clearInventoryUpload(){
+  uploadDateTime = '';
+  store.removeItem('uploadDateTime');
+  const dtEl = $('currentDateTime'); if (dtEl) dtEl.value = nowLocalDT();
+  renderFileDates();
+  if (syncOn && db) { try { db.ref(fbPath() + '/meta/uploadedAt').remove().catch(() => {}); } catch(e){} }
 }
 
 function mergeOneItem(l, r, me){
@@ -1593,6 +1647,7 @@ function updateField(serial, field, value){
   item[field] = v;
   item.editedAt = Date.now();
   saveAndRefresh(false, item);
+  markAdminEdit();
   if (field === 'group') { renderCategoryButtons(); updateStats(); }
 }
 function restoreQtyCell(tr, field, item){
@@ -1656,6 +1711,7 @@ async function updateQty(serial, field, value, tr){
   if (tr) refreshRow(tr, item);
   if (field === 'actualQuantity') patchSingleRow(item);
   updateStats();
+  markAdminEdit();
   if (viaOps) scheduleCountPush(item.code); else schedulePushItem(item);
 
   try {
@@ -2065,6 +2121,21 @@ function attachSync(){
       store.setItem('selectedDateTime', meta.dt);
       const dtEl = $('currentDateTime'); if (dtEl) dtEl.value = meta.dt;
  }
+    /* تاريخ رفع الجرد وتاريخ التعديل — بيتزامنان من Firebase لكل الأجهزة */
+    if (meta.uploadedAt && meta.uploadedAt !== store.getItem('uploadDateTime')) {
+      store.setItem('uploadDateTime', meta.uploadedAt);
+      uploadDateTime = meta.uploadedAt;
+      const upEl = $('currentDateTime'); if (upEl) upEl.value = meta.uploadedAt;
+      renderFileDates();
+ }
+    const rLastEditAt = Number(meta.lastEditAt) || 0;
+    if (rLastEditAt && rLastEditAt !== lastEditAt) {
+      lastEditAt = rLastEditAt;
+      lastEditBy = String(meta.lastEditBy || '');
+      store.setItem('lastEditAt', String(lastEditAt));
+      store.setItem('lastEditBy', lastEditBy);
+      renderFileDates();
+ }
     if (meta.logo && meta.logo !== store.getItem('customLogo')) {
       store.setItem('customLogo', meta.logo);
       applyLogo(meta.logo);
@@ -2305,6 +2376,10 @@ function pushMeta(withUsers){
   if (logo) meta.logo = logo;
   const dt = store.getItem('selectedDateTime');
   if (dt) meta.dt = dt;
+  const upAt = store.getItem('uploadDateTime');
+  if (upAt) meta.uploadedAt = upAt;
+  const leAt = Number(store.getItem('lastEditAt')) || 0;
+  if (leAt) { meta.lastEditAt = leAt; meta.lastEditBy = store.getItem('lastEditBy') || ''; }
   return db.ref(fbPath() + '/meta').update(meta).then(() => {
 
     if (withUsers) {
@@ -2521,6 +2596,10 @@ async function doWipeAll(){
  } catch(e){ failReason = e && e.message ? e.message : String(e); }
  }
   try { clearAllLocalCaches(); } catch(e){}
+  /* بعد المسح النهائي: ملف الجرد اتمسح — تاريخ الرفع بيتصفّر
+     وتاريخ التعديل يسجّل وقت المسح */
+  clearInventoryUpload();
+  markAdminEdit();
   if (serverOk) {
     pendingWipe = false;
     toast('🔥 تم مسح كل البيانات نهائياً من السيرفر والكاش - البرنامج فاضي', 'success');
@@ -2565,6 +2644,7 @@ async function deleteSelected(){
  } else {
     toast('⚠️ اتحذف عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
  }
+  markAdminEdit();
   addLog('حذف محدد نهائي - ' + serials.length + ' صنف');
 }
 
@@ -2750,6 +2830,7 @@ async function confirmImport(){
  });
       selectedSerials.clear();
  }, 'تم استيراد ' + incoming.length + ' صنف (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس) - اتبعت لكل الأجهزة');
+    markInventoryUploaded();
     addLog('استيراد باستبدال — ' + incoming.length + ' صنف (تجاهل رؤوس/فارغ)');
  } else {
     if (needAdmin()) return;
@@ -2815,6 +2896,7 @@ async function confirmImport(){
     pushMergeMeta(changed).then(okServer => {
       if (!okServer) toast('⚠️ اتدمج عندك بس السيرفر لم يستجب — حاول تاني لما النت يرجع', 'error');
  });
+    markInventoryUploaded();
     toast('تم الدمج: ' + added + ' جديد + ' + updated + ' محدّث (تجاهل ' + (skippedEmpty+skippedHeader) + ' فارغ/رأس)', 'success');
     addLog('دمج ملف — ' + added + ' جديد / ' + updated + ' محدّث');
  }
@@ -3987,10 +4069,6 @@ function startAutoUpdate(){
   document.addEventListener('visibilitychange', () => { if (!document.hidden && autoUpdFired !== true) autoUpdateCheck(false); });
 }
 
-function saveDateTime(){
-  store.setItem('selectedDateTime', $('currentDateTime').value);
-  scheduleMetaPush();
-}
 function toggleFullScreen(){
   try {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen();
@@ -4039,7 +4117,9 @@ window.addEventListener('load', () => {
     document.head.appendChild(l);
  } catch (e) {}
   const dt = $('currentDateTime');
-  dt.value = nowLocalDT();
+  /* تاريخ الجرد = تاريخ رفع ملف الإكسيل (إن وجد)، غير كده تاريخ اليوم */
+  dt.value = uploadDateTime || nowLocalDT();
+  renderFileDates();
   setupBarcodeInput();
   setupTableEvents();
   setupKeyboardShortcuts();

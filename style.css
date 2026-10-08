@@ -150,6 +150,8 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .lock-card .lock-sub{ font-size:.72rem; color:#94a3b8; margin-bottom:1.4rem; }
 .lock-card .fld{ text-align:right; }
 .lock-card .fld label{ display:block; font-size:.68rem; font-weight:700; color:#64748b; margin-bottom:.3rem; }
+.show-pass{ display:flex; align-items:center; gap:.4rem; font-size:.75rem; font-weight:700; color:#64748b; margin:-.35rem 0 .8rem; cursor:pointer; user-select:none; text-align:right; }
+.show-pass input,.lock-card .show-pass input{ width:auto; margin:0; padding:0 !important; }
 .lock-card input{ border-radius:.85rem !important; padding:.75rem .9rem !important; }
 .lock-card input:focus{ border-color:var(--orange) !important; }
 .lock-card .mbtn.primary{ background:var(--orange); padding:.85rem; border-radius:.85rem; font-size:.95rem; margin-top:.5rem; }

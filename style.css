@@ -112,6 +112,10 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 .radio-row{ display:flex; gap:1rem; margin:.5rem 0; }
 .radio-row label{ display:flex; align-items:center; gap:.35rem; font-size:.85rem; cursor:pointer; }
 .hint{ font-size:.72rem; color:#94a3b8; margin-top:.35rem; line-height:1.6; }
+/* ملحوظة إرشادية في آخر قائمة اختيار الأعمدة — للقراية بس، مش بتغيّر أي اختيار */
+.import-note{ display:flex; align-items:flex-start; gap:.5rem; margin-top:.9rem; padding:.6rem .7rem; background:#eff6ff; border:1px solid #bfdbfe; border-radius:.6rem; line-height:1.8; }
+.import-note-tag{ flex-shrink:0; background:#1d4ed8; color:#fff; border-radius:.35rem; padding:.1rem .45rem; font-size:.68rem; font-weight:800; }
+.import-note-body{ font-size:.75rem; font-weight:800; color:#1e40af; }
 
 .set-tabs{ display:flex; gap:.25rem; overflow-x:auto; border-bottom:2px solid #f1f5f9; padding-bottom:.5rem; margin-bottom:.9rem; scrollbar-width:none; }
 .set-tabs::-webkit-scrollbar{ display:none; }

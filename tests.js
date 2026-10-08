@@ -1189,6 +1189,38 @@ console.log('== تاريخ رفع الجرد وتاريخ التعديل (أسف
 }
 
 
+console.log('== ملحوظة اختيار الأعمدة في نهاية قائمة الاستيراد ==');
+{
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
+  const css  = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf-8');
+
+  /* القائمة المنبثقة اللي بتفتح من زر «إضافة جرد» بعد رفع الملف */
+  const modStart = html.indexOf('<div id="columnSelectors"');
+  eq(modStart !== -1, true, 'قائمة اختيار الأعمدة (columnSelectors) موجودة في index.html');
+
+  const modEnd = html.indexOf('<div id="toasts">');
+  const modal = modStart !== -1 && modEnd !== -1 ? html.slice(modStart, modEnd) : '';
+
+  eq(modal.includes('id="importColsNote"'), true, 'فيه ملحوظة id=importColsNote جوه القائمة');
+  eq(modal.includes('class="import-note"'), true, 'الملحوظة ستايلها class=import-note');
+  eq(modal.includes('اختار عمود 5 و 9 و 22 و 28'), true, 'نص الملحوظة: «اختار عمود 5 و 9 و 22 و 28»');
+  eq(modal.includes('<span class="import-note-tag">ملحوظة</span>'), true, 'الملحوظة بتبدأ بعنوان «ملحوظة»');
+
+  /* الملحوظة لازم تكون في آخر القائمة: بعد كل اختيارات الأعمدة وقبل أزرار التأكيد */
+  const iNote   = modal.indexOf('id="importColsNote"');
+  const iGroup  = modal.indexOf('id="groupColumn"');
+  const iMode   = modal.indexOf('name="imode"');
+  const iFoot   = modal.indexOf('<div class="modal-foot">');
+  eq(iNote > iGroup && iNote > iMode, true, 'الملحوظة بعد كل قوائم اختيار الأعمدة وطريقة الاستيراد');
+  eq(iNote < iFoot, true, 'الملحوظة قبل أزرار «تأكيد الاستيراد / إلغاء» (في آخر القائمة)');
+
+  /* ملحوظة للقراية بس: مفيش أي سلوك متعلق بيها في app.js */
+  const app = fs.readFileSync(path.join(__dirname, 'app.js'), 'utf-8');
+  eq(app.includes('importColsNote'), false, 'مفيش أي كود في app.js بيغيّر سلوك الملحوظة (عرض فقط)');
+  eq(css.includes('.import-note{'), true, 'ستايل .import-note موجود في style.css');
+}
+
+
 console.log('== تشفير كلمات المرور (salt) ==');
 {
   /* الدوال دي async، فمش هنقدر نستخدم extractFn العادية (بتقص كلمة async) —

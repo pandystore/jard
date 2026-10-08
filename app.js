@@ -142,8 +142,11 @@ let setupDone = false;
 let userFilter = '';
 let qrScanner = null, qrScanCount = 0, qrCamOn = false;
 
-const CAM_DEDUPE_MS  = 2000;
-const SCAN_DEDUPE_MS = 1200;
+/* الكاميرا بتقرا نفس الباركود في كل فريم (10-18 مرة في الثانية) طول ما هو قدامها —
+   فنفس الكود بيتحسب تاني بس لما يختفي من قدام الكاميرا CAM_GONE_MS على الأقل.
+   أي كود مختلف بيتقرا فورًا من غير أي انتظار، ومفيش أي رسالة «اتقرا مرتين». */
+const CAM_GONE_MS = 450;
+const CAM_MIN_SAME_MS = 600;
 let firebaseCfgLS = JSON.parse(store.getItem('firebaseCfg') || 'null');
 
 let db = null, syncOn = false, refOff = null;
@@ -463,7 +466,65 @@ async function legacyHash(p){
   for (let i = 0; i < t.length; i++) x = ((x << 5) + x + t.charCodeAt(i)) >>> 0;
   return 'fb' + x.toString(16);
 }
-async function hashPass(p, salt){
+/* ===== كلمات المرور بالعربي =====
+   - normPass: بيوحّد الأشكال المختلفة لنفس الحرف العربي (أ/إ/آ ← ا، ى ← ي، ة ← ه،
+     ی/ک الفارسي، التشكيل، التطويل، علامات الاتجاه الخفية اللي بعض الكيبوردات
+     بتحطها، الأرقام العربية ← إنجليزية، والمسافات في الأطراف) — فالباسورد العربي
+     يتقبل مهما كان الجهاز/الكيبورد.
+   - passCandidates: لو الكيبورد كان على العربي والباسورد إنجليزي (أو العكس) بيجرّب
+     نفس الزراير على اللغة التانية (كيبورد عربي 101 القياسي). */
+const AR_KEYS = {
+  '`':'ذ','q':'ض','w':'ص','e':'ث','r':'ق','t':'ف','y':'غ','u':'ع','i':'ه','o':'خ','p':'ح','[':'ج',']':'د',
+  'a':'ش','s':'س','d':'ي','f':'ب','g':'ل','h':'ا','j':'ت','k':'ن','l':'م',';':'ك',"'":'ط',
+  'z':'ئ','x':'ء','c':'ؤ','v':'ر','b':'لا','n':'ى','m':'ة',',':'و','.':'ز','/':'ظ',
+  '~':'\u0651','Q':'\u064E','W':'\u064B','E':'\u064F','R':'\u064C','T':'لإ','Y':'إ','U':'\u2018','I':'÷','O':'×','P':'؛',
+  '{':'<','}':'>','A':'\u0650','S':'\u064D','D':']','F':'[','G':'لأ','H':'أ','J':'\u0640','K':'،','L':'/',
+  'Z':'~','X':'\u0652','C':'}','V':'{','B':'لآ','N':'آ','M':'\u2019','<':',','>':'.','?':'؟'
+};
+function normPass(p){
+  let s = String(p == null ? '' : p);
+  try { s = s.normalize('NFKC'); } catch (e) {}
+  const AR = '٠١٢٣٤٥٦٧٨٩', FA = '۰۱۲۳۴۵۶۷۸۹';
+  s = s.replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u061C\u00AD]/g, '')
+    .replace(/[\u0640\u064B-\u065F\u0670]/g, '')
+    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+    .replace(/\u0649/g, '\u064A').replace(/\u06CC/g, '\u064A')
+    .replace(/\u0629/g, '\u0647').replace(/\u06A9/g, '\u0643')
+    .replace(/[٠-٩]/g, d => String(AR.indexOf(d)))
+    .replace(/[۰-۹]/g, d => String(FA.indexOf(d)));
+  return s.trim();
+}
+function enToArKeys(p){
+  let out = '';
+  for (const ch of String(p)) out += Object.prototype.hasOwnProperty.call(AR_KEYS, ch) ? AR_KEYS[ch] : ch;
+  return out;
+}
+function arToEnKeys(p){
+  const rev = {};
+  Object.keys(AR_KEYS).forEach(k => { const v = AR_KEYS[k]; if (v.length === 1 && !rev[v]) rev[v] = k; });
+  const pairs = {};
+  Object.keys(AR_KEYS).forEach(k => { const v = AR_KEYS[k]; if (v.length === 2) pairs[v] = k; });
+  const s = String(p), outs = [];
+  const walk = (i, acc) => {
+    if (outs.length >= 16) return;
+    if (i >= s.length) { outs.push(acc); return; }
+    const two = s.substr(i, 2);
+    /* «لا» ممكن تكون زرار B لوحده أو G وبعدها H — بنجرّب الاحتمالين */
+    if (pairs[two]) walk(i + 2, acc + pairs[two]);
+    const ch = s[i];
+    walk(i + 1, acc + (rev[ch] || ch));
+  };
+  walk(0, '');
+  return outs;
+}
+function passCandidates(p){
+  p = String(p == null ? '' : p);
+  const list = [p, normPass(p)];
+  if (/[\u0600-\u06FF\u2018\u2019÷×]/.test(p)) arToEnKeys(p).forEach(x => { list.push(x, normPass(x)); });
+  if (/[A-Za-z`\[\];',.\/~{}<>?]/.test(p)) { const a = enToArKeys(p); list.push(a, normPass(a)); }
+  return list.filter((x, i) => x && list.indexOf(x) === i);
+}
+async function hashRaw(p, salt){
   const s = salt || randomSalt();
   const h = await sha256Hex(PASS_PREFIX + s + '::' + p);
 
@@ -474,16 +535,27 @@ async function hashPass(p, salt){
   }
   return 'v2$' + s + '$' + h;
 }
+async function hashPass(p, salt){
+  return hashRaw(normPass(p), salt);
+}
 
 async function verifyPass(p, stored){
   if (!stored || typeof stored !== 'string') return null;
+  const cands = passCandidates(p);
   const parts = stored.split('$');
   if (parts.length === 3 && (parts[0] === 'v1' || parts[0] === 'v2')) {
-    const cand = await hashPass(p, parts[1]);
-    return cand === stored ? stored : null;
+    for (const c of cands) {
+      if (await hashRaw(c, parts[1]) === stored) {
+        /* هاش قديم اتعمل قبل التوحيد — بنحدّثه للصيغة الموحّدة عشان يتقبل بأي شكل بعد كده */
+        return normPass(c) === c ? stored : await hashPass(c);
+      }
+    }
+    return null;
   }
 
-  if (await legacyHash(p) === stored) return await hashPass(p);
+  for (const c of cands) {
+    if (await legacyHash(c) === stored) return await hashPass(c);
+  }
   return null;
 }
 
@@ -605,11 +677,14 @@ function importPreviewDlg(title, summaryText, rowsHTML, okLabel){
 }
 function inputDlg(title, ph, isPass){
   return new Promise(res => {
-    const m = showModal(title, '<div class="fld"><input id="_dlgInp" type="' + (isPass ? 'password' : 'text') + '" placeholder="' + esc(ph || '') + '"></div>', [
+    const m = showModal(title, '<div class="fld"><input id="_dlgInp" type="' + (isPass ? 'password' : 'text') + '" placeholder="' + esc(ph || '') + '" dir="auto" autocapitalize="off" autocorrect="off" spellcheck="false"></div>' +
+      (isPass ? '<label class="show-pass"><input type="checkbox" id="_dlgShow"> إظهار كلمة المرور</label>' : ''), [
       { label: 'تأكيد', kind: 'primary', onClick: (body) => res(body.querySelector('#_dlgInp').value || '') },
       { label: 'إلغاء', kind: 'ghost', onClick: () => res(null) }
     ], () => res(null));
     const inp = m.body.querySelector('#_dlgInp');
+    const sh = m.body.querySelector('#_dlgShow');
+    if (sh) sh.onchange = () => { inp.type = sh.checked ? 'text' : 'password'; inp.focus(); };
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { res(inp.value || ''); m.close(); } });
     setTimeout(() => inp.focus(), 50);
  });
@@ -1213,6 +1288,16 @@ async function editUser(i){
   addLog('تعديل كلمة مرور مستخدم: ' + u.name);
   toast('تم تغيير كلمة المرور لـ ' + u.name, 'success');
 }
+/* اسم المستخدم: الأول بالتطابق الحرفي، ولو مالقاش بيقبله لو اتكتب بشكل عربي مختلف
+   (أ/ا، ى/ي...) أو والكيبورد على اللغة التانية — بشرط يطلع يوزر واحد بس */
+function findLoginUser(user){
+  const exact = usersList.find(x => x.name === user);
+  if (exact) return exact;
+  const key = v => normPass(v).toLowerCase();
+  const cands = passCandidates(user).map(key);
+  const hits = usersList.filter(x => cands.indexOf(key(x.name)) !== -1);
+  return hits.length === 1 ? hits[0] : undefined;
+}
 async function tryLogin(user, pass){
   if (user === '__admin__' || user === '') {
     const up = await verifyPass(pass, adminHash);
@@ -1224,7 +1309,7 @@ async function tryLogin(user, pass){
     }
     return null;
  }
-  const u = usersList.find(x => x.name === user);
+  const u = findLoginUser(user);
   if (u && u.active === false) return { blocked: true, name: u.name };
   if (!u) return null;
   const okHash = await verifyPass(pass, u.hash);
@@ -1253,13 +1338,16 @@ function showLock(){
       : '') +
 
     '<div id="lockMsg" style="display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;border-radius:.6rem;padding:.55rem .7rem;font-size:.9rem;font-weight:800;margin-bottom:.8rem;line-height:1.8"></div>' +
-    (hasUsers ? '<div class="fld"><label>اسم المستخدم</label><input type="text" id="lockUser" placeholder="اكتب اسم المستخدم" autocomplete="username"></div>' : '') +
-    '<div class="fld"><label>كلمة المرور</label><input type="password" id="lockInp" placeholder="كلمة المرور" autocomplete="current-password"></div>' +
+    (hasUsers ? '<div class="fld"><label>اسم المستخدم</label><input type="text" id="lockUser" placeholder="اكتب اسم المستخدم" autocomplete="username" dir="auto" autocapitalize="off" autocorrect="off" spellcheck="false"></div>' : '') +
+    '<div class="fld"><label>كلمة المرور</label><input type="password" id="lockInp" placeholder="كلمة المرور" autocomplete="current-password" dir="auto" autocapitalize="off" autocorrect="off" spellcheck="false"></div>' +
+    '<label class="show-pass"><input type="checkbox" id="lockShowPass"> إظهار كلمة المرور (عربي أو إنجليزي)</label>' +
     '<button class="mbtn primary" style="width:100%" id="lockBtn">🔑 دخول</button></div>';
   document.body.appendChild(ov);
   const inp = ov.querySelector('#lockInp');
   const uInp = ov.querySelector('#lockUser');
   const msg = ov.querySelector('#lockMsg');
+  const showP = ov.querySelector('#lockShowPass');
+  if (showP) showP.onchange = () => { inp.type = showP.checked ? 'text' : 'password'; inp.focus(); };
   const say = t => { if (msg) { msg.textContent = t; msg.style.display = t ? 'block' : 'none'; } };
   let lockTicker = null;
   const startLockCountdown = () => {
@@ -1733,19 +1821,12 @@ function eanOk(code){
 function fmtCountsBreakdown(counts){
   return countsSummary(counts);
 }
-let lastScanCode = '', lastScanTime = 0;
 function processCode(code){
   code = sanitizeCode(code);
   if (!code) return;
 
   if (onlineGuard('العدّة دي')) return;
   const nowTs = Date.now();
-  if (code === lastScanCode && (nowTs - lastScanTime) < SCAN_DEDUPE_MS) {
-    toast('⏱️ نفس الكود اتسجل من لحظة — اتجاهل عشان مايتحسبش مرتين', 'warning');
-    beep('bad');
-    return;
- }
-  lastScanCode = code; lastScanTime = nowTs;
   const who = sessionUser ? sessionUser.name : '';
   const bag = who || 'بدون مستخدم';
   const item = inventoryData.find(i => i.code === code);
@@ -3513,7 +3594,7 @@ async function openSettings(){
     '<div class="add-user-title">➕ إضافة مستخدم جديد</div>' +
     '<div class="add-user-grid">' +
     '<div class="fld"><label>اسم المستخدم</label><input id="newUserName" placeholder="مثال: ahmed" autocomplete="off"></div>' +
-    '<div class="fld"><label>كلمة المرور</label><input id="newUserPass" type="password" placeholder="••••" autocomplete="new-password"></div>' +
+    '<div class="fld"><label>كلمة المرور</label><input id="newUserPass" type="password" placeholder="••••" autocomplete="new-password" dir="auto" autocapitalize="off" autocorrect="off" spellcheck="false"></div>' +
     '<div class="fld"><label>الصلاحية</label><select id="newUserRole"><option value="user">مستخدم (جرد فقط)</option><option value="supervisor">مشرف</option><option value="admin">admin</option></select></div>' +
     '</div>' +
     '<div class="modal-foot"><button class="mbtn primary" style="background:var(--green)" id="addUserBtn">💾 حفظ المستخدم</button><button class="mbtn ghost" id="urepBtn">📊 تقرير الجرد بالمستخدمين</button></div>' +
@@ -3781,7 +3862,7 @@ async function openSettings(){
   if (frBtn) frBtn.onclick = () => { m.close(); factoryReset(); };
 }
 
-let lastCamCode = '', lastCamTime = 0, camBusy = false;
+let lastCamCode = '', lastCamTime = 0, lastCamSeen = 0, lastCamBad = 0, camFlashT = null;
 async function openCameraScanner(){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast('الكاميرا غير مدعومة على هذا الجهاز/المتصفح', 'error');
@@ -3808,7 +3889,7 @@ async function openCameraScanner(){
     '<button class="mbtn danger" id="camClose">إغلاق الكاميرا</button>' +
     '</div>';
   const m = showModal('📷 مسح بالكاميرا', bodyHTML, [], () => stopCameraScanner());
-  qrScanCount = 0; lastCamCode = ''; lastCamTime = 0; camBusy = false;
+  qrScanCount = 0; lastCamCode = ''; lastCamTime = 0; lastCamSeen = 0; lastCamBad = 0;
   try {
     if (typeof Html5Qrcode === 'undefined') {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js');
@@ -3863,57 +3944,50 @@ async function openCameraScanner(){
     const startScanner = (target, cfg) => qrScanner.start(target, cfg, onScanSuccess, () => {});
     async function onScanSuccess(txt){
         const now = Date.now();
-
-        if (camBusy) return;
-        if (now - lastCamTime < CAM_DEDUPE_MS) return;
+        txt = sanitizeCode(txt);
+        if (!txt) return;
 
         const f = $('scanFlash'), ft = $('scanFlashTitle'), fc = $('scanFlashCode'), fi = $('scanFlashItem');
         const sc = $('scanCount');
+        const flash = (err, ms) => {
+          if (!f) return;
+          clearTimeout(camFlashT);
+          f.classList.remove('err');
+          f.classList.add('show');
+          if (err) f.classList.add('err');
+          camFlashT = setTimeout(() => { f.classList.remove('show', 'err'); }, ms);
+        };
 
         if (!eanOk(txt)) {
+          /* قراءة ناقصة: بنبلّغ بس من غير ما نوقف قراية أي كود تاني */
+          if (now - lastCamBad < 1200) return;
+          lastCamBad = now;
           beep('bad');
-          camBusy = true;
           if (ft) ft.textContent = '✗ قراءة ناقصة';
           if (fc) fc.textContent = txt;
           if (fi) fi.textContent = 'الباركود اتقص — وجّه الكاميرا صح وامسح تاني';
-          if (f) {
-            f.classList.add('show', 'err');
-            setTimeout(() => { f.classList.remove('show', 'err'); camBusy = false; }, 1200);
- }
+          flash(true, 1000);
           if (sc) sc.innerHTML = '⚠️ قراءة مرفوضة — الكود ناقص — عدد المسحات: <b id="scanCountNum">' + qrScanCount + '</b>';
           return;
- }
+        }
 
-        lastCamCode = txt; lastCamTime = now; camBusy = true;
+        /* نفس الباركود لسه قدام الكاميرا = نفس القطعة، مش قطعة جديدة (من غير أي رسالة) */
+        if (txt === lastCamCode) {
+          const stillInView = (now - lastCamSeen) < CAM_GONE_MS || (now - lastCamTime) < CAM_MIN_SAME_MS;
+          lastCamSeen = now;
+          if (stillInView) return;
+        }
+
+        lastCamCode = txt; lastCamTime = now; lastCamSeen = now;
         qrScanCount++;
-        const scn = $('scanCountNum'); if (scn) scn.textContent = qrScanCount;
         resetIdleTimer();
-        const before = inventoryData.find(i => i.code === txt);
         processCode(txt);
         const after = inventoryData.find(i => i.code === txt);
         if (ft) ft.textContent = '✓ تم الجرد';
         if (fc) fc.textContent = txt;
         if (fi) fi.textContent = (after ? after.name : txt) + ' — القطعة رقم: ' + (after ? fmtQ(after.actualQuantity) : '1');
-        if (f) {
-          f.classList.add('show');
-          setTimeout(() => { f.classList.remove('show'); }, 1000);
- }
-
-        camCountdown(CAM_DEDUPE_MS);
- }
-
-    function camCountdown(ms){
-      const sc = $('scanCount');
-      const end = Date.now() + ms;
-      const tick = () => {
-        const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
-        if (sc) sc.innerHTML = left > 0
-          ? '✅ تم مسح <b style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة — استنى <b>' + left + '</b> ثانية للمسحة الجاية'
-          : '✅ تم مسح <b style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة — جاهز للمسح';
-        if (left > 0) setTimeout(tick, 250);
-        else camBusy = false;
-      };
-      tick();
+        flash(false, 700);
+        if (sc) sc.innerHTML = '✅ تم مسح <b id="scanCountNum" style="color:#059669;font-size:1.1rem">' + qrScanCount + '</b> قطعة — جاهز للمسح';
     }
 
     try {
@@ -4037,7 +4111,7 @@ function autoUpdateBusy(){
       return true;
     });
     if (openOne) return 'فيه نافذة مفتوحة';
-    if (typeof camBusy !== 'undefined' && camBusy) return 'الكاميرا شغالة';
+    if (typeof qrCamOn !== 'undefined' && qrCamOn) return 'الكاميرا شغالة';
   } catch (e) {}
   return null;
 }

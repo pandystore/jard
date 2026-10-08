@@ -1221,6 +1221,29 @@ console.log('== ملحوظة اختيار الأعمدة في نهاية قائ�
 }
 
 
+console.log('== المسح المتكرر لنفس الكود ==');
+{
+  const pc = extractFn('processCode');
+  eq(pc.includes('اتجاهل عشان مايتحسبش مرتين'), false, 'رسالة «نفس الكود اتسجل من لحظة» اتشالت');
+  eq(/SCAN_DEDUPE_MS|lastScanCode/.test(src), false, 'مفيش منع لتكرار نفس الكود في الإدخال اليدوي/الاسكانر');
+  eq(/CAM_DEDUPE_MS|camCountdown|camBusy/.test(src), false, 'الكاميرا مابقاش فيها انتظار ثواني بين المسحات');
+  eq(src.includes('للمسحة الجاية'), false, 'رسالة «استنى ثانية للمسحة الجاية» اتشالت');
+  /* محاكاة: نفس الكود مرتين ورا بعض لازم يتحسب مرتين */
+  const prelude = 'let inventoryData = [{ serial:1, code:"111", name:"x", actualQuantity:0, systemQuantity:0, counts:{} }];' +
+    'let sessionUser = { name:"u1", role:"user" }; const calls = [];' +
+    'function onlineGuard(){ return false; } function legacySeedOp(){ return null; }' +
+    'function applyCountOps(item, ops){ const q = (item.actualQuantity||0) + ops.reduce((s,o)=>s+o.d,0); return { actualQuantity:q, isJarded:true }; }' +
+    'function beep(){} function toast(t){ calls.push(t); } function pushCountNotif(){} function updateTable(){} function renderCategoryButtons(){}' +
+    'function ensureItemVisible(){} function patchSingleRow(){} function updateStats(){} function enqueueCountOp(){} function scheduleCountPush(){}' +
+    'function schedulePushItem(){} function addLog(){} function eanOk(){ return true; } function fmtQ(n){ return n; } function $(){ return null; }';
+  const Module = require('module');
+  const m = new Module();
+  m._compile(prelude + '\n' + extractFn('sanitizeCode') + '\n' + pc + '\nmodule.exports = { processCode, inventoryData, calls };', 'dup-scan.js');
+  m.exports.processCode('111'); m.exports.processCode('111'); m.exports.processCode('111');
+  eq(m.exports.inventoryData[0].actualQuantity, 3, 'نفس الكود 3 مرات في نفس اللحظة = 3 قطع');
+  eq(m.exports.calls.length, 0, 'ومن غير أي رسالة');
+}
+
 console.log('== تشفير كلمات المرور (salt) ==');
 {
   /* الدوال دي async، فمش هنقدر نستخدم extractFn العادية (بتقص كلمة async) —
@@ -1231,11 +1254,11 @@ console.log('== تشفير كلمات المرور (salt) ==');
   else {
     let end = src.indexOf('\n}', b);
     end = src.indexOf('\n', end + 1);
-    const code = src.slice(a, end) + '\nmodule.exports = { hashPass, verifyPass, legacyHash, randomSalt };';
+    const code = src.slice(a, end) + '\nmodule.exports = { hashPass, verifyPass, legacyHash, randomSalt, normPass, passCandidates, hashRaw };';
     const Module = require('module');
     const m = new Module();
     m._compile(code, 'pass-extracted.js');
-    const { hashPass, verifyPass, legacyHash } = m.exports;
+    const { hashPass, verifyPass, legacyHash, normPass, hashRaw } = m.exports;
 
     (async () => {
       const h1 = await hashPass('123456');
@@ -1258,6 +1281,30 @@ console.log('== تشفير كلمات المرور (salt) ==');
       eq(up.startsWith('v2$'), true, 'النسخة المحدّثة بالصيغة الجديدة');
       eq(await verifyPass('123456', up), up, 'والتحقق بالنسخة المحدّثة شغال');
       eq(await verifyPass('999999', old), null, 'باسورد غلط على هاش قديم مرفوض');
+
+      console.log('== باسورد بالعربي ==');
+      const ar = await hashPass('محمد123');
+      eq(await verifyPass('محمد123', ar), ar, 'باسورد عربي بيتقبل عادي');
+      eq(await verifyPass('محمد١٢٣', ar), ar, 'بالأرقام العربية بيتقبل');
+      eq(await verifyPass('\u200Fمحـــمد123', ar), ar, 'علامات الاتجاه الخفية والتطويل مش بيأثروا');
+      const ah = await hashPass('أحمد');
+      eq(!!(await verifyPass('احمد', ah)), true, 'أ / ا نفس الحرف');
+      eq(!!(await verifyPass('مُنى', await hashPass('مني'))), true, 'ى / ي والتشكيل مش بيأثروا');
+      eq(!!(await verifyPass('مريم', ah)), false, 'باسورد عربي غلط مرفوض');
+      /* الكيبورد على العربي والباسورد إنجليزي (والعكس) */
+      const en = await hashPass('abc123');
+      eq(!!(await verifyPass('شلاؤ123', en)), true, 'abc اتكتبت والكيبورد عربي (شلاؤ) — بتتقبل');
+      eq(!!(await verifyPass('شمهلاشق', await hashPass('alibaba'))), false, 'كتابة مختلفة فعلًا مرفوضة');
+      eq(!!(await verifyPass('لاشلاش', await hashPass('baba'))), true, '«لا» = زرار B');
+      eq(!!(await verifyPass('لاشلاش', await hashPass('ghaghba'))), false, 'مش أي حاجة بتعدي');
+      eq(!!(await verifyPass('fgh', await hashPass('بلا'))), true, 'باسورد عربي اتكتب والكيبورد إنجليزي بيتقبل');
+      eq(!!(await verifyPass('ABC123', en)), false, 'حالة الحروف لسه مهمة');
+      /* هاش قديم اتعمل بباسورد عربي من غير توحيد — بيتقبل ويتحدّث */
+      const rawOld = await hashRaw('أحمد');
+      const upAr = await verifyPass('أحمد', rawOld);
+      eq(!!upAr && upAr !== rawOld, true, 'هاش عربي قديم بيتقبل وبيتحدّث للصيغة الموحّدة');
+      eq(!!(await verifyPass('احمد', upAr)), true, 'وبعد التحديث بيتقبل بأي شكل للألف');
+      eq(normPass(' 123 '), '123', 'المسافات في الأطراف بتتشال');
 
       await Promise.all(pendingAsync);
       console.log('\n' + '='.repeat(50));

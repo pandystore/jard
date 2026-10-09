@@ -134,7 +134,7 @@
           كاميرا
         </button>
       </form>
-      <div id="lastScan" style="display:none;margin-top:.45rem;font-size:.72rem;font-weight:700;color:#16a34a"></div>
+      <div id="lastScan" class="last-scan" style="display:none"></div>
       <div class="kbd-hint no-print" style="display:none">
         <span><b>F2</b> جرد</span><span><b>F3</b> بحث</span><span><b>F4</b> كاميرا</span><span><b>F9</b> تقارير</span><span><b>Esc</b> إغلاق</span>
       </div>
@@ -148,11 +148,12 @@
     </div>
   </div>
 
-  <div class="grid-4 statcards no-print">
+  <div class="grid-5 statcards no-print">
     <div class="card mini"><span class="t">أصناف مُجردة</span><span id="cardJarded" class="v c-blue">0</span></div>
-    <div class="card mini"><span class="t">غير مُجردة</span><span id="cardNotJarded" class="v c-amber">0</span></div>
-    <div class="card mini"><span class="t">أصناف عجز</span><span id="cardDeficit" class="v c-red">0</span></div>
+    <div class="card mini"><span class="t">أصناف غير مُجردة</span><span id="cardNotJarded" class="v c-amber">0</span></div>
     <div class="card mini"><span class="t">أصناف زيادة</span><span id="cardSurplus" class="v c-green">0</span></div>
+    <div class="card mini"><span class="t">أصناف عجز</span><span id="cardDeficit" class="v c-red">0</span></div>
+    <div class="card mini"><span class="t">عدد القطع المُجردة<small>تشمل جميع المستخدمين</small></span><span id="cardPieces" class="v c-purple">0</span></div>
   </div>
 
   <div class="filter-toolbar no-print">

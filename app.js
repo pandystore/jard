@@ -1677,8 +1677,10 @@ function updateStats(){
   $('completionPercent').textContent = (total ? ((jarded / total) * 100).toFixed(1) : 0) + '%';
   $('cardJarded').textContent = jarded;
   $('cardNotJarded').textContent = total - jarded;
-  $('cardDeficit').textContent = deficit;
   $('cardSurplus').textContent = surplus;
+  $('cardDeficit').textContent = deficit;
+  /* عدد القطع المُجردة (كل حصص كل المستخدمين) — مش عدد الأصناف */
+  $('cardPieces').textContent = fmtQ(totalJardedPieces(inventoryData));
 
   const dParts = [], sParts = [];
   Object.keys(gs).forEach(g => {
@@ -1821,6 +1823,36 @@ function eanOk(code){
 function fmtCountsBreakdown(counts){
   return countsSummary(counts);
 }
+
+/* سطر «آخر مسح» اللي بيظهر تحت خانة الكود:
+   ✓ كود الصنف (بالأحمر) — اسم الصنف — الكمية الإجمالية الآن
+   الدالة نقية (بترجّع HTML نص) عشان تتاختبر لوحدها في tests.js */
+function lastScanHtml(item, qty){
+  const it = (item && typeof item === 'object') ? item : {};
+  const code = String(it.code == null ? '' : it.code);
+  const name = String(it.name == null ? '' : it.name);
+  let extra = '';
+  if (it.manualQty) {
+    const manualQ = round2(Number(it.counts && it.counts[it.manualBy]) || 0);
+    extra = ' (منها ' + fmtQ(manualQ) + ' تحديد يدوي من ' + (it.manualBy || 'المسؤول') + ' — عدّتك بتتضاف فوقها)';
+  }
+  return '✓ <b class="scan-code" dir="ltr">' + esc(code) + '</b> — ' + esc(name) +
+    ' — الكمية الإجمالية الآن: <b class="scan-qty">' + fmtQ(qty) + '</b>' + (extra ? ' <span class="scan-manual">' + esc(extra) + '</span>' : '');
+}
+
+/* عدد القطع المُجردة كلها — مجموع حصص كل المستخدمين على كل الأصناف.
+   لو الصنف ما عندوش حصص مسجلة (بيانات قديمة/يدوية) بنرجع للرصيد الفعلي. */
+function totalJardedPieces(list){
+  const arr = Array.isArray(list) ? list : [];
+  let pieces = 0;
+  for (let i = 0; i < arr.length; i++){
+    const it = arr[i] || {};
+    const own = sumCounts(it.counts);
+    pieces += own > 0 ? own : Math.max(0, Number(it.actualQuantity) || 0);
+  }
+  return round2(pieces);
+}
+
 function processCode(code){
   code = sanitizeCode(code);
   if (!code) return;
@@ -1876,11 +1908,8 @@ function processCode(code){
   const ls = $('lastScan');
   if (ls && done) {
     ls.style.display = 'block';
-    ls.textContent = '✓ ' + done.name + ' — الكمية الإجمالية الآن: ' + fmtQ(qty) +
-      (done.manualQty
-        ? ' (منها ' + fmtQ(Number(done.counts && done.counts[done.manualBy]) || 0) + ' تحديد يدوي من ' + (done.manualBy || 'المسؤول') + ' — عدّتك بتتضاف فوقها)'
-        : '');
- }
+    ls.innerHTML = lastScanHtml(done, qty);
+  }
 }
 
 function saveAndRefresh(rebuildCats, item){

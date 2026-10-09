@@ -56,9 +56,16 @@ label.sbtn{ margin:0; }
 .inp.orange:focus{ border-color:var(--orange); }
 .statcards{ margin-bottom:1.5rem; }
 .mini{ display:flex; align-items:center; justify-content:space-between; }
-.mini .t{ font-size:.8rem; color:#6b7280; }
-.mini .v{ font-size:1.35rem; font-weight:800; }
-.c-blue{ color:var(--blue); } .c-green{ color:var(--green); } .c-red{ color:#dc2626; } .c-amber{ color:#d97706; }
+.mini .t{ font-size:.8rem; color:#6b7280; line-height:1.3; }
+.mini .t small{ display:block; font-size:.6rem; font-weight:700; color:#9ca3af; margin-top:.15rem; }
+.mini .v{ font-size:1.35rem; font-weight:800; white-space:nowrap; }
+.c-blue{ color:var(--blue); } .c-green{ color:var(--green); } .c-red{ color:#dc2626; } .c-amber{ color:#d97706; } .c-purple{ color:#7c3aed; }
+
+/* سطر «آخر مسح» تحت خانة الكود: الكود بالأحمر — اسم الصنف — الكمية الإجمالية */
+.last-scan{ margin-top:.45rem; font-size:.75rem; font-weight:700; color:#16a34a; line-height:1.6; word-break:break-word; }
+.scan-code{ color:#dc2626; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-weight:800; font-size:.82rem; letter-spacing:.02em; }
+.scan-qty{ color:#0f172a; font-weight:800; }
+.scan-manual{ color:#6b7280; font-weight:700; font-size:.68rem; }
 .toolbar-row{ display:flex; flex-wrap:wrap; align-items:center; gap:1rem; }
 .toolbar-group{ display:flex; align-items:center; gap:.5rem; overflow-x:auto; }
 .toolbar-group::-webkit-scrollbar{ display:none; }
@@ -237,6 +244,17 @@ tfoot td{ border:1px solid #000 !important; font-weight:800; padding:6px !import
 #sidebarOverlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:45; }
 .log-item{ display:flex; justify-content:space-between; font-size:.75rem; padding:.45rem 0; border-bottom:1px dashed #f1f5f9; color:#475569; }
 .log-item .lt{ color:#94a3b8; font-size:.68rem; direction:ltr; }
+
+/* 5 كروت: على الشاشات المتوسطة بقوا 3 في السطر، وعلى الموبايل 2 مع كرت القطع بعرض كامل */
+@media (max-width:1250px){
+  .statcards.grid-5{ grid-template-columns:repeat(3,1fr); gap:.7rem; }
+}
+@media (max-width:900px){
+  .statcards.grid-5{ grid-template-columns:1fr 1fr; }
+  .statcards .card.mini:last-child{ grid-column:1 / -1; }
+  .mini .t{ font-size:.72rem; }
+  .mini .v{ font-size:1.15rem; }
+}
 
 @media (max-width:900px){
   .sidebar{ transform:translateX(105%); transition:transform .3s ease; box-shadow:none; }

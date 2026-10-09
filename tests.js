@@ -615,7 +615,7 @@ console.log('== إحصاءات الجرد حسب الرصيد الفعلي لا 
     'var fmtQ = x => x; var esc = x => String(x);',
     'var setTimeout = f => f(); var toastMsg = ""; var toast = x => {toastMsg=x;};'
   ].join('\n');
-  const funcs = ['updateStats','updateStatsForUser'].map(extractFn).join('\n');
+  const funcs = ['updateStats','updateStatsForUser','totalJardedPieces','sumCounts','round2'].map(extractFn).join('\n');
   const Module = require('module'); const m = new Module();
   m._compile(prelude + '\n' + funcs + '\nmodule.exports={updateStats,updateStatsForUser,els,getToast:()=>toastMsg};', 'actual-quantity-stats.js');
   const t = m.exports;
@@ -623,9 +623,64 @@ console.log('== إحصاءات الجرد حسب الرصيد الفعلي لا 
   eq(t.els.cardJarded.textContent, 2, 'صنفين فقط رصيدهم الفعلي أكبر من صفر (بغض النظر عن isJarded)');
   eq(t.els.cardNotJarded.textContent, 2, 'غير المجرد = عدد الأصناف ناقص اللي رصيدهم موجب');
   eq(t.els.completionPercent.textContent, '50.0%', 'نسبة الإنجاز محسوبة من الرصيد الفعلي');
+  eq(t.els.cardPieces.textContent, 7, 'عدد القطع = مجموع الأرصفة الفعلية للأصناف اللي ملهاش حصص مسجلة (0+3+4+0)');
   t.updateStatsForUser('سارة');
   eq(t.getToast(), 'سارة جرد 1 صنف من أصل 4', 'إحصاء المستخدم يحتسب countedBy فقط مع رصيد فعلي موجب');
 }
+
+console.log('== عدد القطع المجردة يشمل حصص كل المستخدمين ==');
+{
+  const Module = require('module'); const m = new Module();
+  m._compile(['round2','sumCounts','totalJardedPieces'].map(extractFn).join('\n') + '\nmodule.exports={totalJardedPieces};', 'pieces.js');
+  const { totalJardedPieces } = m.exports;
+  eq(totalJardedPieces([]), 0, 'قائمة فاضية = صفر قطعة');
+  eq(totalJardedPieces([
+    { actualQuantity: 8, counts: { admin: 5, 'سارة': 3 } },
+    { actualQuantity: 2, counts: { 'محمود': 1, 'سارة': 1 } }
+  ]), 10, 'مجموع حصص كل المستخدمين على كل الأصناف (8 + 2)');
+  eq(totalJardedPieces([
+    { actualQuantity: 0, counts: { 'سارة': 0 } },
+    { actualQuantity: 4, counts: {} },
+    { actualQuantity: -3, counts: {} }
+  ]), 4, 'حصص صفر أو صنف ملوش حصص يرجع للرصيد الفعلي، والرصيد السالب مايتحسبش');
+  eq(totalJardedPieces(null), 0, 'قيم غير صالحة ما تكسرش الحساب');
+}
+
+console.log('== سطر «آخر مسح»: الكود بالأحمر ثم الاسم ثم الكمية الإجمالية ==');
+{
+  const Module = require('module'); const m = new Module();
+  m._compile(['round2','sumCounts','fmtQ','esc','lastScanHtml'].map(extractFn).join('\n') + '\nmodule.exports={lastScanHtml};', 'last-scan.js');
+  const { lastScanHtml } = m.exports;
+  const html = lastScanHtml({ code: '6221234567890', name: 'مياه معدنية 330 مل', counts: {} }, 12);
+  const plain = html.replace(/<[^>]+>/g, '');
+  eq(plain.indexOf('6221234567890') < plain.indexOf('مياه معدنية 330 مل') && plain.indexOf('مياه معدنية 330 مل') < plain.indexOf('الكمية الإجمالية الآن'), true, 'الترتيب: الكود ← اسم الصنف ← الكمية الإجمالية');
+  eq(html.indexOf('6221234567890') < html.indexOf('مياه معدنية 330 مل'), true, 'كود الصنف بيظهر قبل الاسم');
+  eq(/class="scan-code"/.test(html), true, 'الكود متعلّم بكلاس scan-code (الأحمر في style.css)');
+  eq(html.includes('dir="ltr"'), true, 'الكود بيتقرأ من اليسار لليمين');
+  eq(html.includes('الكمية الإجمالية الآن: <b class="scan-qty">12</b>'), true, 'الكمية الإجمالية ظاهرة بالرقم الحالي');
+  eq(lastScanHtml({ code: '1', name: '<img src=x onerror=alert(1)>', counts: {} }, 1).includes('<img'), false, 'اسم الصنف بيتعمله escape قبل innerHTML');
+  const man = lastScanHtml({ code: '7', name: 'صنف', actualQuantity: 6, manualQty: true, manualBy: 'admin', counts: { admin: 5, 'سارة': 1 } }, 6);
+  eq(man.includes('تحديد يدوي من admin'), true, 'للتحديد اليدوي بيظهر تنبيه إن العدّة بتتضاف فوقه');
+  eq(/<b class="scan-code"[^>]*>7<\/b>/.test(man), true, 'الكود لسه بالأحمر حتى مع التحديد اليدوي');
+}
+
+console.log('== كروت الإحصاء الخمسة في الصفحة ==');
+{
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf-8');
+  const css = fs.readFileSync(path.join(__dirname, 'style.css'), 'utf-8');
+  const cardsRow = (html.match(/<div class="grid-5 statcards no-print">[\s\S]*?<\/div>\s*<\/div>/) || [''])[0];
+  eq(/grid-5 statcards/.test(html), true, 'صف الكروت بقا grid-5 بدل grid-4');
+  ['cardJarded','cardNotJarded','cardSurplus','cardDeficit','cardPieces'].forEach(id => {
+    eq(cardsRow.includes('id="' + id + '"'), true, 'الكروت فيها العنصر #' + id);
+  });
+  eq(cardsRow.indexOf('cardSurplus') < cardsRow.indexOf('cardDeficit'), true, 'أصناف زيادة قبل أصناف عجز');
+  eq(/أصناف غير مُجردة/.test(cardsRow), true, 'مُسمّى الكرت التاني: أصناف غير مُجردة');
+  eq(/عدد القطع المُجردة<small>تشمل جميع المستخدمين<\/small>/.test(cardsRow), true, 'كرت عدد القطع فيه ملاحظة «تشمل جميع المستخدمين»');
+  eq(/\.scan-code\{[^}]*color:#dc2626/.test(css), true, 'كلاس scan-code لونه أحمر في style.css');
+  eq(/\.c-purple\{ color:#7c3aed; \}/.test(css), true, 'لون كرت القطع (بنفسجي) معرّف');
+  eq(/\.statcards\.grid-5\{ grid-template-columns:repeat\(3,1fr\)/.test(css), true, 'على الشاشات المتوسطة الكروت بتبقى 3 في السطر');
+}
+
 
 console.log('== موضع الإشعارات وإخفاؤها عن المستخدم العادي ==');
 {

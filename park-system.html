@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نظام مدينة الألعاب - مكافحة السرقة والتلاعب</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#2563eb; --primary-2:#1e40af; --emerald:#059669; --amber:#d97706; --red:#dc2626;
+  --bg:#f1f5f9; --card:#ffffff; --muted:#64748b; --border:#e2e8f0; --dark:#0f172a;
+}
+*{box-sizing:border-box; font-family:'Tajawal','Cairo',sans-serif}
+body{margin:0; background:var(--bg); color:#0f172a}
+a{color:inherit}
+.topbar{position:sticky; top:0; z-index:50; background:linear-gradient(135deg,#0f172a 0%, #1e3a8a 60%, #2563eb 100%); color:#fff; padding:10px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.logo{display:flex; align-items:center; gap:10px}
+.logo-badge{width:44px; height:44px; border-radius:12px; background:#fff; color:#1e40af; display:grid; place-items:center; font-weight:900; font-size:18px}
+.logo h1{margin:0; font-size:16px; font-weight:900; line-height:1}
+.logo p{margin:2px 0 0; font-size:11px; opacity:.85}
+.top-actions{margin-inline-start:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.select, .input, .btn{border-radius:10px; border:1px solid var(--border); background:#fff; padding:8px 12px; font-size:13px; outline:none}
+.select{ min-width:160px}
+.btn{cursor:pointer; font-weight:800; border:none; display:inline-flex; align-items:center; gap:6px; justify-content:center}
+.btn-primary{background:var(--primary); color:#fff}
+.btn-dark{background:#0f172a; color:#fff}
+.btn-ghost{background:#fff; border:1px solid #e2e8f0}
+.btn-emerald{background:var(--emerald); color:#fff}
+.btn-amber{background:var(--amber); color:#fff}
+.btn-red{background:var(--red); color:#fff}
+.btn-sm{padding:6px 10px; font-size:12px}
+.badge{padding:4px 8px; border-radius:999px; font-size:11px; font-weight:800; display:inline-flex; align-items:center; gap:4px}
+.badge-green{background:#dcfce7; color:#166534; border:1px solid #bbf7d0}
+.badge-red{background:#fee2e2; color:#991b1b; border:1px solid #fecaca}
+.badge-amber{background:#fef3c7; color:#92400e; border:1px solid #fde68a}
+.badge-blue{background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe}
+.layout{max-width:1400px; margin:0 auto; padding:16px}
+.tabs{display:flex; gap:8px; overflow:auto; padding-bottom:8px; scrollbar-width:none}
+.tab{white-space:nowrap; padding:10px 14px; border-radius:999px; background:#fff; border:1px solid var(--border); cursor:pointer; font-weight:800; font-size:13px; display:flex; align-items:center; gap:8px}
+.tab.active{background:var(--primary); color:#fff; border-color:var(--primary)}
+.grid{display:grid; gap:14px}
+.kpis{grid-template-columns:repeat(12,1fr)}
+.kpi{grid-column:span 3; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px; position:relative; overflow:hidden}
+.kpi h3{margin:0; font-size:12px; color:var(--muted); font-weight:700}
+.kpi .v{margin:8px 0 4px; font-size:26px; font-weight:900}
+.kpi .s{font-size:11px; color:var(--muted)}
+.kpi .icon{position:absolute; inset-inline-end:12px; top:12px; width:36px; height:36px; border-radius:10px; display:grid; place-items:center; font-size:18px}
+.card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:14px}
+.card h2{margin:0 0 10px; font-size:15px; font-weight:900; display:flex; align-items:center; gap:8px}
+.muted{color:var(--muted); font-size:12px}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.col2{grid-template-columns:1fr 1fr}
+.col3{grid-template-columns:repeat(3,1fr)}
+.table-wrap{overflow:auto; border:1px solid var(--border); border-radius:12px}
+table{width:100%; border-collapse:collapse; min-width:700px; background:#fff}
+th{ background:#f8fafc; text-align:right; font-size:11px; color:#475569; padding:10px; border-bottom:1px solid var(--border); white-space:nowrap}
+td{padding:10px; border-bottom:1px solid #f1f5f9; font-size:13px; white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.pill{padding:3px 8px; border-radius:999px; font-size:11px; font-weight:800}
+.pill-used{background:#dcfce7; color:#166534}
+.pill-valid{background:#dbeafe; color:#1e40af}
+.pill-expired{background:#fee2e2; color:#991b1b}
+.search{width:100%; max-width:320px}
+.stat-bar{height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden}
+.stat-fill{height:100%; background:linear-gradient(90deg, #2563eb, #06b6d4)}
+.ticket{border:2px dashed #1e40af; border-radius:14px; padding:12px; background:linear-gradient(180deg,#fff,#f8fafc); position:relative}
+.ticket::before{content:""; position:absolute; inset-inline-start:-6px; top:50%; width:12px; height:12px; background:var(--bg); border-radius:50%; transform:translateY(-50%)}
+.ticket::after{content:""; position:absolute; inset-inline-end:-6px; top:50%; width:12px; height:12px; background:var(--bg); border-radius:50%; transform:translateY(-50%)}
+.qr{width:110px; height:110px; border:1px solid #e2e8f0; border-radius:10px; display:grid; place-items:center; background:#fff; overflow:hidden}
+.notice{border:1px solid #fde68a; background:#fffbeb; color:#92400e; padding:10px 12px; border-radius:12px; font-size:12px; line-height:1.7}
+.notice strong{color:#b45309}
+.alert{padding:10px 12px; border-radius:10px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px}
+.alert-ok{ background:#dcfce7; color:#166534; border:1px solid #bbf7d0}
+.alert-err{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca}
+.alert-info{ background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe}
+.modal{position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; z-index:100; padding:16px}
+.modal.open{display:flex}
+.modal-box{background:#fff; border-radius:16px; padding:16px; width:min(520px, 95vw); max-height:90vh; overflow:auto; border:1px solid var(--border)}
+.kbd{font-family:monospace; background:#0f172a; color:#fff; padding:2px 6px; border-radius:6px; font-size:11px}
+@media(max-width:900px){
+  .kpi{grid-column:span 6}
+  .col2,.col3{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .kpi{grid-column:span 12}
+}
+.print-only{display:none}
+@media print{
+  body *{visibility:hidden}
+  .print-area, .print-area *{visibility:visible}
+  .print-area{position:absolute; inset:0; background:#fff; padding:20px}
+  .print-only{display:block}
+  .no-print{display:none !important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar no-print">
+  <div class="logo">
+    <div class="logo-badge">🎪</div>
+    <div>
+      <h1>مدينة الألعاب — نظام الرقابة الذكي</h1>
+      <p>ربط الكاشير • التذكرة المشفّرة • موظف اللعبة &nbsp;|&nbsp; منع السرقة حتى مع التواطؤ</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <select id="roleSwitch" class="select" onchange="switchRole()">
+      <option value="admin">👑 مدير — تحكم كامل</option>
+      <option value="cashier">💰 كاشير — نقطة البيع</option>
+      <option value="operator">🎮 موظف لعبة — بوابة الدخول</option>
+    </select>
+    <select id="currentUserSelect" class="select" onchange="changeCurrentUser()"></select>
+    <button class="btn btn-ghost btn-sm" style="background:#fff;color:#0f172a" onclick="openHelp()">❓ كيف يمنع السرقة؟</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Mechanism banner -->
+  <div class="card no-print" style="background:linear-gradient(135deg,#fff 0%, #f0f9ff 100%); border:1px solid #bfdbfe">
+    <div class="row" style="justify-content:space-between">
+      <div style="flex:1; min-width:280px">
+        <h2 style="margin:0; color:#1e40af">🔒 آلية منع السرقة — 3 طبقات حماية لا يمكن تجاوزها</h2>
+        <div class="muted" style="margin-top:6px; line-height:1.8">
+          <b>المبدأ:</b> لا يوجد دخول بدون <span class="kbd">كود فريد لمرة واحدة</span> ينشئه الكاشير ويستهلكه موظف اللعبة عبر النظام فقط.
+          <br>• كل تذكرة = كود مشفّر <b>صالِح ليوم واحد ولمدة دقائق</b> + مرتبط بلعبة واحدة + بدرج كاشير واحد.
+          <br>• موظف اللعبة <b>لا يستطيع إدخال طفل بدون مسح</b> — أي محاولة = تسجّل كـ <b style="color:#dc2626">دخول مخالف</b> وتظهر في تقرير المطابقة فورًا.
+          <br>• حتى لو اتفق الكاشير والموظف: الكاشير لا يقدر يمسح تذكرة بدون إنشائها، وموظف اللعبة لا يقدر يستهلك كود غير موجود في السيستم.
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <span class="badge badge-blue">⏱ صلاحية 24 ساعة</span>
+        <span class="badge badge-green">✔️ استخدام مرة واحدة</span>
+        <span class="badge badge-amber">🔗 ربط ثلاثي</span>
+        <span class="badge badge-red">🚨 كشف تواطؤ</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs no-print" id="tabs"></div>
+
+  <!-- Dashboard -->
+  <div id="view-dashboard" class="grid">
+    <div class="grid kpis">
+      <div class="kpi"><div class="icon" style="background:#dbeafe">🎫</div><h3>إجمالي التذاكر المباعة اليوم</h3><div class="v" id="kpiSold">0</div><div class="s" id="kpiSoldSub">—</div></div>
+      <div class="kpi"><div class="icon" style="background:#dcfce7">💵</div><h3>إجمالي الإيراد المتوقع (من السيستم)</h3><div class="v" id="kpiRevenue">0 جنيه</div><div class="s">مجموع أسعار كل التذاكر المصدرة</div></div>
+      <div class="kpi"><div class="icon" style="background:#fef3c7">✅</div><h3>تذاكر تم دخولها (ممسوحة)</h3><div class="v" id="kpiUsed">0</div><div class="s" id="kpiUsedSub">—</div></div>
+      <div class="kpi"><div class="icon" style="background:#fee2e2">⚠️</div><h3>تذاكر مباعة ولم تُستخدم بعد</h3><div class="v" id="kpiPending">0</div><div class="s">احتمال زحمة أو انتهاء صلاحية</div></div>
+      <div class="kpi"><div class="icon" style="background:#ede9fe">🎮</div><h3>إجمالي عمليات الدخول المسجلة</h3><div class="v" id="kpiEntries">0</div><div class="s">ممسوحة + دخول مخالف</div></div>
+      <div class="kpi"><div class="icon" style="background:#fee2e2">🚨</div><h3>دخول بدون تذكرة (مخالفات)</h3><div class="v" id="kpiFraud" style="color:#dc2626">0</div><div class="s">يجب أن يكون صفر — أي رقم = سرقة محتملة</div></div>
+      <div class="kpi"><div class="icon" style="background:#ccfbf1">💰</div><h3>النقدية في الأدراج (محاكاة)</h3><div class="v" id="kpiCash">0 جنيه</div><div class="s" id="kpiCashSub">—</div></div>
+      <div class="kpi"><div class="icon" style="background:#fffbeb">📊</div><h3>نسبة الاستخدام</h3><div class="v" id="kpiRate">0%</div><div class="s">الممسوحة / المباعة</div></div>
+    </div>
+
+    <div class="grid col2">
+      <div class="card">
+        <h2>📊 أكثر الألعاب بيعًا (اليوم)</h2>
+        <div id="chartGames" class="grid" style="gap:8px"></div>
+      </div>
+      <div class="card">
+        <h2>👷 أداء موظفي الألعاب — عدد الأطفال المدخلين</h2>
+        <div id="chartEmployees" class="grid" style="gap:8px"></div>
+        <div class="muted" style="margin-top:8px">العدد هنا يجب أن يطابق تمامًا عدد التذاكر الممسوحة لنفس اللعبة — أي فرق = تلاعب</div>
+      </div>
+    </div>
+
+    <div class="grid col2">
+      <div class="card">
+        <h2>💰 إيراد كل درج كاشير</h2>
+        <div id="chartDrawers" class="grid" style="gap:8px"></div>
+      </div>
+      <div class="card">
+        <h2>⏰ حركة اليوم لحظيًا</h2>
+        <div class="table-wrap"><table><thead><tr><th>الوقت</th><th>الحدث</th><th>اللعبة</th><th>الكاشير/الموظف</th><th>الكود</th></tr></thead><tbody id="liveFeed"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cashier POS -->
+  <div id="view-pos" class="grid" style="display:none">
+    <div class="grid col2">
+      <div class="card">
+        <h2>💰 نقطة البيع — إصدار تذكرة جديدة</h2>
+        <div class="notice" style="margin-bottom:10px">
+          <strong>قاعدة ذهبية:</strong> لا تستلم نقدية بدون إصدار تذكرة من السيستم. كل تذكرة لها <b>كود فريد</b> لا يتكرر ومرتبط بدرجك أنت فقط. الإدارة تراجع درجك مقابل السيستم آخر اليوم.
+        </div>
+        <div class="grid" style="gap:10px">
+          <div class="row">
+            <label style="min-width:90px; font-weight:800; font-size:13px">الدرج / الكاشير</label>
+            <select id="posDrawer" class="select" style="flex:1"></select>
+          </div>
+          <div class="row">
+            <label style="min-width:90px; font-weight:800; font-size:13px">اللعبة</label>
+            <select id="posGame" class="select" style="flex:1" onchange="updatePosPrice()"></select>
+          </div>
+          <div class="row">
+            <label style="min-width:90px; font-weight:800; font-size:13px">العدد</label>
+            <input id="posQty" type="number" min="1" max="10" value="1" class="input" style="width:100px" oninput="updatePosPrice()">
+            <span class="muted" id="posPriceLabel" style="font-weight:800"></span>
+            <span style="margin-inline-start:auto; font-weight:900; font-size:16px" id="posTotal">0 جنيه</span>
+          </div>
+          <div class="row">
+            <label style="min-width:90px; font-weight:800; font-size:13px">طريقة الدفع</label>
+            <select id="posPay" class="select"><option value="cash">نقدي 💵</option><option value="visa">فيزا 💳</option></select>
+            <button class="btn btn-primary" style="margin-inline-start:auto; padding:12px 18px; font-size:14px" onclick="issueTickets()">🎫 إصدار وطباعة التذاكر</button>
+          </div>
+          <div id="posMsg"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🖨️ معاينة آخر تذكرة</h2>
+        <div id="ticketPreview" class="ticket" style="min-height:220px; display:grid; place-items:center; color:#64748b">لم يتم إصدار تذاكر بعد</div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn btn-dark btn-sm" onclick="printLastTicket()">🖨️ طباعة</button>
+          <button class="btn btn-ghost btn-sm" onclick="downloadTicketsCSV()">⬇️ تصدير تذاكر اليوم CSV</button>
+          <span class="muted">كل تذكرة صالحة ليوم واحد فقط</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎫 تذاكر اليوم — صادرة من كل الأدراج</h2>
+      <div class="row" style="margin-bottom:8px">
+        <input id="posSearch" class="input search" placeholder="بحث بكود أو لعبة..." oninput="renderPOSTable()">
+        <select id="posFilter" class="select" onchange="renderPOSTable()"><option value="all">كل الحالات</option><option value="valid">صالحة (لم تُستخدم)</option><option value="used">مُستخدمة</option><option value="expired">منتهية</option></select>
+        <span class="muted" id="posCount"></span>
+        <button class="btn btn-ghost btn-sm" onclick="expireOldTickets()">⏰ إنهاء المنتهية</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>الكود</th><th>اللعبة</th><th>السعر</th><th>الدرج/الكاشير</th><th>وقت الإصدار</th><th>الحالة</th><th>استُخدمت بواسطة</th></tr></thead><tbody id="posTable"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- Gate scan -->
+  <div id="view-gate" class="grid" style="display:none">
+    <div class="grid col2">
+      <div class="card">
+        <h2>🎮 بوابة اللعبة — مسح تذكرة الدخول</h2>
+        <div class="notice" style="margin-bottom:10px">
+          <strong>ممنوع إدخال أي طفل بدون مسح!</strong> ضع الكود هنا واضغط دخول. النظام يتحقق لحظيًا: هل الكود صحيح؟ هل لنفس لعبتك؟ هل لم يُستخدم قبل ذلك؟<br>
+          إذا أدخلت طفل بدون مسح، اضغط <b>دخول بدون تذكرة (مخالفة)</b> — سيُسجّل ضدك ويظهر للإدارة.
+        </div>
+        <div class="grid" style="gap:10px">
+          <div class="row">
+            <label style="min-width:90px; font-weight:800; font-size:13px">أنت (الموظف)</label>
+            <select id="gateEmployee" class="select" style="flex:1"></select>
+          </div>
+          <div class="row">
+            <label style="min-width:90px; font-weight:800; font-size:13px">لعبتك</label>
+            <span id="gateGameLabel" class="badge badge-blue" style="font-size:13px; padding:8px 12px">—</span>
+          </div>
+          <div>
+            <label style="font-weight:800; font-size:13px">كود التذكرة (امسح بالكاميرا أو اكتبه)</label>
+            <div class="row" style="margin-top:6px">
+              <input id="gateCode" class="input" placeholder="PK-20240615-ABCDE" style="flex:1; font-family:monospace; font-size:15px; letter-spacing:.5px" onkeydown="if(event.key==='Enter') scanTicket()">
+              <button class="btn btn-emerald" style="padding:12px 18px" onclick="scanTicket()">✅ دخول</button>
+            </div>
+            <div class="muted" style="margin-top:6px">يمكنك لصق الكود من تذكرة مطبوعة أو استخدام قارئ الباركود (يعتبر كيبورد)</div>
+          </div>
+          <div class="row">
+            <button class="btn btn-red btn-sm" onclick="manualEntry()">🚨 دخول بدون تذكرة (يسجّل مخالفة)</button>
+            <span class="muted">للاستخدام الاضطراري فقط — يُحسب كسرقة محتملة في التقرير</span>
+          </div>
+          <div id="gateMsg"></div>
+          <div class="card" style="background:#f8fafc; border-style:dashed">
+            <div style="font-weight:800; font-size:12px; color:#475569">آخر 5 عمليات لك</div>
+            <div id="gateHistory" class="grid" style="gap:6px; margin-top:8px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>📋 سجل دخول لعبتك اليوم</h2>
+        <div class="row" style="margin-bottom:8px">
+          <span class="muted" id="gateCount">—</span>
+          <span class="badge badge-green" id="gateValidCount">0 صحيح</span>
+          <span class="badge badge-red" id="gateFraudCount">0 مخالف</span>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>الوقت</th><th>الكود</th><th>الحالة</th><th>الكاشير المصدر</th></tr></thead><tbody id="gateTable"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Management -->
+  <div id="view-manage" class="grid" style="display:none">
+    <div class="grid col3">
+      <div class="card">
+        <h2>🎪 الألعاب (15 لعبة)</h2>
+        <div class="row" style="margin-bottom:8px">
+          <input id="newGameName" class="input" placeholder="اسم اللعبة" style="flex:1">
+          <input id="newGamePrice" class="input" type="number" placeholder="السعر" style="width:90px">
+        </div>
+        <div class="row" style="margin-bottom:8px">
+          <input id="newGameIcon" class="input" placeholder="أيقونة (اختياري) 🎠" style="width:110px">
+          <button class="btn btn-primary btn-sm" onclick="addGame()">+ إضافة</button>
+        </div>
+        <div id="gamesList" class="grid" style="gap:8px; max-height:480px; overflow:auto; padding-inline-end:4px"></div>
+      </div>
+      <div class="card">
+        <h2>👥 الموظفون</h2>
+        <div class="grid" style="gap:8px; margin-bottom:8px">
+          <input id="newEmpName" class="input" placeholder="اسم الموظف">
+          <div class="row">
+            <select id="newEmpRole" class="select" style="flex:1"><option value="cashier">💰 كاشير</option><option value="operator">🎮 موظف لعبة</option><option value="admin">👑 مدير</option></select>
+            <input id="newEmpPin" class="input" placeholder="PIN (4 أرقام)" style="width:110px" maxlength="6">
+          </div>
+          <div class="row">
+            <select id="newEmpGame" class="select" style="flex:1"></select>
+            <select id="newEmpDrawer" class="select" style="flex:1"></select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addEmployee()">+ إضافة موظف</button>
+          <div class="muted">موظف اللعبة يُربط بلعبة واحدة فقط. الكاشير يُربط بدرج واحد.</div>
+        </div>
+        <div id="employeesList" class="grid" style="gap:8px; max-height:420px; overflow:auto"></div>
+      </div>
+      <div class="card">
+        <h2>🗄️ أدراج الكاشير</h2>
+        <div class="row" style="margin-bottom:8px">
+          <input id="newDrawerName" class="input" placeholder="اسم الدرج (مثال: درج 1 - المدخل)" style="flex:1">
+          <button class="btn btn-primary btn-sm" onclick="addDrawer()">+ إضافة</button>
+        </div>
+        <div id="drawersList" class="grid" style="gap:8px"></div>
+        <div class="notice" style="margin-top:12px">
+          <strong>فكرة الربط:</strong> كل عملية بيع مرتبطة بدرج محدد. آخر اليوم: <b>المبلغ في الدرج يجب أن يساوي (عدد التذاكر × سعر اللعبة) لنفس الدرج</b> حسب السيستم. أي نقص = سرقة.
+        </div>
+        <div class="card" style="margin-top:12px; background:#fffbeb; border-color:#fde68a">
+          <h2 style="font-size:13px">⚙️ إعدادات</h2>
+          <div class="row"><label class="muted">مدة صلاحية التذكرة (ساعات)</label><input id="cfgExpiry" type="number" class="input" style="width:80px" value="24"><button class="btn btn-ghost btn-sm" onclick="saveCfg()">حفظ</button></div>
+          <div class="row" style="margin-top:8px"><button class="btn btn-red btn-sm" onclick="resetDemo()">♻️ إعادة ضبط بيانات تجريبية</button><button class="btn btn-ghost btn-sm" onclick="clearAll()">🗑️ مسح كل البيانات</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reconciliation -->
+  <div id="view-audit" class="grid" style="display:none">
+    <div class="card" style="border:1px solid #fecaca; background:#fff5f5">
+      <h2>🔍 المطابقة اليومية — الكاشير vs السيستم vs موظف اللعبة</h2>
+      <div class="muted">هذا هو التقرير الذي يكشف السرقة. يقارن 3 أرقام لكل لعبة ولكل درج. أي اختلاف يظهر بالأحمر.</div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-dark btn-sm" onclick="renderAudit()">🔄 تحديث المطابقة</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportAuditExcel()">📊 تصدير Excel</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ طباعة التقرير</button>
+        <span class="badge badge-amber" id="auditDate"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📍 مطابقة الألعاب — هل عدد المباع = عدد المدخل؟</h2>
+      <div class="table-wrap"><table><thead><tr><th>اللعبة</th><th>السعر</th><th>مباع (كاشير)</th><th>ممسوح (موظف اللعبة)</th><th>مخالفات بدون تذكرة</th><th>فرق (سرقة محتملة)</th><th>الحالة</th></tr></thead><tbody id="auditGames"></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h2>🗄️ مطابقة الأدراج — هل الفلوس في الدرج = السيستم؟</h2>
+      <div class="muted" style="margin-bottom:8px">أدخل المبلغ الذي عدّيته فعليًا في كل درج، والنظام يحسب العجز/الزيادة تلقائيًا.</div>
+      <div class="table-wrap"><table><thead><tr><th>الدرج / الكاشير</th><th>تذاكر مصدرة</th><th>متوقع نقدًا (سيستم)</th><th>الفعلي في الدرج (عدّ يدوي)</th><th>العجز / الزيادة</th><th>الحالة</th></tr></thead><tbody id="auditDrawers"></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h2>🚨 تنبيهات تلقائية للاشتباه</h2>
+      <div id="auditAlerts" class="grid" style="gap:8px"></div>
+    </div>
+  </div>
+
+  <!-- Logs -->
+  <div id="view-logs" class="grid" style="display:none">
+    <div class="card">
+      <h2>📜 سجل العمليات الكامل — قابل للتدقيق</h2>
+      <div class="row" style="margin-bottom:8px">
+        <input id="logSearch" class="input search" placeholder="بحث في السجل..." oninput="renderLogs()">
+        <button class="btn btn-ghost btn-sm" onclick="exportLogsCSV()">⬇️ تصدير السجل CSV</button>
+        <span class="muted" id="logCount"></span>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th></tr></thead><tbody id="logTable"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="card no-print" style="margin-top:14px; background:#0f172a; color:#e2e8f0; border-color:#1e293b">
+    <div class="row" style="justify-content:space-between">
+      <div style="font-size:12px; line-height:1.8">
+        <b style="color:#fff">💡 كيف تطبّق النظام عمليًا بدون تكلفة عالية؟</b><br>
+        • جهاز كاشير واحد (حتى موبايل/تابلت) يطبع تذاكر حرارية صغيرة عليها <b style="color:#38bdf8">كود + QR + اسم اللعبة + السعر + وقت الإصدار</b>.<br>
+        • كل موظف لعبة معه موبايل رخيص يفتح صفحة <b style="color:#38bdf8">بوابة اللعبة</b> ويمسح الكود بالكاميرا (كاميرا المتصفح).<br>
+        • المدير يفتح <b style="color:#38bdf8">المطابقة اليومية</b> آخر اليوم ويعدّ فلوس كل درج ويقارن.
+      </div>
+      <div class="muted" style="color:#94a3b8">البيانات محفوظة محليًا في المتصفح (localStorage) — يمكن ربطها بـ Firebase لاحقًا بدون تغيير الواجهة.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div id="helpModal" class="modal" onclick="if(event.target===this) closeHelp()">
+  <div class="modal-box" style="width:min(760px,95vw)">
+    <h2 style="margin:0; font-weight:900">🛡️ كيف يمنع النظام السرقة والتواطؤ؟</h2>
+    <div class="grid" style="gap:12px; margin-top:12px; font-size:13px; line-height:1.9">
+      <div class="card" style="background:#f0fdf4; border-color:#bbf7d0">
+        <b>1) موظف اللعبة يدخل أطفال بدون تذكرة (المشكلة الأولى):</b><br>
+        ممنوع. كل دخول يجب أن يكون بمسح كود صالح. لو أدخل بدون كود، يجب أن يضغط "دخول بدون تذكرة" وهذا يُسجّل باسمه ووقته ولعبته ويظهر في تقرير المطابقة كـ <span class="badge badge-red">مخالفة</span>. المدير يرى فورًا: لعبة X فيها 5 مخالفات = الموظف يسرق أو يجامل.
+      </div>
+      <div class="card" style="background:#fef2f2; border-color:#fecaca">
+        <b>2) الكاشير وموظف اللعبة متفقان (المشكلة الثانية - الأخطر):</b><br>
+        الكاشير يستلم فلوس نقدًا ولا يصدر تذكرة، وموظف اللعبة يدخل الطفل. النظام يكشفه بطريقتين:<br>
+        • <b>مطابقة الأدراج:</b> الدرج فيه فلوس لكن السيستم لا يرى تذاكر — أو العكس. آخر اليوم العدّ اليدوي للدرج يكشف العجز.<br>
+        • <b>مطابقة الألعاب:</b> لعبة معينة عدد المدخلين (ممسوح + مخالف) أكبر من المباع في السيستم = سرقة مؤكدة.<br>
+        الحل: <b>العميل لا يدخل إلا بكود مطبوع</b>، والكود لا ينشأ إلا عبر السيستم المرتبط بالدرج. لا يوجد كود ورقي مزوّر لأن كل كود يُتحقق منه لحظيًا.
+      </div>
+      <div class="card" style="background:#eff6ff; border-color:#bfdbfe">
+        <b>3) ضوابط إضافية تمنع التلاعب:</b>
+        <ul style="margin:6px 0 0; padding-inline-start:18px">
+          <li>كود فريد لكل تذكرة (مثال: PK-20250321-7X9Q2) — لا يمكن تخمينه — استخدام مرة واحدة فقط.</li>
+          <li>التذكرة مرتبطة بلعبة واحدة ودرج واحد — لا يمكن استخدام تذكرة لعبة A في لعبة B.</li>
+          <li>صلاحية زمنية (افتراضي 24 ساعة) — تمنع إعادة استخدام تذاكر قديمة.</li>
+          <li>كل عملية مسح تسجّل: من مسحها، متى، على أي لعبة، ومن أي كاشير صدرت.</li>
+          <li>سجل عمليات لا يمكن مسحه إلا بصلاحية مدير، وكل حذف يُسجّل.</li>
+          <li>تنبيه فوري عند محاولة مسح كود مستخدم مسبقًا أو منتهي أو للعبة خاطئة.</li>
+        </ul>
+      </div>
+      <div class="card" style="background:#fffbeb; border-color:#fde68a">
+        <b>دورة العمل الجديدة المقترحة (مختصرة):</b><br>
+        1) ولي الأمر → الكاشير → يدفع → الكاشير يصدر تذكرة مطبوعة (كود + QR) من السيستم.<br>
+        2) ولي الأمر → يسلم التذكرة لموظف اللعبة → الموظف يمسح الكود في النظام → النظام يتحقق ويعطي ✅ → يدخل الطفل.<br>
+        3) آخر اليوم → المدير يفتح <b>المطابقة اليومية</b> → يعدّ فلوس كل درج → يقارن مع السيستم ومع عدد المدخلين لكل لعبة → أي فرق = يُساءل المسؤول.
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px; justify-content:flex-end"><button class="btn btn-dark" onclick="closeHelp()">حسنًا</button></div>
+  </div>
+</div>
+
+<div id="genericModal" class="modal"><div class="modal-box"><h3 id="gTitle" style="margin:0 0 8px"></h3><div id="gBody" style="font-size:13px; line-height:1.8"></div><div class="row" style="margin-top:12px; justify-content:flex-end"><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button></div></div></div>
+
+<div id="printArea" class="print-area"></div>
+
+<script>
+// ===== Data & persistence =====
+const LS_KEY = 'park_pro_v2';
+const defaultGames = [
+  {id:'g1', name:'قطار الأطفال', price:30, icon:'🚂', color:'#2563eb'},
+  {id:'g2', name:'سيارات التصادم', price:40, icon:'🚗', color:'#dc2626'},
+  {id:'g3', name:'النطاطية الكبيرة', price:25, icon:'🏰', color:'#059669'},
+  {id:'g4', name:'المراجيح', price:20, icon:'🎠', color:'#d97706'},
+  {id:'g5', name:'بيت الرعب', price:35, icon:'👻', color:'#7c3aed'},
+  {id:'g6', name:'لعبة الرماية', price:30, icon:'🎯', color:'#0891b2'},
+  {id:'g7', name:'الزحليقة العملاقة', price:25, icon:'🛝', color:'#db2777'},
+  {id:'g8', name:'عجلة الفريس', price:50, icon:'🎡', color:'#ea580c'},
+  {id:'g9', name:'لعبة الماء', price:30, icon:'💦', color:'#0284c7'},
+  {id:'g10', name:'الترامبولين', price:35, icon:'🤸', color:'#16a34a'},
+  {id:'g11', name:'سباق الخيل', price:20, icon:'🐴', color:'#9333ea'},
+  {id:'g12', name:'المتاهة', price:25, icon:'🧩', color:'#475569'},
+  {id:'g13', name:'السينما 5D', price:45, icon:'🎬', color:'#1d4ed8'},
+  {id:'g14', name:'لعبة التسلق', price:30, icon:'🧗', color:'#be123c'},
+  {id:'g15', name:'السيارات الكهربائية', price:35, icon:'🏎️', color:'#0f766e'},
+];
+function loadStore(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return null;
+}
+function saveStore(){
+  localStorage.setItem(LS_KEY, JSON.stringify(store));
+}
+let store = loadStore() || {
+  games: JSON.parse(JSON.stringify(defaultGames)),
+  drawers: [{id:'d1', name:'درج 1 - المدخل الرئيسي', cashierId:'c1'}, {id:'d2', name:'درج 2 - الصالة الخلفية', cashierId:'c2'}],
+  employees: [
+    {id:'admin1', name:'المدير العام', role:'admin', pin:'1234', gameId:null, drawerId:null},
+    {id:'c1', name:'أحمد - كاشير 1', role:'cashier', pin:'1111', gameId:null, drawerId:'d1'},
+    {id:'c2', name:'سارة - كاشير 2', role:'cashier', pin:'2222', gameId:null, drawerId:'d2'},
+    ...defaultGames.slice(0,6).map((g,i)=>({id:'op'+(i+1), name:'موظف '+g.name, role:'operator', pin:String(3000+i), gameId:g.id, drawerId:null})),
+  ],
+  tickets: [],
+  entries: [], // {id, code, gameId, employeeId, time, type:'valid'|'fraud', cashierId}
+  logs: [],
+  cfg:{expiryHours:24},
+  auditCash:{}, // drawerId -> actual cash counted
+  lastTicket:null,
+};
+if(!store.entries) store.entries=[];
+if(!store.auditCash) store.auditCash={};
+if(!store.cfg) store.cfg={expiryHours:24};
+
+let currentRole='admin';
+let currentUserId = store.employees[0]?.id || 'admin1';
+let lastIssuedCodes=[];
+
+function logAction(action, details){
+  store.logs.unshift({time:new Date().toISOString(), userId:currentUserId, action, details});
+  if(store.logs.length>600) store.logs=store.logs.slice(0,600);
+  saveStore();
+  renderLogs(); renderDashboard(); renderAudit(); // live
+}
+function uid(prefix){ return prefix+'-'+Math.random().toString(36).slice(2,8).toUpperCase()+'-'+Date.now().toString(36).slice(-4).toUpperCase(); }
+function genCode(){
+  const d = new Date();
+  const ymd = d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  const rand = Math.random().toString(36).slice(2,7).toUpperCase();
+  return `PK-${ymd}-${rand}`;
+}
+function formatTime(iso){ const d=new Date(iso); return d.toLocaleString('ar-EG', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'}); }
+function formatMoney(n){ return (Number(n)||0).toLocaleString('ar-EG')+' جنيه'; }
+function getUser(id){ return store.employees.find(e=>e.id===id); }
+function getGame(id){ return store.games.find(g=>g.id===id); }
+function getDrawer(id){ return store.drawers.find(d=>d.id===id); }
+
+// ===== Tabs =====
+const TABS=[
+  {id:'dashboard', label:'لوحة التحكم', icon:'📊', roles:['admin','cashier','operator']},
+  {id:'pos', label:'الكاشير', icon:'💰', roles:['admin','cashier']},
+  {id:'gate', label:'بوابة اللعبة', icon:'🎮', roles:['admin','operator']},
+  {id:'audit', label:'المطابقة اليومية', icon:'🔍', roles:['admin']},
+  {id:'manage', label:'الإدارة', icon:'⚙️', roles:['admin']},
+  {id:'logs', label:'سجل العمليات', icon:'📜', roles:['admin']},
+];
+function renderTabs(){
+  const el=document.getElementById('tabs');
+  const allowed = TABS.filter(t=> t.roles.includes(currentRole));
+  el.innerHTML = allowed.map(t=> `<div class="tab ${currentView===t.id?'active':''}" onclick="switchView('${t.id}')">${t.icon} ${t.label}</div>`).join('');
+}
+let currentView='dashboard';
+function switchView(id){
+  currentView=id;
+  document.querySelectorAll('[id^="view-"]').forEach(x=> x.style.display='none');
+  const v=document.getElementById('view-'+id);
+  if(v) v.style.display='grid';
+  renderTabs();
+  if(id==='dashboard') renderDashboard();
+  if(id==='pos') {renderPOS(); renderPOSTable();}
+  if(id==='gate') renderGate();
+  if(id==='manage') renderManage();
+  if(id==='audit') renderAudit();
+  if(id==='logs') renderLogs();
+}
+function switchRole(){
+  currentRole=document.getElementById('roleSwitch').value;
+  // pick first user of that role
+  const first = store.employees.find(e=> e.role===currentRole) || store.employees[0];
+  if(first) currentUserId=first.id;
+  renderUserSelect();
+  renderTabs();
+  // default view per role
+  if(currentRole==='cashier') switchView('pos');
+  else if(currentRole==='operator') switchView('gate');
+  else switchView('dashboard');
+  renderAll();
+}
+function renderUserSelect(){
+  const sel=document.getElementById('currentUserSelect');
+  const list = store.employees.filter(e=> currentRole==='admin' ? true : e.role===currentRole);
+  sel.innerHTML = list.map(e=> `<option value="${e.id}" ${e.id===currentUserId?'selected':''}>${e.name} — ${e.role==='admin'?'مدير':e.role==='cashier'?'كاشير':'موظف لعبة'} ${e.pin?'('+e.pin+')':''}</option>`).join('');
+  if(!list.find(e=>e.id===currentUserId) && list[0]) currentUserId=list[0].id;
+}
+function changeCurrentUser(){ currentUserId=document.getElementById('currentUserSelect').value; renderGate(); renderPOS(); logAction('تسجيل دخول', getUser(currentUserId)?.name); }
+
+// ===== Dashboard =====
+function isToday(iso){
+  const d=new Date(iso); const n=new Date();
+  return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();
+}
+function renderDashboard(){
+  const todayTickets = store.tickets.filter(t=> isToday(t.createdAt));
+  const todayEntries = store.entries.filter(e=> isToday(e.time));
+  const used = todayTickets.filter(t=> t.status==='used');
+  const pending = todayTickets.filter(t=> t.status==='valid');
+  const fraud = todayEntries.filter(e=> e.type==='fraud');
+  const revenue = todayTickets.reduce((s,t)=> s+Number(t.price||0),0);
+  const cashExpected = revenue; // if all cash; visa separate but for demo all counted
+
+  document.getElementById('kpiSold').textContent = todayTickets.length.toLocaleString('ar-EG');
+  document.getElementById('kpiSoldSub').textContent = `من ${store.games.length} لعبة — عبر ${store.drawers.length} درج`;
+  document.getElementById('kpiRevenue').textContent = formatMoney(revenue);
+  document.getElementById('kpiUsed').textContent = used.length.toLocaleString('ar-EG');
+  document.getElementById('kpiUsedSub').textContent = `من ${todayTickets.length} مباعة — ${todayTickets.length? Math.round(used.length/todayTickets.length*100):0}% تم دخولها`;
+  document.getElementById('kpiPending').textContent = pending.length.toLocaleString('ar-EG');
+  document.getElementById('kpiEntries').textContent = todayEntries.length.toLocaleString('ar-EG');
+  document.getElementById('kpiFraud').textContent = fraud.length.toLocaleString('ar-EG');
+  document.getElementById('kpiCash').textContent = formatMoney(cashExpected);
+  document.getElementById('kpiCashSub').textContent = `متوقع في الأدراج حسب السيستم`;
+  document.getElementById('kpiRate').textContent = (todayTickets.length? Math.round(used.length/todayTickets.length*100):0)+'%';
+
+  // games chart
+  const byGame = {};
+  store.games.forEach(g=> byGame[g.id]={...g, sold:0, used:0});
+  todayTickets.forEach(t=>{ if(byGame[t.gameId]) byGame[t.gameId].sold++ });
+  todayEntries.filter(e=>e.type==='valid').forEach(e=>{ if(byGame[e.gameId]) byGame[e.gameId].used++ });
+  const sortedGames = Object.values(byGame).sort((a,b)=> b.sold-a.sold).slice(0,8);
+  const maxSold = Math.max(1, ...sortedGames.map(g=>g.sold));
+  document.getElementById('chartGames').innerHTML = sortedGames.map(g=> `
+    <div style="display:flex; align-items:center; gap:10px">
+      <span style="width:28px; height:28px; border-radius:8px; background:${g.color}; color:#fff; display:grid; place-items:center; font-size:14px">${g.icon}</span>
+      <div style="flex:1">
+        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:800"><span>${g.name}</span><span>${g.sold} مباعة • ${g.used} دخول</span></div>
+        <div class="stat-bar" style="margin-top:4px"><div class="stat-fill" style="width:${(g.sold/maxSold*100)}%"></div></div>
+      </div>
+      <span class="muted" style="font-weight:800">${formatMoney(g.price)}</span>
+    </div>
+  `).join('') || '<div class="muted">لا توجد مبيعات اليوم</div>';
+
+  // employees
+  const byEmp={};
+  store.employees.filter(e=>e.role==='operator').forEach(e=> byEmp[e.id]={...e, count:0, fraud:0});
+  todayEntries.forEach(e=>{
+    if(byEmp[e.employeeId]) { byEmp[e.employeeId].count++; if(e.type==='fraud') byEmp[e.employeeId].fraud++; }
+  });
+  const sortedEmps = Object.values(byEmp).sort((a,b)=> b.count-a.count).slice(0,10);
+  const maxEmp = Math.max(1, ...sortedEmps.map(e=>e.count));
+  document.getElementById('chartEmployees').innerHTML = sortedEmps.map(e=>{
+    const g=getGame(e.gameId);
+    return `<div style="display:flex; align-items:center; gap:10px; background:${e.fraud? '#fef2f2':'#f8fafc'}; border:1px solid ${e.fraud?'#fecaca':'#e2e8f0'}; border-radius:10px; padding:8px">
+      <div style="flex:1">
+        <div style="font-weight:800; font-size:13px">${e.name} ${g? `<span class="muted">— ${g.icon} ${g.name}</span>`:''} ${e.fraud? `<span class="badge badge-red">🚨 ${e.fraud} مخالف</span>`:''}</div>
+        <div class="stat-bar" style="margin-top:6px"><div class="stat-fill" style="width:${e.count/maxEmp*100}%; background:${e.fraud?'#dc2626':'#059669'}"></div></div>
+      </div>
+      <span style="font-weight:900; font-size:16px">${e.count}</span>
+    </div>`
+  }).join('') || '<div class="muted">لا يوجد دخول اليوم</div>';
+
+  // drawers
+  const byDrawer={};
+  store.drawers.forEach(d=> byDrawer[d.id]={...d, sold:0, revenue:0});
+  todayTickets.forEach(t=>{ if(byDrawer[t.drawerId]){ byDrawer[t.drawerId].sold++; byDrawer[t.drawerId].revenue+=Number(t.price||0); }});
+  const maxRev = Math.max(1, ...Object.values(byDrawer).map(d=>d.revenue));
+  document.getElementById('chartDrawers').innerHTML = Object.values(byDrawer).map(d=>{
+    const cashier=getUser(d.cashierId);
+    return `<div style="display:flex; align-items:center; gap:10px">
+      <div style="width:36px; height:36px; border-radius:10px; background:#0f172a; color:#fff; display:grid; place-items:center">🗄️</div>
+      <div style="flex:1">
+        <div style="font-weight:800; font-size:13px">${d.name} <span class="muted">— ${cashier?cashier.name:'—'}</span></div>
+        <div class="stat-bar" style="margin-top:4px"><div class="stat-fill" style="width:${(d.revenue/maxRev*100)}%; background:#0f172a"></div></div>
+      </div>
+      <div style="text-align:left"><div style="font-weight:900">${d.sold} تذكرة</div><div class="muted">${formatMoney(d.revenue)}</div></div>
+    </div>`
+  }).join('');
+
+  // live feed (last 12)
+  const feed = [...store.tickets].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt)).slice(0,5).map(t=> ({time:t.createdAt, text:`إصدار تذكرة`, game:getGame(t.gameId)?.name, user:getUser(t.cashierId)?.name, code:t.code}))
+    .concat([...store.entries].sort((a,b)=> new Date(b.time)-new Date(a.time)).slice(0,5).map(e=> ({time:e.time, text: e.type==='fraud'?'🚨 دخول مخالف':'✅ دخول صحيح', game:getGame(e.gameId)?.name, user:getUser(e.employeeId)?.name, code:e.code||'—'})))
+    .sort((a,b)=> new Date(b.time)-new Date(a.time)).slice(0,10);
+  document.getElementById('liveFeed').innerHTML = feed.map(f=> `<tr><td>${formatTime(f.time)}</td><td style="font-weight:800">${f.text}</td><td>${f.game||'—'}</td><td>${f.user||'—'}</td><td style="font-family:monospace; direction:ltr; text-align:left">${f.code}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">لا توجد حركة بعد</td></tr>';
+}
+
+// ===== POS =====
+function renderPOS(){
+  const drawerSel=document.getElementById('posDrawer');
+  drawerSel.innerHTML = store.drawers.map(d=> `<option value="${d.id}">${d.name} — ${getUser(d.cashierId)?.name||'بدون كاشير'}</option>`).join('');
+  // auto select drawer of current user if cashier
+  const cu=getUser(currentUserId);
+  if(cu && cu.drawerId) drawerSel.value=cu.drawerId;
+
+  const gameSel=document.getElementById('posGame');
+  gameSel.innerHTML = store.games.map(g=> `<option value="${g.id}">${g.icon} ${g.name} — ${g.price} جنيه</option>`).join('');
+  updatePosPrice();
+}
+function updatePosPrice(){
+  const gameId=document.getElementById('posGame').value;
+  const qty=Number(document.getElementById('posQty').value||1);
+  const g=getGame(gameId);
+  if(!g) return;
+  document.getElementById('posPriceLabel').textContent = `${g.price} جنيه × ${qty}`;
+  document.getElementById('posTotal').textContent = formatMoney(g.price*qty);
+}
+function issueTickets(){
+  const drawerId=document.getElementById('posDrawer').value;
+  const gameId=document.getElementById('posGame').value;
+  const qty=Math.max(1, Math.min(10, Number(document.getElementById('posQty').value||1)));
+  const pay=document.getElementById('posPay').value;
+  if(!drawerId || !gameId) return showPosMsg('اختر الدرج واللعبة أولاً','err');
+  const drawer=getDrawer(drawerId);
+  const game=getGame(gameId);
+  const cashierId = drawer?.cashierId || currentUserId;
+
+  const newCodes=[];
+  for(let i=0;i<qty;i++){
+    const code=genCode();
+    const ticket={code, gameId, price:game.price, cashierId, drawerId, payMethod:pay, createdAt:new Date().toISOString(), status:'valid', usedAt:null, usedBy:null};
+    store.tickets.unshift(ticket);
+    store.entries.push({id:uid('log'), code:`ISSUE:${code}`, gameId, employeeId:cashierId, time:new Date().toISOString(), type:'issue', cashierId});
+    newCodes.push(ticket);
+    logAction('إصدار تذكرة', `${game.name} — ${code} — ${drawer.name} — ${formatMoney(game.price)}`);
+  }
+  lastIssuedCodes=newCodes.map(t=>t.code);
+  store.lastTicket=newCodes[0];
+  saveStore();
+  renderTicketPreview(newCodes);
+  renderPOSTable(); renderDashboard(); renderAudit();
+  showPosMsg(`✅ تم إصدار ${qty} تذكرة بنجاح — ${formatMoney(game.price*qty)} — اطبعها وسلمها للعميل`, 'ok');
+  // reset qty
+  document.getElementById('posQty').value=1; updatePosPrice();
+}
+function showPosMsg(text, type){
+  const el=document.getElementById('posMsg');
+  el.innerHTML = `<div class="alert ${type==='ok'?'alert-ok':type==='err'?'alert-err':'alert-info'}">${type==='ok'?'✅':type==='err'?'⛔':'ℹ️'} ${text}</div>`;
+  setTimeout(()=> el.innerHTML='', 5000);
+}
+function renderTicketPreview(tickets){
+  if(!tickets || !tickets.length) return;
+  const first=tickets[0];
+  const game=getGame(first.gameId);
+  const drawer=getDrawer(first.drawerId);
+  const many = tickets.length>1;
+  const el=document.getElementById('ticketPreview');
+  el.innerHTML = `
+    <div style="width:100%">
+      <div style="display:flex; justify-content:space-between; align-items:center">
+        <div style="font-weight:900; font-size:13px; color:#1e40af">🎪 مدينة الألعاب — تذكرة دخول</div>
+        <span class="badge badge-green">صالحة اليوم فقط</span>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:10px; align-items:center">
+        <div style="flex:1">
+          <div style="font-size:18px; font-weight:900">${game.icon} ${game.name}</div>
+          <div style="font-size:13px; color:#475569">السعر: <b style="color:#0f172a">${formatMoney(game.price)}</b> — ${drawer.name}</div>
+          <div style="font-family:monospace; font-weight:900; font-size:16px; direction:ltr; text-align:right; background:#0f172a; color:#fff; padding:6px 8px; border-radius:8px; margin-top:6px; letter-spacing:1px">${first.code}</div>
+          <div class="muted" style="margin-top:4px">وقت الإصدار: ${formatTime(first.createdAt)} — ${document.getElementById('posPay').value==='cash'?'نقدي':'فيزا'}</div>
+          ${many? `<div class="badge badge-amber" style="margin-top:6px">📦 ${tickets.length} تذاكر — أكواد: ${tickets.map(t=>t.code.slice(-5)).join(' ، ')}</div>`:''}
+          <div class="muted" style="margin-top:6px; font-size:11px">⚠️ التذكرة لمرة واحدة فقط — تُمسح عند بوابة اللعبة — لا تُقبل بدون مسح إلكتروني</div>
+        </div>
+        <div style="text-align:center">
+          <canvas id="qrCanvas" width="110" height="110" style="border:1px solid #e2e8f0; border-radius:10px; background:#fff"></canvas>
+          <div style="font-size:10px; color:#64748b; margin-top:4px">QR CODE</div>
+        </div>
+      </div>
+      ${many? `<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">${tickets.map(t=> `<span class="kbd">${t.code}</span>`).join('')}</div>`:''}
+    </div>
+  `;
+  // draw fake QR
+  setTimeout(()=> drawQR(first.code), 50);
+  // also set print area
+  document.getElementById('printArea').innerHTML = `<div style="font-family:'Tajawal',sans-serif; max-width:400px; margin:0 auto; border:2px dashed #000; padding:16px; border-radius:12px">
+    <div style="text-align:center; font-weight:900; font-size:18px">🎪 مدينة الألعاب</div>
+    <div style="text-align:center; font-size:12px; color:#475569; margin-bottom:10px">تذكرة دخول — صالحة ليوم واحد</div>
+    ${tickets.map(t=>{
+      const g=getGame(t.gameId);
+      return `<div style="border:1px solid #e2e8f0; border-radius:10px; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center">
+        <div><div style="font-weight:900">${g.icon} ${g.name}</div><div style="font-family:monospace; font-weight:800">${t.code}</div><div style="font-size:11px; color:#64748b">${formatTime(t.createdAt)} — ${formatMoney(t.price)}</div></div>
+        <div style="width:70px; height:70px; border:1px solid #000; display:grid; place-items:center; font-size:9px; text-align:center">QR<br>${t.code.slice(-4)}</div>
+      </div>`
+    }).join('')}
+    <div style="text-align:center; font-size:10px; color:#64748b; margin-top:8px">شكرًا لزيارتكم — احتفظ بالتذكرة حتى الدخول</div>
+  </div>`;
+}
+function drawQR(text){
+  const c=document.getElementById('qrCanvas');
+  if(!c) return;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,110,110);
+  // simple hash to pattern
+  let hash=0; for(let i=0;i<text.length;i++) hash = ((hash<<5)-hash)+text.charCodeAt(i);
+  hash=Math.abs(hash);
+  // outer finder patterns
+  function finder(x,y){
+    ctx.fillStyle='#0f172a'; ctx.fillRect(x,y,22,22);
+    ctx.fillStyle='#fff'; ctx.fillRect(x+3,y+3,16,16);
+    ctx.fillStyle='#0f172a'; ctx.fillRect(x+7,y+7,8,8);
+  }
+  finder(4,4); finder(84,4); finder(4,84);
+  // random blocks seeded
+  ctx.fillStyle='#0f172a';
+  for(let y=0;y<10;y++){
+    for(let x=0;x<10;x++){
+      const v = (hash + x*31 + y*17) % 3;
+      if(v===0) ctx.fillRect(30+x*5, 6+y*5, 4,4);
+    }
+  }
+  // center text
+  ctx.fillStyle='#1e40af'; ctx.font='bold 7px monospace'; ctx.fillText(text.slice(-4), 38, 104);
+}
+function renderPOSTable(){
+  const search=(document.getElementById('posSearch').value||'').toLowerCase();
+  const filter=document.getElementById('posFilter').value;
+  let list=[...store.tickets].sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+  if(filter!=='all') list=list.filter(t=> t.status===filter);
+  if(search) list=list.filter(t=> t.code.toLowerCase().includes(search) || getGame(t.gameId)?.name.toLowerCase().includes(search));
+  list=list.slice(0,120);
+  document.getElementById('posCount').textContent = `${list.length} تذكرة — من إجمالي ${store.tickets.length}`;
+  document.getElementById('posTable').innerHTML = list.map(t=>{
+    const g=getGame(t.gameId); const d=getDrawer(t.drawerId); const u=getUser(t.cashierId);
+    const st = t.status==='used'? '<span class="pill pill-used">مُستخدمة</span>' : t.status==='expired'? '<span class="pill pill-expired">منتهية</span>' : '<span class="pill pill-valid">صالحة</span>';
+    return `<tr><td style="font-family:monospace; direction:ltr; text-align:left; font-weight:800">${t.code}</td><td>${g? g.icon+' '+g.name : '—'}</td><td style="font-weight:800">${formatMoney(t.price)}</td><td>${d? d.name : '—'}<br><span class="muted">${u?u.name:'—'}</span></td><td>${formatTime(t.createdAt)}</td><td>${st}</td><td>${t.usedBy? getUser(t.usedBy)?.name||t.usedBy : '—'}<br><span class="muted">${t.usedAt? formatTime(t.usedAt):''}</span></td></tr>`
+  }).join('') || '<tr><td colspan="7" class="muted" style="text-align:center">لا توجد تذاكر</td></tr>';
+}
+function printLastTicket(){
+  if(!store.lastTicket) return alert('لا يوجد تذكرة للطباعة');
+  window.print();
+}
+function expireOldTickets(){
+  const hours=Number(store.cfg.expiryHours||24);
+  const cutoff=Date.now()-hours*3600*1000;
+  let c=0;
+  store.tickets.forEach(t=>{
+    if(t.status==='valid' && new Date(t.createdAt).getTime() < cutoff){ t.status='expired'; c++; }
+  });
+  if(c){ saveStore(); renderPOSTable(); renderDashboard(); logAction('إنهاء تذاكر منتهية', `${c} تذكرة`); alert(`تم إنهاء ${c} تذكرة منتهية`); }
+  else alert('لا توجد تذاكر منتهية');
+}
+
+// ===== Gate =====
+function renderGate(){
+  const sel=document.getElementById('gateEmployee');
+  const ops=store.employees.filter(e=> e.role==='operator');
+  sel.innerHTML = ops.map(e=> `<option value="${e.id}" ${e.id===currentUserId && getUser(currentUserId)?.role==='operator' ? 'selected':''}>${e.name} — ${getGame(e.gameId)?.name||'—'}</option>`).join('');
+  if(!sel.value && ops[0]) sel.value=ops[0].id;
+  // if current user is operator, force his id
+  const cu=getUser(currentUserId);
+  if(cu && cu.role==='operator') sel.value=cu.id;
+
+  sel.onchange = updateGateGame;
+  updateGateGame();
+  renderGateTable();
+}
+function updateGateGame(){
+  const empId=document.getElementById('gateEmployee').value;
+  const emp=getUser(empId);
+  const game= emp? getGame(emp.gameId):null;
+  document.getElementById('gateGameLabel').textContent = game? `${game.icon} ${game.name}` : '— غير محدد — راجع الإدارة';
+  document.getElementById('gateGameLabel').style.background = game? '#dbeafe':'#fee2e2';
+  renderGateTable();
+}
+function scanTicket(){
+  const code=(document.getElementById('gateCode').value||'').trim().toUpperCase();
+  const empId=document.getElementById('gateEmployee').value;
+  const emp=getUser(empId);
+  if(!code) return showGateMsg('اكتب كود التذكرة أولاً','err');
+  if(!emp) return showGateMsg('اختر موظف اللعبة','err');
+  if(!emp.gameId) return showGateMsg('هذا الموظف غير مربوط بلعبة — راجع الإدارة','err');
+
+  const ticket=store.tickets.find(t=> t.code.toUpperCase()===code);
+  if(!ticket) return showGateMsg(`⛔ كود غير موجود في السيستم — قد يكون مزوّر أو خطأ كتابة<br><span class="muted">تأكد أن التذكرة صادرة من الكاشير عبر السيستم فقط</span>`, 'err', true);
+
+  // check game match
+  if(ticket.gameId !== emp.gameId){
+    const tg=getGame(ticket.gameId); const eg=getGame(emp.gameId);
+    return showGateMsg(`⛔ هذه التذكرة لـ <b>${tg?tg.name:'لعبة أخرى'}</b> وليست لـ <b>${eg?eg.name:'لعبتك'}</b><br><span class="muted">ممنوع استخدام تذكرة لعبة في لعبة أخرى — هذه محاولة تحايل</span>`, 'err', true);
+  }
+  // check status
+  if(ticket.status==='used'){
+    return showGateMsg(`⛔ هذه التذكرة <b>مُستخدمة مسبقًا</b><br>استُخدمت بواسطة ${getUser(ticket.usedBy)?.name||'—'} في ${formatTime(ticket.usedAt)}<br><span class="muted">محاولة إعادة استخدام = تلاعب</span>`, 'err', true);
+  }
+  if(ticket.status==='expired'){
+    return showGateMsg(`⛔ التذكرة <b>منتهية الصلاحية</b><br><span class="muted">صلاحية التذكرة ${store.cfg.expiryHours} ساعة فقط</span>`, 'err', true);
+  }
+  if(ticket.status==='cancelled'){
+    return showGateMsg(`⛔ تذكرة ملغاة`,'err',true);
+  }
+  // check expiry by time
+  const ageHours = (Date.now()-new Date(ticket.createdAt).getTime())/3600000;
+  if(ageHours > Number(store.cfg.expiryHours||24)){
+    ticket.status='expired'; saveStore();
+    return showGateMsg(`⛔ التذكرة منتهية (مر ${Math.round(ageHours)} ساعة)`,'err',true);
+  }
+
+  // success - consume
+  ticket.status='used';
+  ticket.usedAt=new Date().toISOString();
+  ticket.usedBy=empId;
+  store.entries.unshift({id:uid('e'), code:ticket.code, gameId:ticket.gameId, employeeId:empId, time:new Date().toISOString(), type:'valid', cashierId:ticket.cashierId});
+  saveStore();
+  logAction('دخول صحيح', `${emp.name} أدخل ${ticket.code} — ${getGame(ticket.gameId).name} — من ${getUser(ticket.cashierId)?.name}`);
+  showGateMsg(`✅ <b>تم الدخول بنجاح</b> — ${getGame(ticket.gameId).name} — الكود ${ticket.code}<br>مرحبًا بالطفل 🎉`, 'ok', true);
+  document.getElementById('gateCode').value='';
+  renderGateTable(); renderPOSTable(); renderDashboard(); renderAudit();
+  // beep
+  try{ const a=new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA=='); a.play().catch(()=>{});}catch(e){}
+}
+function manualEntry(){
+  const empId=document.getElementById('gateEmployee').value;
+  const emp=getUser(empId);
+  if(!emp) return showGateMsg('اختر موظف اللعبة','err');
+  if(!confirm(`⚠️ تأكيد: هل تريد تسجيل "دخول بدون تذكرة" باسم ${emp.name}؟\nسيُحتسب كمخالفة ويظهر في تقرير الإدارة.`)) return;
+  store.entries.unshift({id:uid('f'), code:null, gameId:emp.gameId, employeeId:empId, time:new Date().toISOString(), type:'fraud', cashierId:null});
+  saveStore();
+  logAction('🚨 دخول مخالف بدون تذكرة', `${emp.name} — ${getGame(emp.gameId)?.name}`);
+  showGateMsg(`🚨 تم تسجيل <b>دخول بدون تذكرة</b> باسم ${emp.name}<br><span class="muted">تم احتسابها كمخالفة — ستظهر في تقرير المطابقة</span>`, 'err', true);
+  renderGateTable(); renderDashboard(); renderAudit();
+}
+function showGateMsg(html, type, keep){
+  const el=document.getElementById('gateMsg');
+  el.innerHTML=`<div class="alert ${type==='ok'?'alert-ok':'alert-err'}">${html}</div>`;
+  if(!keep) setTimeout(()=> el.innerHTML='',4000);
+}
+function renderGateTable(){
+  const empId=document.getElementById('gateEmployee').value;
+  const list = store.entries.filter(e=> e.employeeId===empId || (!empId && false)).filter(e=> isToday(e.time));
+  // also show fraud vs valid
+  const valid=list.filter(e=> e.type==='valid').length;
+  const fraud=list.filter(e=> e.type==='fraud').length;
+  document.getElementById('gateCount').textContent=`اليوم: ${list.length} دخول`;
+  document.getElementById('gateValidCount').textContent=`${valid} صحيح`;
+  document.getElementById('gateFraudCount').textContent=`${fraud} مخالف`;
+  document.getElementById('gateTable').innerHTML = list.slice(0,50).map(e=>{
+    const ticket = e.code? store.tickets.find(t=> t.code===e.code) : null;
+    const cashier = ticket? getUser(ticket.cashierId) : null;
+    const st = e.type==='fraud'? '<span class="badge badge-red">🚨 بدون تذكرة</span>' : '<span class="badge badge-green">✅ صحيح</span>';
+    return `<tr><td>${formatTime(e.time)}</td><td style="font-family:monospace; direction:ltr; text-align:left">${e.code||'—'}</td><td>${st}</td><td>${cashier?cashier.name:'—'}</td></tr>`
+  }).join('') || '<tr><td colspan="4" class="muted">لا يوجد دخول اليوم</td></tr>';
+
+  // history chips
+  document.getElementById('gateHistory').innerHTML = list.slice(0,5).map(e=> `<div style="display:flex; justify-content:space-between; background:${e.type==='fraud'?'#fef2f2':'#f0fdf4'}; border:1px solid ${e.type==='fraud'?'#fecaca':'#bbf7d0'}; border-radius:8px; padding:6px 8px; font-size:12px"><span>${formatTime(e.time)}</span><span style="font-family:monospace">${e.code||'بدون كود'}</span><span>${e.type==='fraud'?'مخالفة':'صحيح'}</span></div>`).join('') || '<div class="muted">—</div>';
+}
+
+// ===== Manage =====
+function renderManage(){
+  // games
+  document.getElementById('gamesList').innerHTML = store.games.map(g=> `
+    <div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px">
+      <span style="width:32px; height:32px; border-radius:8px; background:${g.color}; color:#fff; display:grid; place-items:center">${g.icon}</span>
+      <div style="flex:1"><div style="font-weight:800; font-size:13px">${g.name}</div><div class="muted">${formatMoney(g.price)} — ${g.id}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="editGame('${g.id}')">✏️</button>
+      <button class="btn btn-red btn-sm" onclick="delGame('${g.id}')">🗑️</button>
+    </div>
+  `).join('');
+
+  // game selects
+  const gameOpts = store.games.map(g=> `<option value="${g.id}">${g.icon} ${g.name}</option>`).join('');
+  document.getElementById('newEmpGame').innerHTML = '<option value="">— اختر لعبة (لموظف اللعبة) —</option>'+gameOpts;
+
+  // drawers
+  document.getElementById('drawersList').innerHTML = store.drawers.map(d=>{
+    const cashier=getUser(d.cashierId);
+    return `<div style="display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:8px">
+      <span>🗄️</span><div style="flex:1"><div style="font-weight:800; font-size:13px">${d.name}</div><div class="muted">${cashier?cashier.name:'بدون كاشير'}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="delDrawer('${d.id}')">🗑️</button>
+    </div>`
+  }).join('');
+
+  const drawerOpts = store.drawers.map(d=> `<option value="${d.id}">${d.name}</option>`).join('');
+  document.getElementById('newEmpDrawer').innerHTML = '<option value="">— اختر درج (للكاشير) —</option>'+drawerOpts;
+
+  // employees
+  document.getElementById('employeesList').innerHTML = store.employees.map(e=>{
+    const roleLabel = e.role==='admin'?'👑 مدير': e.role==='cashier'?'💰 كاشير':'🎮 موظف لعبة';
+    const extra = e.role==='operator'? (getGame(e.gameId)?.name||'غير محدد') : e.role==='cashier'? (getDrawer(e.drawerId)?.name||'بدون درج') : '';
+    return `<div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px">
+      <div style="width:32px; height:32px; border-radius:999px; background:#0f172a; color:#fff; display:grid; place-items:center; font-size:12px; font-weight:800">${e.name.slice(0,2)}</div>
+      <div style="flex:1"><div style="font-weight:800; font-size:13px">${e.name} <span class="badge badge-blue" style="font-size:10px">${roleLabel}</span></div><div class="muted">PIN: ${e.pin||'—'} ${extra? '• '+extra:''}</div></div>
+      <button class="btn btn-red btn-sm" onclick="delEmployee('${e.id}')">🗑️</button>
+    </div>`
+  }).join('');
+
+  document.getElementById('cfgExpiry').value = store.cfg.expiryHours;
+}
+function addGame(){
+  const name=document.getElementById('newGameName').value.trim();
+  const price=Number(document.getElementById('newGamePrice').value||0);
+  const icon=document.getElementById('newGameIcon').value.trim()||'🎪';
+  if(!name || !price) return alert('اكتب اسم اللعبة والسعر');
+  const id='g'+Date.now();
+  store.games.push({id, name, price, icon, color:'#2563eb'});
+  saveStore(); renderManage(); renderPOS(); renderDashboard();
+  logAction('إضافة لعبة', name+' — '+price);
+  document.getElementById('newGameName').value=''; document.getElementById('newGamePrice').value=''; document.getElementById('newGameIcon').value='';
+}
+function editGame(id){
+  const g=getGame(id); if(!g) return;
+  const name=prompt('اسم اللعبة', g.name); if(name===null) return;
+  const price=prompt('السعر', g.price); if(price===null) return;
+  g.name=name.trim()||g.name; g.price=Number(price)||g.price;
+  saveStore(); renderManage(); renderPOS(); renderDashboard();
+}
+function delGame(id){
+  if(!confirm('حذف اللعبة؟ قد يؤثر على التذاكر القديمة')) return;
+  store.games=store.games.filter(g=> g.id!==id);
+  saveStore(); renderManage(); renderDashboard();
+  logAction('حذف لعبة', id);
+}
+function addEmployee(){
+  const name=document.getElementById('newEmpName').value.trim();
+  const role=document.getElementById('newEmpRole').value;
+  const pin=document.getElementById('newEmpPin').value.trim();
+  const gameId=document.getElementById('newEmpGame').value||null;
+  const drawerId=document.getElementById('newEmpDrawer').value||null;
+  if(!name) return alert('اكتب اسم الموظف');
+  if(role==='operator' && !gameId) return alert('موظف اللعبة يجب ربطه بلعبة');
+  if(role==='cashier' && !drawerId) return alert('الكاشير يجب ربطه بدرج');
+  const id='e'+Date.now();
+  store.employees.push({id, name, role, pin, gameId: role==='operator'? gameId:null, drawerId: role==='cashier'? drawerId:null});
+  // if cashier, link drawer
+  if(role==='cashier' && drawerId){
+    const d=getDrawer(drawerId); if(d) d.cashierId=id;
+  }
+  saveStore(); renderManage(); renderUserSelect(); renderPOS(); renderGate();
+  logAction('إضافة موظف', name+' — '+role);
+  document.getElementById('newEmpName').value=''; document.getElementById('newEmpPin').value='';
+}
+function delEmployee(id){
+  if(id==='admin1') return alert('لا يمكن حذف المدير الأساسي في العرض التجريبي');
+  if(!confirm('حذف الموظف؟')) return;
+  store.employees=store.employees.filter(e=> e.id!==id);
+  // unlink drawers
+  store.drawers.forEach(d=>{ if(d.cashierId===id) d.cashierId=null; });
+  saveStore(); renderManage(); renderUserSelect(); renderGate();
+  logAction('حذف موظف', id);
+}
+function addDrawer(){
+  const name=document.getElementById('newDrawerName').value.trim();
+  if(!name) return alert('اكتب اسم الدرج');
+  store.drawers.push({id:'d'+Date.now(), name, cashierId:null});
+  saveStore(); renderManage(); renderPOS();
+  logAction('إضافة درج', name);
+  document.getElementById('newDrawerName').value='';
+}
+function delDrawer(id){
+  if(store.drawers.length<=1) return alert('يجب أن يبقى درج واحد على الأقل');
+  if(!confirm('حذف الدرج؟')) return;
+  store.drawers=store.drawers.filter(d=> d.id!==id);
+  saveStore(); renderManage(); renderPOS();
+}
+function saveCfg(){
+  store.cfg.expiryHours=Number(document.getElementById('cfgExpiry').value||24);
+  saveStore(); alert('تم الحفظ');
+}
+function resetDemo(){
+  if(!confirm('إعادة ضبط بيانات تجريبية؟ سيتم مسح التذاكر الحالية')) return;
+  localStorage.removeItem(LS_KEY);
+  location.reload();
+}
+function clearAll(){
+  if(!confirm('مسح كل البيانات نهائيًا؟')) return;
+  if(!confirm('تأكيد أخير: سيتم حذف كل التذاكر والسجلات')) return;
+  store.tickets=[]; store.entries=[]; store.logs=[]; store.auditCash={};
+  saveStore(); renderAll(); alert('تم المسح');
+}
+
+// ===== Audit =====
+function renderAudit(){
+  const todayTickets = store.tickets.filter(t=> isToday(t.createdAt));
+  const todayEntries = store.entries.filter(e=> isToday(e.time));
+  document.getElementById('auditDate').textContent = new Date().toLocaleDateString('ar-EG', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+  // by game
+  const byGame={};
+  store.games.forEach(g=> byGame[g.id]={game:g, sold:0, used:0, fraud:0});
+  todayTickets.forEach(t=>{ if(byGame[t.gameId]) byGame[t.gameId].sold++; });
+  todayEntries.forEach(e=>{ if(!byGame[e.gameId]) return; if(e.type==='valid') byGame[e.gameId].used++; else if(e.type==='fraud') byGame[e.gameId].fraud++; });
+  document.getElementById('auditGames').innerHTML = Object.values(byGame).map(row=>{
+    const diff = row.sold - (row.used + row.fraud); // if negative, more entries than sold = theft
+    // Actually fraud already counted as entry without ticket, so used+fraud should <= sold ideally. If > sold => theft.
+    const totalEntries = row.used + row.fraud;
+    const discrepancy = row.sold - totalEntries; // negative = over entry
+    let status='', cls='';
+    if(row.fraud>0) { status='🚨 يوجد دخول بدون تذكرة — راجع الموظف'; cls='badge-red'; }
+    else if(discrepancy<0) { status=`🚨 زيادة ${Math.abs(discrepancy)} دخول عن المباع — سرقة مؤكدة`; cls='badge-red'; }
+    else if(discrepancy>0) { status=`⚠️ ${discrepancy} تذاكر لم تُستخدم بعد (قد تكون الزبون لم يدخل)`; cls='badge-amber'; }
+    else if(row.sold>0) { status='✅ متطابق'; cls='badge-green'; }
+    else { status='— لا حركة'; cls='badge-blue'; }
+    const diffText = discrepancy===0? '0' : (discrepancy>0? `+${discrepancy}`: `${discrepancy}`);
+    return `<tr style="${discrepancy<0||row.fraud>0?'background:#fef2f2':''}"><td style="font-weight:800">${row.game.icon} ${row.game.name}</td><td>${formatMoney(row.game.price)}</td><td style="font-weight:900">${row.sold}</td><td style="font-weight:900; color:#059669">${row.used}</td><td style="font-weight:900; color:#dc2626">${row.fraud}</td><td style="font-weight:900; color:${discrepancy<0?'#dc2626':'#475569'}">${diffText}</td><td><span class="badge ${cls}">${status}</span></td></tr>`
+  }).join('');
+
+  // by drawer
+  const byDrawer={};
+  store.drawers.forEach(d=> byDrawer[d.id]={drawer:d, sold:0, expected:0});
+  todayTickets.forEach(t=>{ if(byDrawer[t.drawerId]){ byDrawer[t.drawerId].sold++; byDrawer[t.drawerId].expected+=Number(t.price||0); }});
+  document.getElementById('auditDrawers').innerHTML = Object.values(byDrawer).map(row=>{
+    const actual = Number(store.auditCash[row.drawer.id]||0);
+    const diff = actual - row.expected; // if counting manually
+    const hasInput = store.auditCash[row.drawer.id]!==undefined && store.auditCash[row.drawer.id]!=='' && store.auditCash[row.drawer.id]!==null;
+    let status='— أدخل الفعلي';
+    let badge='badge-blue';
+    if(hasInput){
+      if(diff===0) { status='✅ متطابق'; badge='badge-green'; }
+      else if(diff<0) { status=`عجز ${formatMoney(Math.abs(diff))}`; badge='badge-red'; }
+      else { status=`زيادة ${formatMoney(diff)}`; badge='badge-amber'; }
+    }
+    return `<tr><td>${row.drawer.name}<br><span class="muted">${getUser(row.drawer.cashierId)?.name||'—'}</span></td><td>${row.sold}</td><td style="font-weight:900">${formatMoney(row.expected)}</td><td><input type="number" class="input" style="width:130px" placeholder="0" value="${hasInput? actual:''}" onchange="setAuditCash('${row.drawer.id}', this.value)"></td><td style="font-weight:900; color:${diff<0?'#dc2626': diff>0?'#d97706':'#059669'}">${hasInput? (diff===0? '0' : (diff>0? '+'+formatMoney(diff): '-'+formatMoney(Math.abs(diff)))) : '—'}</td><td><span class="badge ${badge}">${status}</span></td></tr>`
+  }).join('') || '<tr><td colspan="6" class="muted">لا توجد أدراج</td></tr>';
+
+  // alerts
+  const alerts=[];
+  Object.values(byGame).forEach(r=>{
+    if(r.fraud>0) alerts.push({type:'red', text:`🚨 لعبة <b>${r.game.name}</b>: يوجد <b>${r.fraud}</b> دخول بدون تذكرة — الموظف <b>${store.employees.find(e=> e.gameId===r.game.id)?.name||'—'}</b> يجب مساءلته فورًا.`});
+    const total=r.used+r.fraud;
+    if(total > r.sold) alerts.push({type:'red', text:`🚨 لعبة <b>${r.game.name}</b>: عدد المدخلين (${total}) أكبر من المباع (${r.sold}) — فرق ${total-r.sold} — <b>سرقة مؤكدة أو تواطؤ كاشير+موظف</b>.`});
+    if(r.sold>5 && r.used===0) alerts.push({type:'amber', text:`⚠️ لعبة <b>${r.game.name}</b>: مباع ${r.sold} تذاكر ولم يتم مسح أي منها — تأكد أن موظف اللعبة يمسح فعلاً.`});
+  });
+  Object.values(byDrawer).forEach(r=>{
+    const actual=store.auditCash[r.drawer.id];
+    if(actual!==undefined && actual!=='' && actual!==null){
+      const diff=Number(actual)-r.expected;
+      if(diff<0 && Math.abs(diff)>0) alerts.push({type:'red', text:`💰 درج <b>${r.drawer.name}</b>: عجز <b>${formatMoney(Math.abs(diff))}</b> — الفلوس أقل من السيستم — راجع الكاشير <b>${getUser(r.drawer.cashierId)?.name||'—'}</b>.`});
+      if(diff>0) alerts.push({type:'amber', text:`💰 درج <b>${r.drawer.name}</b>: زيادة <b>${formatMoney(diff)}</b> — قد يكون الكاشير استلم بدون تذكرة أو خطأ عدّ.`});
+    }
+  });
+  if(alerts.length===0) alerts.push({type:'green', text:'✅ لا توجد تنبيهات — كل شيء متطابق حتى الآن. استمر في المراجعة آخر اليوم.'});
+  document.getElementById('auditAlerts').innerHTML = alerts.map(a=> `<div class="alert ${a.type==='red'?'alert-err':a.type==='amber'?'alert-info':'alert-ok'}" style="border-width:1px">${a.text}</div>`).join('');
+}
+function setAuditCash(drawerId, val){
+  if(val==='') delete store.auditCash[drawerId];
+  else store.auditCash[drawerId]=Number(val);
+  saveStore(); renderAudit();
+}
+function exportAuditExcel(){
+  let csv = 'لعبة,سعر,مباع,ممسوح,مخالفات,فرق,حالة\n';
+  document.querySelectorAll('#auditGames tr').forEach(tr=>{
+    const tds=[...tr.querySelectorAll('td')].map(td=> '"'+td.innerText.replace(/"/g,'""')+'"');
+    if(tds.length) csv+=tds.join(',')+'\n';
+  });
+  csv+='\nدرج,تذاكر,متوقع,فعلي,فرق,حالة\n';
+  document.querySelectorAll('#auditDrawers tr').forEach(tr=>{
+    const tds=[...tr.querySelectorAll('td')].map(td=> '"'+td.innerText.replace(/"/g,'""')+'"');
+    if(tds.length) csv+=tds.join(',')+'\n';
+  });
+  const blob=new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='مطابقة-يومية-'+new Date().toISOString().slice(0,10)+'.csv'; a.click(); URL.revokeObjectURL(url);
+}
+
+// ===== Logs =====
+function renderLogs(){
+  const q=(document.getElementById('logSearch').value||'').toLowerCase();
+  let list=[...store.logs];
+  if(q) list=list.filter(l=> (l.action+l.details+ (getUser(l.userId)?.name||'')).toLowerCase().includes(q));
+  document.getElementById('logCount').textContent=`${list.length} سجل`;
+  document.getElementById('logTable').innerHTML = list.slice(0,200).map(l=> `<tr><td>${formatTime(l.time)}</td><td>${getUser(l.userId)?.name||l.userId}</td><td style="font-weight:800">${l.action}</td><td>${l.details}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">لا يوجد سجل</td></tr>';
+}
+function exportLogsCSV(){
+  let csv='وقت,مستخدم,عملية,تفاصيل\n';
+  store.logs.forEach(l=> csv+=`"${formatTime(l.time)}","${getUser(l.userId)?.name||''}","${l.action}","${l.details.replace(/"/g,'""')}"\n`);
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='سجل-العمليات.csv'; a.click(); URL.revokeObjectURL(url);
+}
+function downloadTicketsCSV(){
+  let csv='كود,لعبة,سعر,درج,كاشير,وقت,حالة\n';
+  store.tickets.forEach(t=> csv+=`"${t.code}","${getGame(t.gameId)?.name||''}",${t.price},"${getDrawer(t.drawerId)?.name||''}","${getUser(t.cashierId)?.name||''}","${formatTime(t.createdAt)}","${t.status}"\n`);
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='تذاكر-اليوم.csv'; a.click(); URL.revokeObjectURL(url);
+}
+
+// ===== Helpers =====
+function openHelp(){ document.getElementById('helpModal').classList.add('open'); }
+function closeHelp(){ document.getElementById('helpModal').classList.remove('open'); }
+function closeModal(){ document.getElementById('genericModal').classList.remove('open'); }
+function renderAll(){ renderUserSelect(); renderDashboard(); renderPOS(); renderPOSTable(); renderGate(); renderManage(); renderAudit(); renderLogs(); }
+
+// init
+renderUserSelect(); renderTabs(); switchView('dashboard'); renderAll();
+updatePosPrice();
+
+// auto expire check every minute
+setInterval(()=>{ const h=Number(store.cfg.expiryHours||24); let changed=false; store.tickets.forEach(t=>{ if(t.status==='valid' && (Date.now()-new Date(t.createdAt).getTime())/3600000 > h){ t.status='expired'; changed=true; }}); if(changed){ saveStore(); renderPOSTable(); renderDashboard(); } }, 60000);
+
+// demo data if empty
+if(store.tickets.length===0){
+  // create 12 demo tickets
+  const demoDrawers=store.drawers;
+  for(let i=0;i<12;i++){
+    const g=store.games[i%store.games.length];
+    const d=demoDrawers[i% demoDrawers.length];
+    const code=genCode();
+    const isUsed = Math.random()>.4;
+    store.tickets.push({code, gameId:g.id, price:g.price, cashierId:d.cashierId, drawerId:d.id, payMethod:'cash', createdAt:new Date(Date.now()-Math.random()*6*3600000).toISOString(), status:isUsed?'used':'valid', usedAt:isUsed?new Date().toISOString():null, usedBy:isUsed? store.employees.find(e=> e.gameId===g.id)?.id:null});
+    if(isUsed){
+      const emp=store.employees.find(e=> e.gameId===g.id);
+      if(emp) store.entries.push({id:uid('e'), code, gameId:g.id, employeeId:emp.id, time:new Date().toISOString(), type:'valid', cashierId:d.cashierId});
+    }
+  }
+  // add 2 fraud entries
+  const op=store.employees.find(e=> e.role==='operator');
+  if(op) store.entries.push({id:uid('f'), code:null, gameId:op.gameId, employeeId:op.id, time:new Date().toISOString(), type:'fraud', cashierId:null});
+  saveStore(); renderAll();
+}
+</script>
+</body>
+</html>

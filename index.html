@@ -67,10 +67,7 @@
         <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
         تصدير
       </button>
-      <button onclick="exportToCSV()" class="sbtn b-green" id="btnExportCsv">
-        <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        CSV
-      </button>
+
     </div>
     <div class="btn-grid">
       <label class="sbtn b-blue" id="btnUpload">
@@ -96,10 +93,7 @@
         <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
         التقارير
       </button>
-      <button onclick="prepareAndPrint()" class="sbtn b-slate" id="btnPrint" title="طباعة تقرير الجرد">
-        <svg class="ic" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        طباعة
-      </button>
+
     </div>
     <button onclick="openSettings()" class="sbtn b-dark" id="settingsBtn">
       <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a2 2 0 1 1-2.83-2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -153,7 +147,7 @@
     <div class="card mini"><span class="t">أصناف غير مُجردة</span><span id="cardNotJarded" class="v c-amber">0</span></div>
     <div class="card mini"><span class="t">أصناف زيادة</span><span id="cardSurplus" class="v c-green">0</span></div>
     <div class="card mini"><span class="t">أصناف عجز</span><span id="cardDeficit" class="v c-red">0</span></div>
-    <div class="card mini"><span class="t">عدد القطع المُجردة<small>تشمل جميع المستخدمين</small></span><span id="cardPieces" class="v c-purple">0</span></div>
+    <div class="card mini"><span class="t">عدد القطع المُجردة</span><span id="cardPieces" class="v c-purple">0</span></div>
   </div>
 
   <div class="filter-toolbar no-print">

@@ -796,7 +796,7 @@ function applyUserUI(){
   const adm = isAdmin();
   const elev = isElevated();
   if (sb) sb.style.display = adm ? '' : 'none';
-  ['btnExport', 'btnExportCsv', 'btnPrint', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnReports'].forEach(id => {
+  ['btnExport', 'btnUpload', 'btnImport', 'btnClearAll', 'btnClearSel', 'btnReports'].forEach(id => {
     const b = $(id); if (b) b.style.display = elev ? '' : 'none';
  });
 
@@ -823,15 +823,15 @@ function applyUserUI(){
 }
 
 function saveAuth(name){
-  try { if (name) localStorage.setItem('jardAuthUser', name); } catch (e) {}
+  try { if (name) sessionStorage.setItem('jardAuthUser', name); } catch (e) {}
 }
 function clearAuth(){
-  try { localStorage.removeItem('jardAuthUser'); } catch (e) {}
+  try { sessionStorage.removeItem('jardAuthUser'); } catch (e) {}
 }
 function restoreSession(){
   return (async () => {
     let name = '';
-    try { name = localStorage.getItem('jardAuthUser') || ''; } catch (e) { return false; }
+    try { name = sessionStorage.getItem('jardAuthUser') || ''; } catch (e) { return false; }
     if (!name) return false;
     const user = usersList.find(u => u && u.name === name);
     if (!user || user.active === false) { clearAuth(); return false; }
@@ -860,7 +860,7 @@ function logoutUser(){
 }
 
 let idleTimer = null;
-const IDLE_LIMIT = 30 * 60 * 1000;
+const IDLE_LIMIT = 60 * 60 * 1000;
 function resetIdleTimer(){
   if (idleTimer) clearTimeout(idleTimer);
   if (!sessionUser) return;
@@ -877,7 +877,7 @@ function autoLogout(){
   try { stopCameraScanner(); } catch (e) {}
   document.querySelectorAll('.modal-overlay, .big-block-ov, .lock-overlay').forEach(x => x.remove());
   applyUserUI();
-  toast('⏱️ تم تسجيل الخروج تلقائيًا بعد 30 دقيقة خمول', 'warning');
+  toast('⏱️ تم تسجيل الخروج تلقائيًا بعد 60 دقيقة من غير استخدام', 'warning');
   showLock();
 }
 function setupIdleWatch(){

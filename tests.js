@@ -555,6 +555,7 @@ console.log('== استرجاع الجلسة المحفوظة بعد تحديث �
       'const auth = new Map();',
       `if (${JSON.stringify(saved)} !== null) auth.set('jardAuthUser', ${JSON.stringify(saved)});`,
       "var localStorage = { getItem:k=>auth.has(k)?auth.get(k):null, setItem:(k,v)=>auth.set(k,String(v)), removeItem:k=>auth.delete(k) };",
+      "var sessionStorage = { getItem:k=>auth.has(k)?auth.get(k):null, setItem:(k,v)=>auth.set(k,String(v)), removeItem:k=>auth.delete(k) };",
       `var usersList = ${JSON.stringify(users)};`,
       'var sessionUser = null;',
       'var claimCalls = [];',
@@ -596,7 +597,7 @@ console.log('== استرجاع الجلسة المحفوظة بعد تحديث �
     eq(await t.restoreSession(), false, 'خطأ الشبكة مايفتحش جلسة محلية');
     eq(t.auth.get('jardAuthUser'), 'سارة', 'خطأ الشبكة يحتفظ بالاسم المحفوظ');
     t.saveAuth('محمود');
-    eq(t.auth.get('jardAuthUser'), 'محمود', 'saveAuth تحفظ الاسم في localStorage');
+    eq(t.auth.get('jardAuthUser'), 'محمود', 'saveAuth تحفظ الاسم في sessionStorage (يمسح عند إغلاق المتصفح)');
     t.clearAuth();
     eq(t.auth.has('jardAuthUser'), false, 'clearAuth تمسح الاسم المحفوظ');
   })());
@@ -675,7 +676,7 @@ console.log('== كروت الإحصاء الخمسة في الصفحة ==');
   });
   eq(cardsRow.indexOf('cardSurplus') < cardsRow.indexOf('cardDeficit'), true, 'أصناف زيادة قبل أصناف عجز');
   eq(/أصناف غير مُجردة/.test(cardsRow), true, 'مُسمّى الكرت التاني: أصناف غير مُجردة');
-  eq(/عدد القطع المُجردة<small>تشمل جميع المستخدمين<\/small>/.test(cardsRow), true, 'كرت عدد القطع فيه ملاحظة «تشمل جميع المستخدمين»');
+  eq(!/تشمل جميع المستخدمين/.test(cardsRow), true, 'ملاحظة «تشمل جميع المستخدمين» شلت نهائياً من كرت عدد القطع');
   eq(/\.scan-code\{[^}]*color:#dc2626/.test(css), true, 'كلاس scan-code لونه أحمر في style.css');
   eq(/\.c-purple\{ color:#7c3aed; \}/.test(css), true, 'لون كرت القطع (بنفسجي) معرّف');
   eq(/\.statcards\.grid-5\{ grid-template-columns:repeat\(3,1fr\)/.test(css), true, 'على الشاشات المتوسطة الكروت بتبقى 3 في السطر');
